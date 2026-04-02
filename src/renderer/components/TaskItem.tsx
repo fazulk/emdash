@@ -3,7 +3,7 @@ import {
   ArrowUpRight,
   AlertCircle,
   Archive,
-  GitBranch,
+  FolderGit2,
   Pencil,
   Pin,
   PinOff,
@@ -338,7 +338,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             title="Worktree task"
             className="inline-flex items-center text-muted-foreground"
           >
-            <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <FolderGit2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           </span>
         )}
         {rightBadge}

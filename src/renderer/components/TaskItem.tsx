@@ -1,5 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowUpRight, AlertCircle, Archive, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import {
+  ArrowUpRight,
+  AlertCircle,
+  Archive,
+  GitBranch,
+  Pencil,
+  Pin,
+  PinOff,
+  Trash2,
+} from 'lucide-react';
 import { useTaskChanges } from '../hooks/useTaskChanges';
 import { ChangesBadge } from './TaskChanges';
 import { usePrStatus } from '../hooks/usePrStatus';
@@ -155,6 +164,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
   const hasChanges = !isLoading && (totalAdditions > 0 || totalDeletions > 0);
   const compact = formatCompactDate(task.updatedAt);
+  const showWorktreeIndicator = task.useWorktree === true;
 
   // Right side: PR badge only, OR changes + date, OR just date
   const rightBadge = pr ? (
@@ -298,7 +308,18 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           </span>
         )}
       </div>
-      <div className="flex flex-shrink-0 items-center">{rightBadge}</div>
+      <div className="flex flex-shrink-0 items-center gap-1.5">
+        {showWorktreeIndicator && (
+          <span
+            aria-label="Worktree task"
+            title="Worktree task"
+            className="inline-flex items-center text-muted-foreground"
+          >
+            <GitBranch className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          </span>
+        )}
+        {rightBadge}
+      </div>
     </div>
   );
 

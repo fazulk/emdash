@@ -26,6 +26,7 @@ export interface KeyboardSettings {
   nextProject?: KeyboardShortcutBinding;
   prevProject?: KeyboardShortcutBinding;
   newTask?: KeyboardShortcutBinding;
+  newAgent?: KeyboardShortcutBinding;
   nextAgent?: KeyboardShortcutBinding;
   prevAgent?: KeyboardShortcutBinding;
   openInEditor?: KeyboardShortcutBinding;
@@ -88,6 +89,7 @@ export interface GlobalShortcutHandlers {
 
   // Task creation
   onNewTask?: () => void;
+  onNewAgent?: () => void;
 
   // Agent switching (within same task)
   onNextAgent?: () => void;

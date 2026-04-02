@@ -60,6 +60,7 @@ export interface KeyboardSettings {
   nextProject?: KeyboardShortcutBinding;
   prevProject?: KeyboardShortcutBinding;
   newTask?: KeyboardShortcutBinding;
+  newAgent?: KeyboardShortcutBinding;
   nextAgent?: KeyboardShortcutBinding;
   prevAgent?: KeyboardShortcutBinding;
   openInEditor?: KeyboardShortcutBinding;
@@ -190,12 +191,13 @@ const DEFAULT_SETTINGS: AppSettings = {
     settings: { key: ',', modifier: 'cmd' },
     toggleLeftSidebar: { key: 'b', modifier: 'cmd' },
     toggleRightSidebar: { key: '.', modifier: 'cmd' },
-    toggleTheme: { key: 't', modifier: 'cmd' },
+    toggleTheme: { key: 't', modifier: 'cmd+shift' },
     toggleKanban: { key: 'p', modifier: 'cmd' },
     toggleEditor: { key: 'e', modifier: 'cmd' },
     nextProject: TASK_SWITCH_DEFAULTS.next,
     prevProject: TASK_SWITCH_DEFAULTS.prev,
-    newTask: { key: 'n', modifier: 'cmd' },
+    newTask: { key: 't', modifier: 'cmd' },
+    newAgent: { key: 'n', modifier: 'cmd' },
     nextAgent: { key: ']', modifier: 'cmd+shift' },
     prevAgent: { key: '[', modifier: 'cmd+shift' },
     openInEditor: { key: 'o', modifier: 'cmd' },
@@ -520,10 +522,21 @@ export function normalizeSettings(input: AppSettings): AppSettings {
     nextProject: normalizeBinding(keyboard.nextProject, DEFAULT_SETTINGS.keyboard!.nextProject!),
     prevProject: normalizeBinding(keyboard.prevProject, DEFAULT_SETTINGS.keyboard!.prevProject!),
     newTask: normalizeBinding(keyboard.newTask, DEFAULT_SETTINGS.keyboard!.newTask!),
+    newAgent: normalizeBinding(keyboard.newAgent, DEFAULT_SETTINGS.keyboard!.newAgent!),
     nextAgent: normalizeBinding(keyboard.nextAgent, DEFAULT_SETTINGS.keyboard!.nextAgent!),
     prevAgent: normalizeBinding(keyboard.prevAgent, DEFAULT_SETTINGS.keyboard!.prevAgent!),
     openInEditor: normalizeBinding(keyboard.openInEditor, DEFAULT_SETTINGS.keyboard!.openInEditor!),
   };
+  const hasLegacyThemeShortcut = isBinding(out.keyboard.toggleTheme!, 'cmd', 't');
+  const hasLegacyNewTaskShortcut = isBinding(out.keyboard.newTask!, 'cmd', 'n');
+  const hasNewTaskOnCommandT = isBinding(out.keyboard.newTask!, 'cmd', 't');
+  if (hasLegacyThemeShortcut && (hasLegacyNewTaskShortcut || hasNewTaskOnCommandT)) {
+    out.keyboard.toggleTheme = DEFAULT_SETTINGS.keyboard!.toggleTheme!;
+    if (hasLegacyNewTaskShortcut) {
+      out.keyboard.newTask = DEFAULT_SETTINGS.keyboard!.newTask!;
+      out.keyboard.newAgent = DEFAULT_SETTINGS.keyboard!.newAgent!;
+    }
+  }
   const platformTaskDefaults = getPlatformTaskSwitchDefaults();
   const isLegacyArrowPair =
     isBinding(out.keyboard.nextProject!, 'cmd', 'ArrowRight') &&

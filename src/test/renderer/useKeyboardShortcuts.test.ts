@@ -1,5 +1,19 @@
-import { describe, expect, it } from 'vitest';
-import { getAgentTabSelectionIndex } from '../../renderer/hooks/useKeyboardShortcuts';
+// @vitest-environment jsdom
+
+import React from 'react';
+import { fireEvent, render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  APP_SHORTCUTS,
+  getAgentTabSelectionIndex,
+  useKeyboardShortcuts,
+} from '../../renderer/hooks/useKeyboardShortcuts';
+import type { GlobalShortcutHandlers } from '../../renderer/types/shortcuts';
+
+function ShortcutHarness({ handlers }: { handlers: GlobalShortcutHandlers }) {
+  useKeyboardShortcuts(handlers);
+  return null;
+}
 
 describe('getAgentTabSelectionIndex', () => {
   it('maps Cmd/Ctrl+1 through Cmd/Ctrl+9 to zero-based tab indexes', () => {
@@ -79,5 +93,25 @@ describe('getAgentTabSelectionIndex', () => {
         shiftKey: false,
       } as KeyboardEvent)
     ).toBeNull();
+  });
+});
+
+describe('new task shortcut defaults', () => {
+  it('uses Cmd/Ctrl+T for new task and Cmd/Ctrl+N for new agent', () => {
+    expect(APP_SHORTCUTS.NEW_TASK.key).toBe('t');
+    expect(APP_SHORTCUTS.NEW_TASK.modifier).toBe('cmd');
+    expect(APP_SHORTCUTS.NEW_AGENT.key).toBe('n');
+    expect(APP_SHORTCUTS.NEW_AGENT.modifier).toBe('cmd');
+  });
+
+  it('triggers the new-task handler on Ctrl+T and not on Ctrl+N', () => {
+    const onNewTask = vi.fn();
+
+    render(React.createElement(ShortcutHarness, { handlers: { onNewTask } }));
+
+    fireEvent.keyDown(window, { key: 't', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
+
+    expect(onNewTask).toHaveBeenCalledTimes(1);
   });
 });

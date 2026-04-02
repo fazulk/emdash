@@ -218,6 +218,35 @@ describe('normalizeSettings - keyboard shortcuts', () => {
     expect(result.keyboard?.commandPalette).toEqual({ key: 'k', modifier: 'cmd' });
     expect(result.keyboard?.openInEditor).toEqual({ key: 'i', modifier: 'cmd' });
   });
+
+  it('migrates the legacy Cmd+T theme shortcut when it conflicts with the new-task shortcut', () => {
+    const result = normalizeSettings(
+      makeSettings({
+        keyboard: {
+          toggleTheme: { key: 't', modifier: 'cmd' },
+        },
+      })
+    );
+
+    expect(result.keyboard?.toggleTheme).toEqual({ key: 't', modifier: 'cmd+shift' });
+    expect(result.keyboard?.newTask).toEqual({ key: 't', modifier: 'cmd' });
+  });
+
+  it('migrates the old Cmd+N new-task shortcut to Cmd+T and reserves Cmd+N for new agent', () => {
+    const result = normalizeSettings(
+      makeSettings({
+        keyboard: {
+          toggleTheme: { key: 't', modifier: 'cmd' },
+          newTask: { key: 'n', modifier: 'cmd' },
+          newAgent: { key: 'n', modifier: 'cmd' },
+        },
+      })
+    );
+
+    expect(result.keyboard?.toggleTheme).toEqual({ key: 't', modifier: 'cmd+shift' });
+    expect(result.keyboard?.newTask).toEqual({ key: 't', modifier: 'cmd' });
+    expect(result.keyboard?.newAgent).toEqual({ key: 'n', modifier: 'cmd' });
+  });
 });
 
 describe('normalizeSettings - review preset', () => {

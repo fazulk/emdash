@@ -28,6 +28,8 @@ import { formatCommentsForAgent } from '@/lib/formatCommentsForAgent';
 import { buildPromptInjectionPayload } from '@/lib/terminalInjection';
 import { TaskScopeProvider } from './TaskScopeContext';
 import TaskContextBadges from './TaskContextBadges';
+import { getTerminalFooterSummary } from '@/lib/terminalFooter';
+import TerminalContextFooter from './TerminalContextFooter';
 
 interface Props {
   task: Task;
@@ -69,6 +71,7 @@ const MultiAgentTask: React.FC<Props> = ({
 
   const activeVariantPath = variants[activeTabIndex]?.path ?? task.path;
   useCommentInjection(task.id, activeVariantPath);
+  const activeVariant = variants[activeTabIndex] ?? null;
 
   const variantEnvs = useMemo(() => {
     if (!projectPath) return new Map<string, Record<string, string>>();
@@ -89,6 +92,22 @@ const MultiAgentTask: React.FC<Props> = ({
     }
     return envMap;
   }, [variants, task.id, task.name, projectPath, defaultBranch]);
+
+  const activeVariantFooter = useMemo(
+    () =>
+      activeVariant
+        ? getTerminalFooterSummary({
+            mode: 'task',
+            task: {
+              branch: activeVariant.branch,
+              path: activeVariant.path,
+              useWorktree: true,
+            },
+            projectPath,
+          })
+        : { branch: null, worktreeName: null },
+    [activeVariant, projectPath]
+  );
 
   // Auto-scroll to bottom when this task becomes active
   const { scrollToBottom } = useAutoScrollOnTaskSwitch(true, task.id);
@@ -636,82 +655,91 @@ const MultiAgentTask: React.FC<Props> = ({
                   className="min-h-0 flex-1 px-6 pt-4"
                   onWheelCapture={handleTerminalViewportWheelForwarding}
                 >
-                  <div
-                    className={`mx-auto h-full max-w-4xl overflow-hidden rounded-md ${
-                      v.agent === 'mistral'
-                        ? isDark
-                          ? 'bg-[#202938]'
-                          : 'bg-white'
-                        : isDark
-                          ? 'bg-card'
-                          : 'bg-white'
-                    }`}
-                  >
-                    <TerminalPane
-                      ref={isActive ? activeTerminalRef : undefined}
-                      id={`${v.worktreeId}-main`}
-                      cwd={v.path}
-                      remote={
-                        effectiveConnectionId ? { connectionId: effectiveConnectionId } : undefined
-                      }
-                      providerId={v.agent}
-                      env={variantEnvs.get(v.worktreeId || v.path)}
-                      autoApprove={
-                        (Boolean(task.metadata?.autoApprove) ||
-                          Boolean(multiAgentSettings?.tasks?.autoApproveByDefault)) &&
-                        Boolean(agentMeta[v.agent]?.autoApproveFlag)
-                      }
-                      initialPrompt={
-                        agentMeta[v.agent]?.initialPromptFlag !== undefined &&
-                        !agentMeta[v.agent]?.useKeystrokeInjection &&
-                        !task.metadata?.initialInjectionSent
-                          ? (initialInjection ?? undefined)
-                          : undefined
-                      }
-                      keepAlive
-                      mapShiftEnterToCtrlJ
-                      variant={isDark ? 'dark' : 'light'}
-                      themeOverride={
+                  <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden">
+                    <div
+                      className={`min-h-0 flex-1 overflow-hidden rounded-md ${
                         v.agent === 'mistral'
-                          ? {
-                              background:
-                                effectiveTheme === 'dark-black'
-                                  ? '#141820'
-                                  : isDark
-                                    ? '#202938'
-                                    : '#ffffff',
-                              selectionBackground: 'rgba(96, 165, 250, 0.35)',
-                              selectionForeground: isDark ? '#f9fafb' : '#0f172a',
-                            }
-                          : effectiveTheme === 'dark-black'
-                            ? {
-                                background: '#000000',
-                                selectionBackground: 'rgba(96, 165, 250, 0.35)',
-                                selectionForeground: '#f9fafb',
-                              }
+                          ? isDark
+                            ? 'bg-[#202938]'
+                            : 'bg-white'
+                          : isDark
+                            ? 'bg-card'
+                            : 'bg-white'
+                      }`}
+                    >
+                      <TerminalPane
+                        ref={isActive ? activeTerminalRef : undefined}
+                        id={`${v.worktreeId}-main`}
+                        cwd={v.path}
+                        remote={
+                          effectiveConnectionId ? { connectionId: effectiveConnectionId } : undefined
+                        }
+                        providerId={v.agent}
+                        env={variantEnvs.get(v.worktreeId || v.path)}
+                        autoApprove={
+                          (Boolean(task.metadata?.autoApprove) ||
+                            Boolean(multiAgentSettings?.tasks?.autoApproveByDefault)) &&
+                          Boolean(agentMeta[v.agent]?.autoApproveFlag)
+                        }
+                        initialPrompt={
+                          agentMeta[v.agent]?.initialPromptFlag !== undefined &&
+                          !agentMeta[v.agent]?.useKeystrokeInjection &&
+                          !task.metadata?.initialInjectionSent
+                            ? (initialInjection ?? undefined)
                             : undefined
-                      }
-                      className="h-full w-full"
-                      onStartSuccess={() => {
-                        if (
-                          initialInjection &&
-                          !task.metadata?.initialInjectionSent &&
-                          (agentMeta[v.agent]?.initialPromptFlag === undefined ||
-                            agentMeta[v.agent]?.useKeystrokeInjection)
-                        ) {
-                          void injectPrompt(`${v.worktreeId}-main`, v.agent, initialInjection);
                         }
-                        if (initialInjection && !task.metadata?.initialInjectionSent) {
-                          void rpc.db.saveTask({
-                            ...task,
-                            metadata: {
-                              ...task.metadata,
-                              initialInjectionSent: true,
-                            },
-                          });
+                        keepAlive
+                        mapShiftEnterToCtrlJ
+                        variant={isDark ? 'dark' : 'light'}
+                        themeOverride={
+                          v.agent === 'mistral'
+                            ? {
+                                background:
+                                  effectiveTheme === 'dark-black'
+                                    ? '#141820'
+                                    : isDark
+                                      ? '#202938'
+                                      : '#ffffff',
+                                selectionBackground: 'rgba(96, 165, 250, 0.35)',
+                                selectionForeground: isDark ? '#f9fafb' : '#0f172a',
+                              }
+                            : effectiveTheme === 'dark-black'
+                              ? {
+                                  background: '#000000',
+                                  selectionBackground: 'rgba(96, 165, 250, 0.35)',
+                                  selectionForeground: '#f9fafb',
+                                }
+                              : undefined
                         }
-                      }}
-                    />
+                        className="h-full w-full"
+                        onStartSuccess={() => {
+                          if (
+                            initialInjection &&
+                            !task.metadata?.initialInjectionSent &&
+                            (agentMeta[v.agent]?.initialPromptFlag === undefined ||
+                              agentMeta[v.agent]?.useKeystrokeInjection)
+                          ) {
+                            void injectPrompt(`${v.worktreeId}-main`, v.agent, initialInjection);
+                          }
+                          if (initialInjection && !task.metadata?.initialInjectionSent) {
+                            void rpc.db.saveTask({
+                              ...task,
+                              metadata: {
+                                ...task.metadata,
+                                initialInjectionSent: true,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                    </div>
+                    {isActive ? (
+                      <TerminalContextFooter
+                        branch={activeVariantFooter.branch}
+                        worktreeName={activeVariantFooter.worktreeName}
+                        className="mt-2"
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>

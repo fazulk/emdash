@@ -254,6 +254,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     pr ? safeTaskPath : undefined,
     pr?.number
   );
+  const [branchName, setBranchName] = useState<string | null>(null);
   const [branchAhead, setBranchAhead] = useState<number | null>(null);
   const [branchStatusLoading, setBranchStatusLoading] = useState<boolean>(false);
 
@@ -265,6 +266,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     setRevertingFiles(new Set());
     setRestoreTarget(null);
     setIsStagingAll(false);
+    setBranchName(null);
   }, [resolvedTaskPath]);
 
   // Default to checks when PR exists but no changes; reset when PR disappears
@@ -291,11 +293,15 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
           taskId: resolvedTaskId,
         });
         if (!cancelled) {
+          setBranchName(res?.success ? (res?.branch ?? null) : null);
           setBranchAhead(res?.success ? (res?.ahead ?? 0) : 0);
         }
       } catch {
         // Network or IPC error - default to 0
-        if (!cancelled) setBranchAhead(0);
+        if (!cancelled) {
+          setBranchName(null);
+          setBranchAhead(0);
+        }
       } finally {
         if (!cancelled) setBranchStatusLoading(false);
       }
@@ -440,9 +446,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             taskId: resolvedTaskId,
           });
           if (taskPathRef.current !== taskPathAtCommit) return;
+          setBranchName(bs?.success ? (bs?.branch ?? null) : null);
           setBranchAhead(bs?.success ? (bs?.ahead ?? 0) : 0);
         } catch {
-          if (taskPathRef.current === taskPathAtCommit) setBranchAhead(0);
+          if (taskPathRef.current === taskPathAtCommit) {
+            setBranchName(null);
+            setBranchAhead(0);
+          }
         } finally {
           if (taskPathRef.current === taskPathAtCommit) setBranchStatusLoading(false);
         }
@@ -665,6 +675,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     -{formatDiffCount(totalChanges.deletions)}
                   </span>
                 </div>
+                {branchName && (
+                  <span
+                    className="max-w-[180px] shrink-0 truncate rounded bg-muted-foreground/10 px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground"
+                    title={branchName}
+                  >
+                    {branchName}
+                  </span>
+                )}
                 {hasStagedChanges && (
                   <span className="shrink-0 rounded bg-muted-foreground/10 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                     {stagedCount} staged

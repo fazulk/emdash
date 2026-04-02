@@ -153,6 +153,15 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     [handleConfirmEdit, handleCancelEdit]
   );
 
+  const handleTitleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isEditing) return;
+      handleStartEdit();
+    },
+    [handleStartEdit, isEditing]
+  );
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       requestAnimationFrame(() => {
@@ -161,6 +170,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       });
     }
   }, [isEditing]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(blurGuardTimerRef.current);
+    },
+    []
+  );
 
   const hasChanges = !isLoading && (totalAdditions > 0 || totalDeletions > 0);
   const compact = formatCompactDate(task.updatedAt);
@@ -266,6 +282,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           <input
             ref={inputRef}
             type="text"
+            aria-label={`Rename task ${task.name}`}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -295,7 +312,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 }}
               />
             )}
-            <span className="block truncate text-sm font-medium text-foreground">{task.name}</span>
+            <span
+              className="block min-w-0 flex-1 truncate text-sm font-medium text-foreground"
+              onDoubleClick={handleTitleDoubleClick}
+              title={onRename ? 'Double-click to rename' : undefined}
+            >
+              {task.name}
+            </span>
           </>
         )}
         {showDirectBadge && task.useWorktree === false && (

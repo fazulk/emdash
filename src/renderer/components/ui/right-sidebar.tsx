@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/constants/layout';
 
 interface RightSidebarContextValue {
   collapsed: boolean;
@@ -17,15 +18,45 @@ export function RightSidebarProvider({
   children,
   defaultCollapsed = false,
 }: RightSidebarProviderProps) {
-  const [collapsed, setCollapsedState] = React.useState<boolean>(defaultCollapsed);
+  const storageKey = RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY;
+  const persistCollapsed = React.useCallback(
+    (next: boolean) => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.setItem(storageKey, next ? 'true' : 'false');
+      } catch {
+        // ignore persistence errors
+      }
+    },
+    [storageKey]
+  );
 
-  const setCollapsed = React.useCallback((next: boolean) => {
-    setCollapsedState(next);
-  }, []);
+  const [collapsed, setCollapsedState] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return defaultCollapsed;
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (stored === null) return defaultCollapsed;
+      return stored === 'true';
+    } catch {
+      return defaultCollapsed;
+    }
+  });
+
+  const setCollapsed = React.useCallback(
+    (next: boolean) => {
+      persistCollapsed(next);
+      setCollapsedState(next);
+    },
+    [persistCollapsed]
+  );
 
   const toggle = React.useCallback(() => {
-    setCollapsedState((prev) => !prev);
-  }, []);
+    setCollapsedState((prev) => {
+      const next = !prev;
+      persistCollapsed(next);
+      return next;
+    });
+  }, [persistCollapsed]);
 
   const value = React.useMemo<RightSidebarContextValue>(
     () => ({ collapsed, toggle, setCollapsed }),

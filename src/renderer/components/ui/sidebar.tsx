@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cn } from '@/lib/utils';
+import { LEFT_SIDEBAR_OPEN_STORAGE_KEY } from '@/constants/layout';
 
 interface SidebarContextValue {
   open: boolean;
@@ -42,7 +43,18 @@ interface SidebarProviderProps {
 
 export function SidebarProvider({ defaultOpen = true, children }: SidebarProviderProps) {
   const isMobile = useMediaQuery('(max-width: 1024px)');
-  const storageKey = 'emdash.sidebarOpen';
+  const storageKey = LEFT_SIDEBAR_OPEN_STORAGE_KEY;
+  const persistDesktopOpen = React.useCallback(
+    (next: boolean) => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.setItem(storageKey, next ? 'true' : 'false');
+      } catch {
+        // ignore persistence errors
+      }
+    },
+    [storageKey]
+  );
 
   const [desktopOpen, setDesktopOpen] = React.useState<boolean>(() => {
     if (typeof window === 'undefined') return defaultOpen;
@@ -62,24 +74,16 @@ export function SidebarProvider({ defaultOpen = true, children }: SidebarProvide
     }
   }, [isMobile]);
 
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(storageKey, desktopOpen ? 'true' : 'false');
-    } catch {
-      // ignore persistence errors
-    }
-  }, [desktopOpen, storageKey]);
-
   const setOpen = React.useCallback(
     (next: boolean) => {
       if (isMobile) {
         setMobileOpen(next);
         return;
       }
+      persistDesktopOpen(next);
       setDesktopOpen(next);
     },
-    [isMobile]
+    [isMobile, persistDesktopOpen]
   );
 
   const toggle = React.useCallback(() => {
@@ -87,8 +91,12 @@ export function SidebarProvider({ defaultOpen = true, children }: SidebarProvide
       setMobileOpen((prev) => !prev);
       return;
     }
-    setDesktopOpen((prev) => !prev);
-  }, [isMobile]);
+    setDesktopOpen((prev) => {
+      const next = !prev;
+      persistDesktopOpen(next);
+      return next;
+    });
+  }, [isMobile, persistDesktopOpen]);
 
   const open = isMobile ? mobileOpen : desktopOpen;
 

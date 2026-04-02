@@ -449,7 +449,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
               taskPath: safeTaskPath,
               taskId: resolvedTaskId,
               commitMessage: trimmedMessage,
-              createBranchIfOnDefault: true,
+              createBranchIfOnDefault: false,
             })
           : await window.electronAPI.gitCommit({
               taskPath: safeTaskPath,

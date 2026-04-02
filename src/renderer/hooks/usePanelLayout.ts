@@ -87,9 +87,19 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
     initialPanelState.rightSidebarInitiallyCollapsed
   );
   const [autoRightSidebarBehavior, setAutoRightSidebarBehavior] = useState<boolean>(false);
+  const [initialPanelStateApplied, setInitialPanelStateApplied] = useState(false);
+  const [leftSidebarContextReady, setLeftSidebarContextReady] = useState(false);
 
   const handlePanelLayout = useCallback((sizes: number[]) => {
     if (!Array.isArray(sizes) || sizes.length < 3) {
+      return;
+    }
+
+    // Ignore startup layout events until the persisted sidebar state has been
+    // reapplied. react-resizable-panels can emit an initial layout before the
+    // refs and sidebar context are fully synchronized, which would otherwise
+    // overwrite the saved left sidebar state on reload.
+    if (!initialPanelStateApplied) {
       return;
     }
 
@@ -108,10 +118,8 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
       } else {
         leftSidebarSetOpenRef.current?.(true);
         leftSidebarOpenRef.current = true;
-        if (!rightCollapsed) {
-          storedLeft = clampLeftSidebarSize(leftSize);
-          lastLeftSidebarSizeRef.current = storedLeft;
-        }
+        storedLeft = clampLeftSidebarSize(leftSize);
+        lastLeftSidebarSizeRef.current = storedLeft;
       }
     }
 
@@ -128,7 +136,7 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
 
     const middle = Math.max(0, 100 - storedLeft - storedRight);
     savePanelSizes(PANEL_LAYOUT_STORAGE_KEY, [storedLeft, middle, storedRight]);
-  }, []);
+  }, [initialPanelStateApplied]);
 
   const handleSidebarContextChange = useCallback(
     ({
@@ -143,6 +151,9 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
       leftSidebarSetOpenRef.current = setOpen;
       leftSidebarIsMobileRef.current = isMobile;
       leftSidebarOpenRef.current = open;
+      if (!leftSidebarContextReady) {
+        setLeftSidebarContextReady(true);
+      }
       const panel = leftSidebarPanelRef.current;
       if (!panel) {
         return;
@@ -177,46 +188,51 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
         panel.collapse();
       }
     },
-    [showEditorMode]
+    [leftSidebarContextReady, showEditorMode]
   );
 
   const handleRightSidebarCollapsedChange = useCallback((collapsed: boolean) => {
     setRightSidebarCollapsed(collapsed);
   }, []);
 
-  // Apply persisted left sidebar state once the panel and sidebar context are both mounted.
+  // Apply persisted panel state once the left sidebar context and both panel refs are mounted.
   useEffect(() => {
-    const panel = leftSidebarPanelRef.current;
-    if (!panel || leftSidebarIsMobileRef.current) return;
-
-    if (leftSidebarOpenRef.current) {
-      const target = clampLeftSidebarSize(
-        lastLeftSidebarSizeRef.current || DEFAULT_PANEL_LAYOUT[0]
-      );
-      lastLeftSidebarSizeRef.current = target;
-      panel.expand();
-      panel.resize(target);
-    } else {
-      panel.collapse();
+    if (initialPanelStateApplied || !leftSidebarContextReady) {
+      return;
     }
-  }, []);
 
-  // Apply persisted right sidebar state once the panel ref is mounted.
-  useEffect(() => {
-    const panel = rightSidebarPanelRef.current;
-    if (!panel) return;
+    const leftPanel = leftSidebarPanelRef.current;
+    const rightPanel = rightSidebarPanelRef.current;
+    if (!leftPanel || !rightPanel) {
+      return;
+    }
+
+    if (!leftSidebarIsMobileRef.current) {
+      if (leftSidebarOpenRef.current) {
+        const target = clampLeftSidebarSize(
+          lastLeftSidebarSizeRef.current || DEFAULT_PANEL_LAYOUT[0]
+        );
+        lastLeftSidebarSizeRef.current = target;
+        leftPanel.expand();
+        leftPanel.resize(target);
+      } else {
+        leftPanel.collapse();
+      }
+    }
 
     if (rightSidebarCollapsed) {
-      panel.collapse();
+      rightPanel.collapse();
     } else {
       const target = clampRightSidebarSize(
         lastRightSidebarSizeRef.current || DEFAULT_PANEL_LAYOUT[2]
       );
       lastRightSidebarSizeRef.current = target;
-      panel.expand();
-      panel.resize(target);
+      rightPanel.expand();
+      rightPanel.resize(target);
     }
-  }, []);
+
+    setInitialPanelStateApplied(true);
+  }, [initialPanelStateApplied, leftSidebarContextReady, rightSidebarCollapsed]);
 
   // Handle left sidebar visibility when Editor mode changes
   useEffect(() => {

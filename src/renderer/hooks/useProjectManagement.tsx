@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ToastAction } from '@radix-ui/react-toast';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { pickDefaultBranch } from '../components/BranchSelect';
-import { saveActiveIds } from '../constants/layout';
+import { getStoredActiveIds, saveActiveIds } from '../constants/layout';
 import {
   computeBaseRef,
   getProjectRepoKey,
@@ -10,6 +11,11 @@ import {
   resolveProjectGithubInfo,
   withRepoKey,
 } from '../lib/projectUtils';
+import {
+  buildWorkspaceHref,
+  parseWorkspaceRoute,
+  WORKSPACE_ROUTE_PATHS,
+} from '../lib/workspaceRoutes';
 import type { Project } from '../types/app';
 import { rpc } from '../lib/rpc';
 import { useModalContext } from '../contexts/ModalProvider';
@@ -78,6 +84,13 @@ async function buildProjectFromGitPath(
   return { projectToSave, remoteUrl, repoKey, isGitRepo: true };
 }
 
+function resolveBooleanAction(
+  action: boolean | ((prev: boolean) => boolean),
+  current: boolean
+): boolean {
+  return typeof action === 'function' ? action(current) : action;
+}
+
 export const useProjectManagement = () => {
   const automationsEnabled = useFeatureFlag('automations');
   const { platform } = useAppContext();
@@ -89,19 +102,9 @@ export const useProjectManagement = () => {
   const { toast } = useToast();
   const { showModal } = useModalContext();
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-  const activeProjectIdRef = useRef<string | null>(null);
-  activeProjectIdRef.current = selectedProject?.id || null;
-
-  // Always start on home view (e.g. after app restart)
-  const [showHomeView, setShowHomeView] = useState<boolean>(true);
-  const [showSkillsView, setShowSkillsView] = useState(false);
-  const [showMcpView, setShowMcpView] = useState(false);
-  const [showAutomationsView, setShowAutomationsView] = useState(false);
-  const [showEditorMode, setShowEditorMode] = useState(false);
-  const [showKanban, setShowKanban] = useState(false);
   // Trigger counters — incremented to signal task management to reset active task / auto-open modal
   const [resetTaskTrigger, setResetTaskTrigger] = useState(0);
   const [autoOpenTaskModalTrigger, setAutoOpenTaskModalTrigger] = useState(0);
@@ -127,6 +130,23 @@ export const useProjectManagement = () => {
 
   const projects = rawProjects ?? [];
   const isInitialLoadComplete = rawProjects !== undefined;
+  const route = useMemo(
+    () => parseWorkspaceRoute(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === route.projectId) ?? null,
+    [projects, route.projectId]
+  );
+  const showHomeView = route.kind === 'home' || route.kind === 'root';
+  const showSkillsView = route.kind === 'skills';
+  const showMcpView = route.kind === 'mcp';
+  const showAutomationsView = route.kind === 'automations' && automationsEnabled;
+  const showEditorMode = route.kind === 'editor';
+  const showKanban = route.kind === 'kanban';
+
+  const activeProjectIdRef = useRef<string | null>(null);
+  activeProjectIdRef.current = selectedProject?.id || null;
 
   // ---------------------------------------------------------------------------
   // Mutations — all project writes go through here
@@ -156,9 +176,8 @@ export const useProjectManagement = () => {
         old.filter((p) => p.id !== project.id)
       );
       if (selectedProject?.id === project.id) {
-        setSelectedProject(null);
+        navigate(WORKSPACE_ROUTE_PATHS.home, { replace: true });
         setResetTaskTrigger((t) => t + 1);
-        setShowHomeView(true);
         saveActiveIds(null, null);
       }
     },
@@ -209,14 +228,8 @@ export const useProjectManagement = () => {
       void import('../lib/telemetryClient').then(({ captureTelemetry }) => {
         captureTelemetry('project_view_opened');
       });
-      setSelectedProject(project);
-      setShowHomeView(false);
-      setShowSkillsView(false);
-      setShowMcpView(false);
-      setShowAutomationsView(false);
       setResetTaskTrigger((t) => t + 1);
-      setShowEditorMode(false);
-      setShowKanban(false);
+      navigate(buildWorkspaceHref({ kind: 'project', projectId: project.id }));
       saveActiveIds(project.id, null);
       prewarmReserveForBaseRef(
         project.id,
@@ -225,80 +238,188 @@ export const useProjectManagement = () => {
         project.gitInfo?.baseRef || 'HEAD'
       );
     },
-    [prewarmReserveForBaseRef]
+    [navigate, prewarmReserveForBaseRef]
   );
 
   // ---------------------------------------------------------------------------
   // Navigation
   // ---------------------------------------------------------------------------
-  const handleGoHome = () => {
-    setSelectedProject(null);
-    setShowHomeView(true);
-    setShowSkillsView(false);
-    setShowMcpView(false);
-    setShowAutomationsView(false);
+  const handleGoHome = useCallback(() => {
     setResetTaskTrigger((t) => t + 1);
-    setShowEditorMode(false);
-    setShowKanban(false);
+    navigate(WORKSPACE_ROUTE_PATHS.home);
     saveActiveIds(null, null);
-  };
+  }, [navigate]);
 
-  const handleGoToSkills = () => {
+  const handleGoToSkills = useCallback(() => {
     void import('../lib/telemetryClient').then(({ captureTelemetry }) => {
       captureTelemetry('skills_view_opened');
     });
-    setSelectedProject(null);
-    setShowHomeView(false);
-    setShowSkillsView(true);
-    setShowMcpView(false);
-    setShowAutomationsView(false);
     setResetTaskTrigger((t) => t + 1);
-    setShowEditorMode(false);
-    setShowKanban(false);
+    navigate(WORKSPACE_ROUTE_PATHS.skills);
     saveActiveIds(null, null);
-  };
+  }, [navigate]);
 
-  const handleGoToMcp = () => {
+  const handleGoToMcp = useCallback(() => {
     void import('../lib/telemetryClient').then(({ captureTelemetry }) => {
       captureTelemetry('mcp_view_opened');
     });
-    setSelectedProject(null);
-    setShowHomeView(false);
-    setShowSkillsView(false);
-    setShowMcpView(true);
-    setShowAutomationsView(false);
     setResetTaskTrigger((t) => t + 1);
-    setShowEditorMode(false);
-    setShowKanban(false);
+    navigate(WORKSPACE_ROUTE_PATHS.mcp);
     saveActiveIds(null, null);
-  };
+  }, [navigate]);
 
-  const handleGoToAutomations = () => {
+  const handleGoToAutomations = useCallback(() => {
     if (!automationsEnabled) return;
     void import('../lib/telemetryClient').then(({ captureTelemetry }) => {
       captureTelemetry('automations_view_opened');
     });
-    setSelectedProject(null);
-    setShowHomeView(false);
-    setShowSkillsView(false);
-    setShowMcpView(false);
-    setShowAutomationsView(true);
     setResetTaskTrigger((t) => t + 1);
-    setShowEditorMode(false);
-    setShowKanban(false);
+    navigate(WORKSPACE_ROUTE_PATHS.automations);
     saveActiveIds(null, null);
-  };
+  }, [automationsEnabled, navigate]);
 
   useEffect(() => {
-    if (automationsEnabled || !showAutomationsView) return;
-    setShowAutomationsView(false);
-    setShowHomeView(true);
-    saveActiveIds(null, null);
-  }, [automationsEnabled, showAutomationsView]);
+    if (!isInitialLoadComplete) return;
+    if (route.kind === 'root') {
+      const stored = getStoredActiveIds();
+      const hasStoredProject =
+        stored.projectId && projects.some((project) => project.id === stored.projectId);
+      if (stored.taskId && stored.projectId && hasStoredProject) {
+        navigate(
+          buildWorkspaceHref({
+            kind: 'task',
+            projectId: stored.projectId,
+            taskId: stored.taskId,
+          }),
+          { replace: true }
+        );
+        return;
+      }
+      if (stored.projectId && hasStoredProject) {
+        navigate(
+          buildWorkspaceHref({
+            kind: 'project',
+            projectId: stored.projectId,
+          }),
+          { replace: true }
+        );
+        return;
+      }
+      navigate(WORKSPACE_ROUTE_PATHS.home, { replace: true });
+      return;
+    }
+    if (route.kind === 'automations' && !automationsEnabled) {
+      navigate(WORKSPACE_ROUTE_PATHS.home, { replace: true });
+      return;
+    }
+    if (route.projectId && !selectedProject) {
+      navigate(WORKSPACE_ROUTE_PATHS.home, { replace: true });
+    }
+  }, [
+    automationsEnabled,
+    isInitialLoadComplete,
+    navigate,
+    projects,
+    route.kind,
+    route.projectId,
+    selectedProject,
+  ]);
 
-  const handleSelectProject = (project: Project) => {
-    activateProjectView(project);
-  };
+  const setShowEditorMode = useCallback(
+    (action: boolean | ((prev: boolean) => boolean)) => {
+      const next = resolveBooleanAction(action, showEditorMode);
+      if (next === showEditorMode) return;
+      if (!selectedProject) return;
+      if (next) {
+        if (!route.taskId) return;
+        navigate(
+          buildWorkspaceHref({
+            kind: 'editor',
+            projectId: selectedProject.id,
+            taskId: route.taskId,
+          })
+        );
+        return;
+      }
+      if (route.taskId) {
+        navigate(
+          buildWorkspaceHref({
+            kind: 'task',
+            projectId: selectedProject.id,
+            taskId: route.taskId,
+          })
+        );
+        return;
+      }
+      navigate(buildWorkspaceHref({ kind: 'project', projectId: selectedProject.id }));
+    },
+    [navigate, route.taskId, selectedProject, showEditorMode]
+  );
+
+  const setShowKanban = useCallback(
+    (action: boolean | ((prev: boolean) => boolean)) => {
+      const next = resolveBooleanAction(action, showKanban);
+      if (next === showKanban) return;
+      if (!selectedProject) return;
+      navigate(
+        buildWorkspaceHref({
+          kind: next ? 'kanban' : 'project',
+          projectId: selectedProject.id,
+        })
+      );
+    },
+    [navigate, selectedProject, showKanban]
+  );
+
+  const handleSelectProject = useCallback(
+    (project: Project) => {
+      activateProjectView(project);
+    },
+    [activateProjectView]
+  );
+
+  const setSelectedProject = useCallback(
+    (project: Project | null) => {
+      if (!project) {
+        handleGoHome();
+        return;
+      }
+      navigate(buildWorkspaceHref({ kind: 'project', projectId: project.id }));
+    },
+    [handleGoHome, navigate]
+  );
+
+  const setShowHomeView = useCallback(
+    (next: boolean) => {
+      if (!next) return;
+      handleGoHome();
+    },
+    [handleGoHome]
+  );
+
+  const setShowSkillsView = useCallback(
+    (next: boolean) => {
+      if (!next) return;
+      handleGoToSkills();
+    },
+    [handleGoToSkills]
+  );
+
+  const setShowMcpView = useCallback(
+    (next: boolean) => {
+      if (!next) return;
+      handleGoToMcp();
+    },
+    [handleGoToMcp]
+  );
+
+  const setShowAutomationsView = useCallback(
+    (next: boolean) => {
+      if (!next) return;
+      handleGoToAutomations();
+    },
+    [handleGoToAutomations]
+  );
 
   // ---------------------------------------------------------------------------
   // Project actions — open / new / clone / remote
@@ -564,7 +685,6 @@ export const useProjectManagement = () => {
       let options: { value: string; label: string }[];
 
       if (selectedProject.isRemote && selectedProject.sshConnectionId) {
-        // Load branches over SSH for remote projects
         const result = await window.electronAPI.sshExecuteCommand(
           selectedProject.sshConnectionId,
           'git branch -a --format="%(refname:short)"',
@@ -600,7 +720,6 @@ export const useProjectManagement = () => {
         return;
       }
 
-      // Only update state if we found branches
       if (options.length > 0) {
         setProjectBranchOptions(options);
         const currentRef = selectedProject.gitInfo?.baseRef;
@@ -617,7 +736,6 @@ export const useProjectManagement = () => {
     }
   }, [selectedProject]);
 
-  // Initial load when project changes
   useEffect(() => {
     if (!selectedProject) {
       setProjectBranchOptions([]);
@@ -635,7 +753,6 @@ export const useProjectManagement = () => {
     void refreshBranches();
   }, [selectedProject, refreshBranches]);
 
-  // Keep reserves warm for the currently selected base ref.
   useEffect(() => {
     if (!selectedProject) return;
     if (!hasResolvedBranchOptions) return;

@@ -6,6 +6,8 @@ import {
   DEFAULT_PANEL_LAYOUT,
   clampLeftSidebarSize,
   clampRightSidebarSize,
+  LEFT_SIDEBAR_OPEN_STORAGE_KEY,
+  RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY,
 } from '../constants/layout';
 import { rpc } from '@/lib/rpc';
 
@@ -36,35 +38,54 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
     activeTask,
   } = opts;
 
-  const defaultPanelLayout = useMemo(() => {
+  const initialPanelState = useMemo(() => {
     const stored = loadPanelSizes(PANEL_LAYOUT_STORAGE_KEY, DEFAULT_PANEL_LAYOUT);
     const [storedLeft = DEFAULT_PANEL_LAYOUT[0], , storedRight = DEFAULT_PANEL_LAYOUT[2]] =
       Array.isArray(stored) && stored.length === 3
         ? (stored as [number, number, number])
         : DEFAULT_PANEL_LAYOUT;
-    const left = clampLeftSidebarSize(storedLeft);
-    const right = clampRightSidebarSize(storedRight);
+    const storedLeftWidth = clampLeftSidebarSize(storedLeft);
+    const storedRightWidth = clampRightSidebarSize(storedRight);
+    let leftSidebarInitiallyOpen = true;
+    let rightSidebarInitiallyCollapsed = false;
+    if (typeof window !== 'undefined') {
+      try {
+        leftSidebarInitiallyOpen =
+          window.localStorage.getItem(LEFT_SIDEBAR_OPEN_STORAGE_KEY) !== 'false';
+        rightSidebarInitiallyCollapsed =
+          window.localStorage.getItem(RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+      } catch {
+        leftSidebarInitiallyOpen = true;
+        rightSidebarInitiallyCollapsed = false;
+      }
+    }
+    const left = leftSidebarInitiallyOpen ? storedLeftWidth : 0;
+    const right = rightSidebarInitiallyCollapsed ? 0 : storedRightWidth;
     const middle = Math.max(0, 100 - left - right);
-    return [left, middle, right] as [number, number, number];
+    return {
+      defaultPanelLayout: [left, middle, right] as [number, number, number],
+      storedLeftWidth,
+      storedRightWidth,
+      leftSidebarInitiallyOpen,
+      rightSidebarInitiallyCollapsed,
+    };
   }, []);
-
-  const rightSidebarDefaultWidth = useMemo(
-    () => clampRightSidebarSize(defaultPanelLayout[2]),
-    [defaultPanelLayout]
-  );
+  const defaultPanelLayout = initialPanelState.defaultPanelLayout;
 
   const leftSidebarPanelRef = useRef<ImperativePanelHandle | null>(null);
   const rightSidebarPanelRef = useRef<ImperativePanelHandle | null>(null);
-  const lastLeftSidebarSizeRef = useRef<number>(defaultPanelLayout[0]);
+  const lastLeftSidebarSizeRef = useRef<number>(initialPanelState.storedLeftWidth);
   const leftSidebarWasCollapsedBeforeEditor = useRef<boolean>(false);
   const leftSidebarWasCollapsedBeforeDiffViewer = useRef<boolean>(false);
   const rightSidebarWasCollapsedBeforeDiffViewer = useRef<boolean>(false);
-  const lastRightSidebarSizeRef = useRef<number>(rightSidebarDefaultWidth);
+  const lastRightSidebarSizeRef = useRef<number>(initialPanelState.storedRightWidth);
   const leftSidebarSetOpenRef = useRef<((next: boolean) => void) | null>(null);
   const leftSidebarIsMobileRef = useRef<boolean>(false);
-  const leftSidebarOpenRef = useRef<boolean>(true);
+  const leftSidebarOpenRef = useRef<boolean>(initialPanelState.leftSidebarInitiallyOpen);
   const rightSidebarSetCollapsedRef = useRef<((next: boolean) => void) | null>(null);
-  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState<boolean>(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState<boolean>(
+    initialPanelState.rightSidebarInitiallyCollapsed
+  );
   const [autoRightSidebarBehavior, setAutoRightSidebarBehavior] = useState<boolean>(false);
 
   const handlePanelLayout = useCallback((sizes: number[]) => {
@@ -163,6 +184,40 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
     setRightSidebarCollapsed(collapsed);
   }, []);
 
+  // Apply persisted left sidebar state once the panel and sidebar context are both mounted.
+  useEffect(() => {
+    const panel = leftSidebarPanelRef.current;
+    if (!panel || leftSidebarIsMobileRef.current) return;
+
+    if (leftSidebarOpenRef.current) {
+      const target = clampLeftSidebarSize(
+        lastLeftSidebarSizeRef.current || DEFAULT_PANEL_LAYOUT[0]
+      );
+      lastLeftSidebarSizeRef.current = target;
+      panel.expand();
+      panel.resize(target);
+    } else {
+      panel.collapse();
+    }
+  }, []);
+
+  // Apply persisted right sidebar state once the panel ref is mounted.
+  useEffect(() => {
+    const panel = rightSidebarPanelRef.current;
+    if (!panel) return;
+
+    if (rightSidebarCollapsed) {
+      panel.collapse();
+    } else {
+      const target = clampRightSidebarSize(
+        lastRightSidebarSizeRef.current || DEFAULT_PANEL_LAYOUT[2]
+      );
+      lastRightSidebarSizeRef.current = target;
+      panel.expand();
+      panel.resize(target);
+    }
+  }, []);
+
   // Handle left sidebar visibility when Editor mode changes
   useEffect(() => {
     const panel = leftSidebarPanelRef.current;
@@ -248,15 +303,6 @@ export function usePanelLayout(opts: UsePanelLayoutOptions) {
       window.removeEventListener('autoRightSidebarBehaviorChanged', handleSettingChange);
     };
   }, []);
-
-  // Always collapse right sidebar on home screen
-  useEffect(() => {
-    if (!isInitialLoadComplete) return;
-
-    if (showHomeView) {
-      rightSidebarSetCollapsedRef.current?.(true);
-    }
-  }, [isInitialLoadComplete, showHomeView]);
 
   // Auto-collapse/expand right sidebar based on current view (when setting enabled)
   useEffect(() => {

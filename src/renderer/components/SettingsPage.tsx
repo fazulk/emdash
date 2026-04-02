@@ -31,15 +31,8 @@ import ResourceMonitorSettingsCard from './ResourceMonitorSettingsCard';
 import { AccountTab } from './settings/AccountTab';
 import { WorkspaceProviderInfoCard } from './WorkspaceProviderInfoCard';
 import { useTaskSettings } from '../hooks/useTaskSettings';
-
-export type SettingsPageTab =
-  | 'general'
-  | 'clis-models'
-  | 'integrations'
-  | 'repository'
-  | 'interface'
-  | 'docs'
-  | 'account';
+import type { SettingsPageTab } from '../types/settings';
+export type { SettingsPageTab } from '../types/settings';
 
 // Helper functions from SettingsModal
 const createDefaultCliAgents = (): CliAgentStatus[] =>

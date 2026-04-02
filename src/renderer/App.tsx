@@ -13,6 +13,7 @@ import { PostHogFeatureFlagProvider } from './contexts/PostHogFeatureFlagProvide
 import { ProjectManagementProvider } from './contexts/ProjectManagementProvider';
 import { TaskManagementProvider } from './contexts/TaskManagementContext';
 import { ModalProvider } from './contexts/ModalProvider';
+import { HashRouter } from 'react-router-dom';
 
 const queryClient = new QueryClient();
 
@@ -33,26 +34,28 @@ export function App() {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ModalProvider>
-        <AppContextProvider>
-          <EmdashAccountProvider>
-            <PostHogFeatureFlagProvider>
-              <GithubContextProvider>
-                <ProjectManagementProvider>
-                  <TaskManagementProvider>
-                    <AppSettingsProvider>
-                      <ThemeProvider>
-                        <ErrorBoundary>{renderContent()}</ErrorBoundary>
-                      </ThemeProvider>
-                    </AppSettingsProvider>
-                  </TaskManagementProvider>
-                </ProjectManagementProvider>
-              </GithubContextProvider>
-            </PostHogFeatureFlagProvider>
-          </EmdashAccountProvider>
-        </AppContextProvider>
-      </ModalProvider>
-    </QueryClientProvider>
+    <HashRouter>
+      <QueryClientProvider client={queryClient}>
+        <ModalProvider>
+          <AppContextProvider>
+            <EmdashAccountProvider>
+              <PostHogFeatureFlagProvider>
+                <GithubContextProvider>
+                  <ProjectManagementProvider>
+                    <TaskManagementProvider>
+                      <AppSettingsProvider>
+                        <ThemeProvider>
+                          <ErrorBoundary>{renderContent()}</ErrorBoundary>
+                        </ThemeProvider>
+                      </AppSettingsProvider>
+                    </TaskManagementProvider>
+                  </ProjectManagementProvider>
+                </GithubContextProvider>
+              </PostHogFeatureFlagProvider>
+            </EmdashAccountProvider>
+          </AppContextProvider>
+        </ModalProvider>
+      </QueryClientProvider>
+    </HashRouter>
   );
 }

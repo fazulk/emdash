@@ -197,7 +197,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const [revertingFiles, setRevertingFiles] = useState<Set<string>>(new Set());
   const [isStagingAll, setIsStagingAll] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
-  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitAction, setCommitAction] = useState<'commit' | 'commitAndPush' | null>(null);
+  const [isPushing, setIsPushing] = useState(false);
+  const [showPushAfterCommit, setShowPushAfterCommit] = useState(false);
   const [isMergingToMain, setIsMergingToMain] = useState(false);
   const [showMergeConfirm, setShowMergeConfirm] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
@@ -262,6 +264,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   useEffect(() => {
     setIsMergingToMain(false);
     setCommitMessage('');
+    setCommitAction(null);
+    setIsPushing(false);
+    setShowPushAfterCommit(false);
     setStagingFiles(new Set());
     setRevertingFiles(new Set());
     setRestoreTarget(null);
@@ -393,7 +398,30 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     }
   };
 
-  const handleCommitAndPush = async () => {
+  const refreshBranchStatus = useCallback(
+    async (taskPath: string) => {
+      try {
+        setBranchStatusLoading(true);
+        const status = await window.electronAPI.getBranchStatus({
+          taskPath,
+          taskId: resolvedTaskId,
+        });
+        if (taskPathRef.current !== taskPath) return;
+        setBranchName(status?.success ? (status?.branch ?? null) : null);
+        setBranchAhead(status?.success ? (status?.ahead ?? 0) : 0);
+      } catch {
+        if (taskPathRef.current === taskPath) {
+          setBranchName(null);
+          setBranchAhead(0);
+        }
+      } finally {
+        if (taskPathRef.current === taskPath) setBranchStatusLoading(false);
+      }
+    },
+    [resolvedTaskId]
+  );
+
+  const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     const trimmedMessage = commitMessage.trim();
     if (!trimmedMessage) {
       toast({
@@ -413,19 +441,26 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
       return;
     }
 
-    setIsCommitting(true);
+    setCommitAction(action);
     try {
-      const result = await window.electronAPI.gitCommitAndPush({
-        taskPath: safeTaskPath,
-        taskId: resolvedTaskId,
-        commitMessage: trimmedMessage,
-        createBranchIfOnDefault: true,
-      });
+      const result =
+        action === 'commitAndPush'
+          ? await window.electronAPI.gitCommitAndPush({
+              taskPath: safeTaskPath,
+              taskId: resolvedTaskId,
+              commitMessage: trimmedMessage,
+              createBranchIfOnDefault: true,
+            })
+          : await window.electronAPI.gitCommit({
+              taskPath: safeTaskPath,
+              message: trimmedMessage,
+            });
 
       if (result.success) {
         const taskPathAtCommit = safeTaskPath;
+        setShowPushAfterCommit(action === 'commit');
         toast({
-          title: 'Committed and Pushed',
+          title: action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed',
           description: `Changes committed with message: "${trimmedMessage}"`,
         });
         setCommitMessage('');
@@ -438,29 +473,16 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
           // PR refresh is best-effort
         }
         if (taskPathRef.current !== taskPathAtCommit) return;
-        // Reload branch status so the Create PR button appears immediately
-        try {
-          setBranchStatusLoading(true);
-          const bs = await window.electronAPI.getBranchStatus({
-            taskPath: taskPathAtCommit,
-            taskId: resolvedTaskId,
-          });
-          if (taskPathRef.current !== taskPathAtCommit) return;
-          setBranchName(bs?.success ? (bs?.branch ?? null) : null);
-          setBranchAhead(bs?.success ? (bs?.ahead ?? 0) : 0);
-        } catch {
-          if (taskPathRef.current === taskPathAtCommit) {
-            setBranchName(null);
-            setBranchAhead(0);
-          }
-        } finally {
-          if (taskPathRef.current === taskPathAtCommit) setBranchStatusLoading(false);
-        }
+        await refreshBranchStatus(taskPathAtCommit);
       } else {
         toast({
           title: 'Commit Failed',
           description:
-            typeof result.error === 'string' ? result.error : 'Failed to commit and push changes.',
+            typeof result.error === 'string'
+              ? result.error
+              : action === 'commitAndPush'
+                ? 'Failed to commit and push changes.'
+                : 'Failed to commit changes.',
           variant: 'destructive',
         });
       }
@@ -471,7 +493,46 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsCommitting(false);
+      setCommitAction(null);
+    }
+  };
+
+  const isCommitting = commitAction !== null;
+
+  const handleCommitAndPush = async () => {
+    await handleCommit('commitAndPush');
+  };
+
+  const handlePush = async () => {
+    setIsPushing(true);
+    try {
+      const result = await window.electronAPI.gitPush({ taskPath: safeTaskPath });
+      if (result?.success) {
+        const taskPathAtPush = safeTaskPath;
+        setShowPushAfterCommit(false);
+        toast({ title: 'Pushed successfully' });
+        try {
+          await refreshPr();
+        } catch {
+          // PR refresh is best-effort
+        }
+        if (taskPathRef.current !== taskPathAtPush) return;
+        await refreshBranchStatus(taskPathAtPush);
+      } else {
+        toast({
+          title: 'Push Failed',
+          description: result?.error || 'Failed to push changes.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Push Failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPushing(false);
     }
   };
 
@@ -590,8 +651,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     return null;
   }
 
-  const isActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain;
+  const isActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain || isPushing;
   const hasDisplayChanges = displayChanges.length > 0;
+  const shouldShowPushButton = showPushAfterCommit || (branchAhead ?? 0) > 0;
 
   return (
     <div className={`flex h-full flex-col bg-card shadow-sm ${className ?? ''}`}>
@@ -730,30 +792,60 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
               </div>
             </div>
 
-            {hasStagedChanges && (
-              <div className="flex items-center space-x-2">
-                <Input
-                  placeholder="Enter commit message..."
-                  value={commitMessage}
-                  onChange={(e) => setCommitMessage(e.target.value)}
-                  className="h-8 flex-1 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleCommitAndPush();
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-2 text-xs"
-                  title="Commit all staged changes and push"
-                  onClick={() => void handleCommitAndPush()}
-                  disabled={isCommitting || !commitMessage.trim()}
-                >
-                  {isCommitting ? <Spinner size="sm" /> : 'Commit & Push'}
-                </Button>
+            {(hasStagedChanges || shouldShowPushButton) && (
+              <div
+                className={`flex items-center gap-2 ${hasStagedChanges ? '' : 'justify-end'}`}
+              >
+                {hasStagedChanges && (
+                  <Input
+                    placeholder="Enter commit message..."
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                    className="h-8 flex-1 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleCommitAndPush();
+                      }
+                    }}
+                  />
+                )}
+                {hasStagedChanges && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    title="Commit staged changes without pushing"
+                    onClick={() => void handleCommit('commit')}
+                    disabled={isCommitting || !commitMessage.trim()}
+                  >
+                    {commitAction === 'commit' ? <Spinner size="sm" /> : 'Commit'}
+                  </Button>
+                )}
+                {hasStagedChanges && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    title="Commit all staged changes and push"
+                    onClick={() => void handleCommitAndPush()}
+                    disabled={isCommitting || !commitMessage.trim()}
+                  >
+                    {commitAction === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
+                  </Button>
+                )}
+                {shouldShowPushButton && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    title="Push committed changes"
+                    onClick={() => void handlePush()}
+                    disabled={isPushing || isCommitting}
+                  >
+                    {isPushing ? <Spinner size="sm" /> : 'Push'}
+                  </Button>
+                )}
               </div>
             )}
           </div>

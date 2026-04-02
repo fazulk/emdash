@@ -1050,6 +1050,15 @@ const ChatInterface: React.FC<Props> = ({
     return () => window.removeEventListener('emdash:close-active-chat', handleCloseActiveChat);
   }, [activeConversationId, handleCloseChat]);
 
+  useEffect(() => {
+    const handleNewAgent = () => {
+      handleCreateNewChat();
+    };
+
+    window.addEventListener('emdash:new-agent', handleNewAgent);
+    return () => window.removeEventListener('emdash:new-agent', handleNewAgent);
+  }, [handleCreateNewChat]);
+
   const isTerminal = agentMeta[agent]?.terminalOnly === true;
 
   // Auto-approve is enabled if:

@@ -49,7 +49,19 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
   const { toggle: toggleRightSidebar } = useRightSidebar();
   const { toggleTheme } = useTheme();
   const { settings: keyboardSettings } = useKeyboardSettings();
-  const { handleNextTask, handlePrevTask, handleNewTask } = useTaskManagementContext();
+  const { activeTask, handleNextTask, handlePrevTask, handleNewTask } = useTaskManagementContext();
+
+  const handleNewAgent = React.useCallback(() => {
+    const isMultiAgentTask = Boolean(
+      (activeTask?.metadata as { multiAgent?: { enabled?: boolean } } | undefined)?.multiAgent
+        ?.enabled
+    );
+    if (!activeTask || isMultiAgentTask) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent('emdash:new-agent'));
+  }, [activeTask]);
 
   useKeyboardShortcuts({
     onToggleCommandPalette: handleToggleCommandPalette,
@@ -62,6 +74,7 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
     onNextProject: handleNextTask,
     onPrevProject: handlePrevTask,
     onNewTask: handleNewTask,
+    onNewAgent: handleNewAgent,
     onNextAgent: () =>
       window.dispatchEvent(
         new CustomEvent('emdash:switch-agent', { detail: { direction: 'next' } })

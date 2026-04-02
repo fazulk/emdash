@@ -20,6 +20,7 @@ export type ShortcutSettingsKey =
   | 'nextProject'
   | 'prevProject'
   | 'newTask'
+  | 'newAgent'
   | 'nextAgent'
   | 'prevAgent'
   | 'openInEditor';
@@ -136,7 +137,7 @@ export const APP_SHORTCUTS: Record<string, AppShortcut> = {
 
   TOGGLE_THEME: {
     key: 't',
-    modifier: 'cmd',
+    modifier: 'cmd+shift',
     label: 'Toggle Theme',
     description: 'Cycle through light, dark navy, and dark black themes',
     category: 'View',
@@ -176,12 +177,21 @@ export const APP_SHORTCUTS: Record<string, AppShortcut> = {
   PREV_TASK: TASK_SWITCH_SHORTCUTS.prev,
 
   NEW_TASK: {
-    key: 'n',
+    key: 't',
     modifier: 'cmd',
     label: 'New Task',
     description: 'Create a new task',
     category: 'Navigation',
     settingsKey: 'newTask',
+  },
+
+  NEW_AGENT: {
+    key: 'n',
+    modifier: 'cmd',
+    label: 'New Agent',
+    description: 'Add a new agent to the current task',
+    category: 'Navigation',
+    settingsKey: 'newAgent',
   },
 
   NEXT_AGENT: {
@@ -387,6 +397,7 @@ export function useKeyboardShortcuts(handlers: GlobalShortcutHandlers) {
       nextProject: getEffectiveConfig(APP_SHORTCUTS.NEXT_TASK, custom),
       prevProject: getEffectiveConfig(APP_SHORTCUTS.PREV_TASK, custom),
       newTask: getEffectiveConfig(APP_SHORTCUTS.NEW_TASK, custom),
+      newAgent: getEffectiveConfig(APP_SHORTCUTS.NEW_AGENT, custom),
       nextAgent: getEffectiveConfig(APP_SHORTCUTS.NEXT_AGENT, custom),
       prevAgent: getEffectiveConfig(APP_SHORTCUTS.PREV_AGENT, custom),
       openInEditor: getEffectiveConfig(APP_SHORTCUTS.OPEN_IN_EDITOR, custom),
@@ -460,6 +471,12 @@ export function useKeyboardShortcuts(handlers: GlobalShortcutHandlers) {
       effectiveShortcuts.newTask && {
         config: effectiveShortcuts.newTask,
         handler: () => handlers.onNewTask?.(),
+        priority: 'global',
+        requiresClosed: true,
+      },
+      effectiveShortcuts.newAgent && {
+        config: effectiveShortcuts.newAgent,
+        handler: () => handlers.onNewAgent?.(),
         priority: 'global',
         requiresClosed: true,
       },

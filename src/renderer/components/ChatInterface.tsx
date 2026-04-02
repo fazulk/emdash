@@ -41,6 +41,8 @@ import {
   getConversationTabLabel,
   planConversationTitleUpdates,
 } from '../lib/conversationTabTitles';
+import { getTerminalFooterSummary } from '../lib/terminalFooter';
+import TerminalContextFooter from './TerminalContextFooter';
 
 declare const window: Window & {
   electronAPI: {
@@ -345,6 +347,16 @@ const ChatInterface: React.FC<Props> = ({
       defaultBranch: defaultBranch || undefined,
     });
   }, [task.id, task.name, task.path, projectPath, defaultBranch]);
+
+  const terminalFooter = useMemo(
+    () =>
+      getTerminalFooterSummary({
+        mode: 'task',
+        task,
+        projectPath,
+      }),
+    [projectPath, task]
+  );
 
   const installedAgents = useMemo(
     () =>
@@ -1377,127 +1389,138 @@ const ChatInterface: React.FC<Props> = ({
             className="mt-4 min-h-0 flex-1 px-6"
             onWheelCapture={handleTerminalViewportWheelForwarding}
           >
-            <div
-              ref={terminalPanelRef}
-              className={`relative mx-auto h-full max-w-4xl overflow-hidden rounded-md ${
-                agent === 'charm'
-                  ? effectiveTheme === 'dark-black'
-                    ? 'bg-black'
-                    : effectiveTheme === 'dark'
-                      ? 'bg-card'
-                      : 'bg-white'
-                  : agent === 'mistral'
-                    ? effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
-                      ? effectiveTheme === 'dark-black'
-                        ? 'bg-[#141820]'
-                        : 'bg-[#202938]'
-                      : 'bg-white'
-                    : ''
-              }`}
-            >
-              <TerminalSearchOverlay
-                isOpen={isSearchOpen}
-                fullWidth
-                searchQuery={searchQuery}
-                searchStatus={searchStatus}
-                searchInputRef={searchInputRef}
-                onQueryChange={handleSearchQueryChange}
-                onStep={stepSearch}
-                onClose={closeSearch}
-              />
-              {/* Wait for conversations to load to ensure stable terminalId.
-                  For workspace tasks, also wait until the workspace connection is
-                  resolved so the PTY starts on the remote host, not locally. */}
-              {conversationsLoaded && (!isWorkspaceTask || workspaceConnectionId) && (
-                <TerminalPane
-                  ref={terminalRef}
-                  id={terminalId}
-                  cwd={effectiveCwd}
-                  remote={effectiveRemote}
-                  providerId={agent}
-                  autoApprove={autoApproveEnabled}
-                  env={taskEnv}
-                  keepAlive={true}
-                  mapShiftEnterToCtrlJ
-                  disableSnapshots={false}
-                  onActivity={handleTerminalActivity}
-                  onStartError={(message) => {
-                    setCliStartError(message);
-                  }}
-                  onStartSuccess={() => {
-                    setCliStartError(null);
-                    if (
-                      isMainConversation &&
-                      initialInjection &&
-                      !task.metadata?.initialInjectionSent
-                    ) {
-                      void rpc.db.saveTask({
-                        ...task,
-                        metadata: {
-                          ...task.metadata,
-                          initialInjectionSent: true,
-                        },
-                      });
+            <div className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden">
+              <div
+                ref={terminalPanelRef}
+                className={`relative min-h-0 flex-1 overflow-hidden rounded-md ${
+                  agent === 'charm'
+                    ? effectiveTheme === 'dark-black'
+                      ? 'bg-black'
+                      : effectiveTheme === 'dark'
+                        ? 'bg-card'
+                        : 'bg-white'
+                    : agent === 'mistral'
+                      ? effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                        ? effectiveTheme === 'dark-black'
+                          ? 'bg-[#141820]'
+                          : 'bg-[#202938]'
+                        : 'bg-white'
+                      : ''
+                }`}
+              >
+                <TerminalSearchOverlay
+                  isOpen={isSearchOpen}
+                  fullWidth
+                  searchQuery={searchQuery}
+                  searchStatus={searchStatus}
+                  searchInputRef={searchInputRef}
+                  onQueryChange={handleSearchQueryChange}
+                  onStep={stepSearch}
+                  onClose={closeSearch}
+                />
+                {/* Wait for conversations to load to ensure stable terminalId.
+                    For workspace tasks, also wait until the workspace connection is
+                    resolved so the PTY starts on the remote host, not locally. */}
+                {conversationsLoaded && (!isWorkspaceTask || workspaceConnectionId) && (
+                  <TerminalPane
+                    ref={terminalRef}
+                    id={terminalId}
+                    cwd={effectiveCwd}
+                    remote={effectiveRemote}
+                    providerId={agent}
+                    autoApprove={autoApproveEnabled}
+                    env={taskEnv}
+                    keepAlive={true}
+                    mapShiftEnterToCtrlJ
+                    disableSnapshots={false}
+                    onActivity={handleTerminalActivity}
+                    onStartError={(message) => {
+                      setCliStartError(message);
+                    }}
+                    onStartSuccess={() => {
+                      setCliStartError(null);
+                      if (
+                        isMainConversation &&
+                        initialInjection &&
+                        !task.metadata?.initialInjectionSent
+                      ) {
+                        void rpc.db.saveTask({
+                          ...task,
+                          metadata: {
+                            ...task.metadata,
+                            initialInjectionSent: true,
+                          },
+                        });
+                      }
+                      if (!isMainConversation && reviewPrompt && !reviewPromptSent) {
+                        markActiveReviewPromptSent();
+                      }
+                    }}
+                    variant={
+                      effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                        ? 'dark'
+                        : 'light'
                     }
-                    if (!isMainConversation && reviewPrompt && !reviewPromptSent) {
-                      markActiveReviewPromptSent();
-                    }
-                  }}
-                  variant={
-                    effectiveTheme === 'dark' || effectiveTheme === 'dark-black' ? 'dark' : 'light'
-                  }
-                  themeOverride={
-                    agent === 'charm'
-                      ? {
-                          background:
-                            effectiveTheme === 'dark-black'
-                              ? '#0a0a0a'
-                              : effectiveTheme === 'dark'
-                                ? '#1f2937'
-                                : '#ffffff',
-                          selectionBackground: 'rgba(96, 165, 250, 0.35)',
-                          selectionForeground: effectiveTheme === 'light' ? '#0f172a' : '#f9fafb',
-                        }
-                      : agent === 'mistral'
+                    themeOverride={
+                      agent === 'charm'
                         ? {
                             background:
                               effectiveTheme === 'dark-black'
-                                ? '#141820'
+                                ? '#0a0a0a'
                                 : effectiveTheme === 'dark'
-                                  ? '#202938'
+                                  ? '#1f2937'
                                   : '#ffffff',
                             selectionBackground: 'rgba(96, 165, 250, 0.35)',
-                            selectionForeground: effectiveTheme === 'light' ? '#0f172a' : '#f9fafb',
+                            selectionForeground:
+                              effectiveTheme === 'light' ? '#0f172a' : '#f9fafb',
                           }
-                        : effectiveTheme === 'dark-black'
+                        : agent === 'mistral'
                           ? {
-                              background: '#000000',
+                              background:
+                                effectiveTheme === 'dark-black'
+                                  ? '#141820'
+                                  : effectiveTheme === 'dark'
+                                    ? '#202938'
+                                    : '#ffffff',
                               selectionBackground: 'rgba(96, 165, 250, 0.35)',
-                              selectionForeground: '#f9fafb',
+                              selectionForeground:
+                                effectiveTheme === 'light' ? '#0f172a' : '#f9fafb',
                             }
-                          : undefined
-                  }
-                  contentFilter={
-                    agent === 'charm' &&
-                    effectiveTheme !== 'dark' &&
-                    effectiveTheme !== 'dark-black'
-                      ? 'invert(1) hue-rotate(180deg) brightness(1.1) contrast(1.05)'
-                      : undefined
-                  }
-                  initialPrompt={
-                    agentMeta[agent]?.initialPromptFlag !== undefined &&
-                    !agentMeta[agent]?.useKeystrokeInjection &&
-                    ((isMainConversation && !task.metadata?.initialInjectionSent) ||
-                      (!isMainConversation && !reviewPromptSent))
-                      ? isMainConversation
-                        ? (initialInjection ?? undefined)
-                        : (reviewPrompt ?? undefined)
-                      : undefined
-                  }
-                  onFirstMessage={shouldCaptureFirstMessage ? handleFirstMessage : undefined}
-                  className="h-full w-full"
-                />
-              )}
+                          : effectiveTheme === 'dark-black'
+                            ? {
+                                background: '#000000',
+                                selectionBackground: 'rgba(96, 165, 250, 0.35)',
+                                selectionForeground: '#f9fafb',
+                              }
+                            : undefined
+                    }
+                    contentFilter={
+                      agent === 'charm' &&
+                      effectiveTheme !== 'dark' &&
+                      effectiveTheme !== 'dark-black'
+                        ? 'invert(1) hue-rotate(180deg) brightness(1.1) contrast(1.05)'
+                        : undefined
+                    }
+                    initialPrompt={
+                      agentMeta[agent]?.initialPromptFlag !== undefined &&
+                      !agentMeta[agent]?.useKeystrokeInjection &&
+                      ((isMainConversation && !task.metadata?.initialInjectionSent) ||
+                        (!isMainConversation && !reviewPromptSent))
+                        ? isMainConversation
+                          ? (initialInjection ?? undefined)
+                          : (reviewPrompt ?? undefined)
+                        : undefined
+                    }
+                    onFirstMessage={shouldCaptureFirstMessage ? handleFirstMessage : undefined}
+                    className="h-full w-full"
+                  />
+                )}
+              </div>
+              <TerminalContextFooter
+                branch={terminalFooter.branch}
+                worktreeName={terminalFooter.worktreeName}
+                className="mt-2"
+              />
             </div>
           </div>
         </div>

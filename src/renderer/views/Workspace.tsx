@@ -34,6 +34,12 @@ import { useProjectManagementContext } from '@/contexts/ProjectManagementProvide
 import { useTheme } from '@/hooks/useTheme';
 import useUpdateNotifier from '@/hooks/useUpdateNotifier';
 import { useAutomationTrigger } from '@/hooks/useAutomationTrigger';
+import {
+  buildWorkspaceHref,
+  parseWorkspaceRoute,
+  routeSupportsSettingsOverlay,
+  updateWorkspaceSearch,
+} from '@/lib/workspaceRoutes';
 import { activityStore } from '@/lib/activityStore';
 import { agentStatusStore } from '@/lib/agentStatusStore';
 import { handleMenuUndo, handleMenuRedo } from '@/lib/menuUndoRedo';
@@ -41,6 +47,7 @@ import { soundPlayer } from '@/lib/soundPlayer';
 import BrowserProvider, { useBrowser } from '@/providers/BrowserProvider';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { SettingsPageTab } from '@/components/SettingsPage';
+import { useLocation, useNavigate } from 'react-router-dom';
 const PANEL_RESIZE_DRAGGING_EVENT = 'emdash:panel-resize-dragging';
 type ResizeHandleId = 'left' | 'right';
 
@@ -83,6 +90,12 @@ export function Workspace() {
   useTheme(); // Initialize theme on app startup
   const { showModal } = useModalContext();
   const { settings } = useAppSettings();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const route = useMemo(
+    () => parseWorkspaceRoute(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
 
   // Agent event hook: plays sounds and updates sidebar status for all tasks
   const handleAgentEvent = useCallback((event: import('@shared/agentEvents').AgentEvent) => {
@@ -101,26 +114,50 @@ export function Workspace() {
   }, [settings?.notifications]);
 
   // --- View-mode / UI visibility state (inlined from former useModalState) ---
-  const [showSettingsPage, setShowSettingsPage] = useState(false);
-  const [settingsPageInitialTab, setSettingsPageInitialTab] = useState<SettingsPageTab>('general');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const showSettingsPage = Boolean(route.settingsTab && routeSupportsSettingsOverlay(route.kind));
+  const settingsPageInitialTab = route.settingsTab ?? 'general';
+  const showDiffViewer = route.kind === 'diff';
+  const diffViewerInitialFile = route.diffFile;
+  const diffViewerTaskPath = route.diffTaskPath;
 
-  const openSettingsPage = useCallback((tab: SettingsPageTab = 'general') => {
-    setSettingsPageInitialTab(tab);
-    setShowSettingsPage(true);
-  }, []);
+  const openSettingsPage = useCallback(
+    (tab: SettingsPageTab = 'general') => {
+      if (!routeSupportsSettingsOverlay(route.kind)) return;
+      navigate(
+        `${location.pathname}${updateWorkspaceSearch(location.search, { settingsTab: tab })}`
+      );
+    },
+    [location.pathname, location.search, navigate, route.kind]
+  );
 
-  const handleCloseSettingsPage = useCallback(() => setShowSettingsPage(false), []);
+  const handleCloseSettingsPage = useCallback(
+    () => navigate(`${location.pathname}${updateWorkspaceSearch(location.search, {})}`),
+    [location.pathname, location.search, navigate]
+  );
   const handleToggleCommandPalette = useCallback(() => setShowCommandPalette((prev) => !prev), []);
   const handleCloseCommandPalette = useCallback(() => setShowCommandPalette(false), []);
-  const [showDiffViewer, setShowDiffViewer] = useState(false);
-  const [diffViewerInitialFile, setDiffViewerInitialFile] = useState<string | null>(null);
-  const [diffViewerTaskPath, setDiffViewerTaskPath] = useState<string | null>(null);
   const handleCloseDiffViewer = useCallback(() => {
-    setShowDiffViewer(false);
-    setDiffViewerInitialFile(null);
-    setDiffViewerTaskPath(null);
-  }, []);
+    if (route.kind !== 'diff' || !route.projectId) return;
+    if (route.taskId) {
+      navigate(
+        buildWorkspaceHref({
+          kind: 'task',
+          projectId: route.projectId,
+          taskId: route.taskId,
+        }),
+        { replace: true }
+      );
+      return;
+    }
+    navigate(
+      buildWorkspaceHref({
+        kind: 'project',
+        projectId: route.projectId,
+      }),
+      { replace: true }
+    );
+  }, [navigate, route.kind, route.projectId, route.taskId]);
   const panelHandleDraggingRef = useRef<Record<ResizeHandleId, boolean>>({
     left: false,
     right: false,
@@ -465,9 +502,22 @@ export function Workspace() {
                       forceBorder={showEditorMode}
                       onOpenChanges={(filePath?: string, taskPath?: string) => {
                         setShowEditorMode(false);
-                        setDiffViewerInitialFile(filePath ?? null);
-                        setDiffViewerTaskPath(taskPath ?? null);
-                        setShowDiffViewer(true);
+                        const projectId = selectedProject?.id ?? activeTask?.projectId;
+                        const taskId = activeTask?.id;
+                        if (!projectId || !taskId) return;
+                        navigate(
+                          buildWorkspaceHref(
+                            {
+                              kind: 'diff',
+                              projectId,
+                              taskId,
+                            },
+                            {
+                              diffFile: filePath ?? null,
+                              diffTaskPath: taskPath ?? null,
+                            }
+                          )
+                        );
                       }}
                     />
                   </ResizablePanel>

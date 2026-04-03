@@ -1,12 +1,14 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileChangesPanel } from '../../renderer/components/FileChangesPanel';
 
 const getBranchStatusMock = vi.fn();
+const gitCommitAndPushMock = vi.fn();
 const toastMock = vi.fn();
 const refreshChangesMock = vi.fn();
 const refreshPrMock = vi.fn();
+const useFileChangesMock = vi.fn();
 
 vi.mock('framer-motion', () => ({
   motion: {
@@ -31,19 +33,7 @@ vi.mock('../../renderer/hooks/useCreatePR', () => ({
 }));
 
 vi.mock('../../renderer/hooks/useFileChanges', () => ({
-  useFileChanges: () => ({
-    fileChanges: [
-      {
-        path: 'src/file.ts',
-        status: 'modified',
-        isStaged: false,
-        additions: 5,
-        deletions: 2,
-      },
-    ],
-    isLoading: false,
-    refreshChanges: refreshChangesMock,
-  }),
+  useFileChanges: (...args: unknown[]) => useFileChangesMock(...args),
 }));
 
 vi.mock('../../renderer/hooks/usePrStatus', () => ({
@@ -102,17 +92,38 @@ describe('FileChangesPanel', () => {
     refreshChangesMock.mockReset();
     refreshPrMock.mockReset();
     getBranchStatusMock.mockReset();
+    gitCommitAndPushMock.mockReset();
+    useFileChangesMock.mockReset();
     getBranchStatusMock.mockResolvedValue({
       success: true,
       branch: 'main',
       ahead: 2,
       behind: 0,
     });
+    gitCommitAndPushMock.mockResolvedValue({
+      success: true,
+      branch: 'main',
+      message: 'Update src/file.ts',
+    });
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: false,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
 
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
       value: {
         getBranchStatus: getBranchStatusMock,
+        gitCommitAndPush: gitCommitAndPushMock,
       },
     });
   });
@@ -126,5 +137,39 @@ describe('FileChangesPanel', () => {
     expect(screen.getByRole('button', { name: 'Commit' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled();
+  });
+
+  it('allows commit and push with a blank subject so the backend can generate one', async () => {
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: true,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+
+    const commitAndPushButton = screen.getByRole('button', { name: 'Commit & Push' });
+    expect(commitAndPushButton).toBeEnabled();
+
+    fireEvent.click(commitAndPushButton);
+
+    await waitFor(() =>
+      expect(gitCommitAndPushMock).toHaveBeenCalledWith({
+        taskPath: '/tmp/repo',
+        taskId: 'task-1',
+        commitMessage: undefined,
+        createBranchIfOnDefault: false,
+      })
+    );
   });
 });

@@ -237,11 +237,9 @@ const TerminalPaneComponent = forwardRef<TerminalPaneHandle, Props>(
         errorCleanupRef.current = null;
         exitCleanupRef.current?.();
         exitCleanupRef.current = null;
-        if (!keepAlive) {
-          terminalSessionRegistry.dispose(id);
-        }
+        terminalSessionRegistry.dispose(id);
       };
-    }, [id, keepAlive]);
+    }, [id]);
 
     const handleFocus = () => {
       void (async () => {

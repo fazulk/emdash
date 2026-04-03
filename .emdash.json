@@ -7,9 +7,5 @@
     ".envrc",
     "docker-compose.override.yml"
   ],
-  "scripts": {
-    "setup": "",
-    "run": "",
-    "teardown": ""
-  }
+  "tmux": true
 }

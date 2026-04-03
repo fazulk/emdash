@@ -299,17 +299,21 @@ const ChatInterface: React.FC<Props> = ({
 
   // Update terminal ID to include conversation ID and agent - unique per conversation
   const terminalId = useMemo(() => {
+    const activeProvider = (activeConversation?.provider || task.agentId || agent) as Agent;
+
     if (activeConversation?.isMain) {
-      // Main conversations use task-based ID for backward compatibility
-      // This ensures terminal sessions persist correctly
-      return makePtyId(agent, 'main', task.id);
-    } else if (activeConversationId) {
-      // Additional conversations use conversation-specific ID
-      return makePtyId(agent, 'chat', activeConversationId);
+      // Main conversations use task-based ID for backward compatibility.
+      // Always derive the provider from the active conversation/task so switching
+      // back to the main agent tab doesn't get stuck on the previous tab's agent.
+      return makePtyId(activeProvider, 'main', task.id);
     }
-    // Fallback to main format if no active conversation
-    return makePtyId(agent, 'main', task.id);
-  }, [activeConversation, activeConversationId, agent, task.id]);
+    if (activeConversationId) {
+      // Additional conversations use conversation-specific IDs.
+      return makePtyId(activeProvider, 'chat', activeConversationId);
+    }
+    // Fallback to main format if no active conversation.
+    return makePtyId(activeProvider, 'main', task.id);
+  }, [activeConversation, activeConversationId, agent, task.id, task.agentId]);
 
   // Claude needs consistent working directory to maintain session state
   const terminalCwd = useMemo(() => {
@@ -425,9 +429,7 @@ const ChatInterface: React.FC<Props> = ({
       const active =
         normalizedConversations.find((c: Conversation) => c.isActive) ?? normalizedConversations[0];
       setActiveConversationId(active.id);
-      if (active.provider) {
-        setAgent(active.provider as Agent);
-      }
+      setAgent((active.provider || task.agentId || fallbackAgentRef.current) as Agent);
 
       if (!normalizedConversations.some((c: Conversation) => c.isActive)) {
         await rpc.db.setActiveConversation({
@@ -803,22 +805,24 @@ const ChatInterface: React.FC<Props> = ({
 
   const handleSwitchChat = useCallback(
     async (conversationId: string) => {
-      // Don't dispose terminals - just switch between them
-      // Each chat maintains its own persistent terminal session
-
-      await rpc.db.setActiveConversation({
-        taskId: task.id,
-        conversationId,
-      });
-      setActiveConversationId(conversationId);
-
-      // Update provider based on conversation
+      // Switch immediately in the UI so agent tabs always feel responsive,
+      // even if persisting the active conversation is slow.
       const conv = conversations.find((c) => c.id === conversationId);
-      if (conv?.provider) {
-        setAgent(conv.provider as Agent);
+      const nextAgent = (conv?.provider || task.agentId || fallbackAgentRef.current) as Agent;
+
+      setActiveConversationId(conversationId);
+      setAgent(nextAgent);
+
+      try {
+        await rpc.db.setActiveConversation({
+          taskId: task.id,
+          conversationId,
+        });
+      } catch (error) {
+        console.error('Failed to switch chat:', error);
       }
     },
-    [task.id, conversations]
+    [task.id, task.agentId, conversations]
   );
 
   const handleCloseChat = useCallback(

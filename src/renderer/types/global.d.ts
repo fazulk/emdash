@@ -30,6 +30,7 @@ declare global {
         autoApprove?: boolean;
         initialPrompt?: string;
         skipResume?: boolean;
+        rendererSessionId?: string;
       }) => Promise<{ ok: boolean; error?: string }>;
       ptyStartDirect: (opts: {
         id: string;
@@ -42,10 +43,12 @@ declare global {
         initialPrompt?: string;
         env?: Record<string, string>;
         resume?: boolean;
+        rendererSessionId?: string;
       }) => Promise<{ ok: boolean; reused?: boolean; error?: string }>;
       ptyInput: (args: { id: string; data: string }) => void;
       ptyResize: (args: { id: string; cols: number; rows: number }) => void;
       ptyKill: (id: string) => void;
+      ptyDisconnect: (id: string) => void;
       onPtyData: (id: string, listener: (data: string) => void) => () => void;
       ptyGetSnapshot: (args: { id: string }) => Promise<{
         ok: boolean;

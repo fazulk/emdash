@@ -49,6 +49,7 @@ import { waitForShellPrompt, type PromptWaitHandle } from '../utils/waitForShell
 const owners = new Map<string, WebContents>();
 const listeners = new Set<string>();
 const promptHandles = new Map<string, PromptWaitHandle[]>();
+const rendererSessions = new Map<string, string>();
 
 function cancelPromptHandles(id: string): void {
   const handles = promptHandles.get(id);
@@ -288,6 +289,8 @@ function clearPtyData(id: string): void {
 function cleanupPtySession(id: string): void {
   // Ensure telemetry timers are cleared even on manual kill
   maybeMarkProviderFinish(id, null, undefined, 'manual_kill');
+  cancelPromptHandles(id);
+  clearPtyData(id);
   sendPtyExitGlobal(id);
   // Kill associated tmux session if this PTY was tmux-wrapped
   if (getPtyTmuxSessionName(id)) {
@@ -296,6 +299,32 @@ function cleanupPtySession(id: string): void {
   killPty(id);
   owners.delete(id);
   listeners.delete(id);
+  rendererSessions.delete(id);
+}
+
+function recyclePtyConnectionForRendererReload(id: string): void {
+  cancelPromptHandles(id);
+  clearPtyData(id);
+  killPty(id);
+  owners.delete(id);
+  listeners.delete(id);
+  rendererSessions.delete(id);
+}
+
+function shouldReuseExistingPty(id: string, rendererSessionId?: string): boolean {
+  if (!rendererSessionId) return true;
+  const existingRendererSessionId = rendererSessions.get(id);
+  if (!existingRendererSessionId) return true;
+  return existingRendererSessionId === rendererSessionId;
+}
+
+function trackRendererSession(id: string, rendererSessionId?: string): void {
+  if (!rendererSessionId) return;
+  rendererSessions.set(id, rendererSessionId);
+}
+
+function shouldForceTmuxPersistence(): boolean {
+  return process.platform !== 'win32';
 }
 
 function bufferedSendPtyData(id: string, chunk: string): void {
@@ -683,6 +712,7 @@ export function registerPtyIpc(): void {
         autoApprove?: boolean;
         initialPrompt?: string;
         skipResume?: boolean;
+        rendererSessionId?: string;
       }
     ) => {
       const ptyStartTime = performance.now();
@@ -690,16 +720,32 @@ export function registerPtyIpc(): void {
         return { ok: false, error: 'PTY disabled via EMDASH_DISABLE_PTY=1' };
       }
       try {
-        const { id, cwd, remote, shell, env, cols, rows, autoApprove, initialPrompt, skipResume } =
-          args;
+        const {
+          id,
+          cwd,
+          remote,
+          shell,
+          env,
+          cols,
+          rows,
+          autoApprove,
+          initialPrompt,
+          skipResume,
+          rendererSessionId,
+        } = args;
         const existing = getPty(id);
+        if (existing && !shouldReuseExistingPty(id, rendererSessionId)) {
+          if (getPtyTmuxSessionName(id)) recyclePtyConnectionForRendererReload(id);
+          else cleanupPtySession(id);
+        }
+        const activePty = getPty(id);
 
         // Remote PTY routing: run an interactive ssh session in a local PTY.
         if (remote?.connectionId) {
           const wc = event.sender;
           owners.set(id, wc);
 
-          if (existing) {
+          if (activePty) {
             const kind = getPtyKind(id);
             if (kind === 'ssh') {
               return { ok: true, reused: true };
@@ -713,6 +759,15 @@ export function registerPtyIpc(): void {
 
           const ssh = await resolveSshInvocation(remote.connectionId);
 
+          // Resolve tmux config from remote .emdash.json.
+          // Workspace-provisioned connections always use tmux for session persistence.
+          const isWorkspaceConnection = remote.connectionId.startsWith('workspace-');
+          const remoteTmux =
+            shouldForceTmuxPersistence() ||
+            isWorkspaceConnection ||
+            (cwd ? await resolveRemoteTmuxEnabled(ssh, cwd) : false);
+          const remoteTmuxOpt = remoteTmux ? { sessionName: getTmuxSessionName(id) } : undefined;
+
           const remoteInitCommand = cwd ? buildRemoteInitShellCommand(cwd) : undefined;
 
           const proc = startSshPty({
@@ -723,7 +778,10 @@ export function registerPtyIpc(): void {
             cols,
             rows,
             env,
+            tmuxSessionName: remoteTmuxOpt?.sessionName,
           });
+
+          trackRendererSession(id, rendererSessionId);
 
           if (!listeners.has(id)) {
             proc.onData((data) => {
@@ -737,17 +795,11 @@ export function registerPtyIpc(): void {
               sendPtyExitGlobal(id);
               owners.delete(id);
               listeners.delete(id);
+              rendererSessions.delete(id);
               removePtyRecord(id);
             });
             listeners.add(id);
           }
-
-          // Resolve tmux config from remote .emdash.json.
-          // Workspace-provisioned connections always use tmux for session persistence.
-          const isWorkspaceConnection = remote.connectionId.startsWith('workspace-');
-          const remoteTmux =
-            isWorkspaceConnection || (cwd ? await resolveRemoteTmuxEnabled(ssh, cwd) : false);
-          const remoteTmuxOpt = remoteTmux ? { sessionName: getTmuxSessionName(id) } : undefined;
 
           const remoteInit = buildRemoteInitKeystrokes({
             cwd,
@@ -763,6 +815,13 @@ export function registerPtyIpc(): void {
           } catch {}
 
           return { ok: true, tmux: remoteTmux };
+        }
+
+        if (activePty) {
+          const wc = event.sender;
+          owners.set(id, wc);
+          trackRendererSession(id, rendererSessionId);
+          return { ok: true, reused: true };
         }
 
         // Determine if we should skip resume
@@ -863,25 +922,24 @@ export function registerPtyIpc(): void {
         }
 
         const shellSetup = cwd ? await resolveShellSetup(cwd) : undefined;
-        const tmux = cwd ? await resolveTmuxEnabled(cwd) : false;
+        const tmux = shouldForceTmuxPersistence() || (cwd ? await resolveTmuxEnabled(cwd) : false);
 
-        const proc =
-          existing ??
-          (await startPty({
-            id,
-            cwd,
-            shell,
-            env,
-            cols,
-            rows,
-            autoApprove,
-            initialPrompt,
-            skipResume: shouldSkipResume,
-            shellSetup,
-            tmux,
-          }));
+        const proc = await startPty({
+          id,
+          cwd,
+          shell,
+          env,
+          cols,
+          rows,
+          autoApprove,
+          initialPrompt,
+          skipResume: shouldSkipResume,
+          shellSetup,
+          tmux,
+        });
         const wc = event.sender;
         owners.set(id, wc);
+        trackRendererSession(id, rendererSessionId);
 
         // Attach data/exit listeners once per PTY id
         if (!listeners.has(id)) {
@@ -906,6 +964,7 @@ export function registerPtyIpc(): void {
             );
             owners.delete(id);
             listeners.delete(id);
+            rendererSessions.delete(id);
             removePtyRecord(id);
           });
 
@@ -932,6 +991,7 @@ export function registerPtyIpc(): void {
                 } catch {}
                 owners.delete(ptyId);
                 listeners.delete(ptyId);
+                rendererSessions.delete(ptyId);
               }
             }
           });
@@ -1015,6 +1075,14 @@ export function registerPtyIpc(): void {
       cleanupPtySession(args.id);
     } catch (e) {
       log.error('pty:kill error', { id: args.id, error: e });
+    }
+  });
+
+  ipcMain.on('pty:disconnect', (_event, args: { id: string }) => {
+    try {
+      recyclePtyConnectionForRendererReload(args.id);
+    } catch (e) {
+      log.error('pty:disconnect error', { id: args.id, error: e });
     }
   });
 
@@ -1172,6 +1240,7 @@ export function registerPtyIpc(): void {
         initialPrompt?: string;
         env?: Record<string, string>;
         resume?: boolean;
+        rendererSessionId?: string;
       }
     ) => {
       if (process.env.EMDASH_DISABLE_PTY === '1') {
@@ -1179,15 +1248,31 @@ export function registerPtyIpc(): void {
       }
 
       try {
-        const { id, providerId, cwd, remote, cols, rows, autoApprove, initialPrompt, env, resume } =
-          args;
+        const {
+          id,
+          providerId,
+          cwd,
+          remote,
+          cols,
+          rows,
+          autoApprove,
+          initialPrompt,
+          env,
+          resume,
+          rendererSessionId,
+        } = args;
         const existing = getPty(id);
+        if (existing && !shouldReuseExistingPty(id, rendererSessionId)) {
+          if (getPtyTmuxSessionName(id)) recyclePtyConnectionForRendererReload(id);
+          else cleanupPtySession(id);
+        }
+        const activePty = getPty(id);
 
         if (remote?.connectionId) {
           const wc = event.sender;
           owners.set(id, wc);
 
-          if (existing) {
+          if (activePty) {
             const kind = getPtyKind(id);
             if (kind === 'ssh') {
               return { ok: true, reused: true };
@@ -1205,6 +1290,15 @@ export function registerPtyIpc(): void {
             initialPrompt,
             resume,
           });
+
+          // Resolve tmux config from remote .emdash.json.
+          // Workspace-provisioned connections always use tmux for session persistence.
+          const isWorkspaceConn = remote.connectionId.startsWith('workspace-');
+          const remoteTmux =
+            shouldForceTmuxPersistence() ||
+            isWorkspaceConn ||
+            (cwd ? await resolveRemoteTmuxEnabled(ssh, cwd) : false);
+          const tmuxOpt = remoteTmux ? { sessionName: getTmuxSessionName(id) } : undefined;
 
           const resolvedConfig = resolveProviderCommandConfig(providerId);
           const mergedEnv = resolvedConfig?.env ? { ...resolvedConfig.env, ...env } : env;
@@ -1264,7 +1358,10 @@ export function registerPtyIpc(): void {
             cols,
             rows,
             env: mergedEnv,
+            tmuxSessionName: tmuxOpt?.sessionName,
           });
+
+          trackRendererSession(id, rendererSessionId);
 
           if (!listeners.has(id)) {
             proc.onData((data) => {
@@ -1279,17 +1376,11 @@ export function registerPtyIpc(): void {
               maybeMarkProviderFinish(id, exitCode, signal, 'process_exit');
               owners.delete(id);
               listeners.delete(id);
+              rendererSessions.delete(id);
               removePtyRecord(id);
             });
             listeners.add(id);
           }
-
-          // Resolve tmux config from remote .emdash.json.
-          // Workspace-provisioned connections always use tmux for session persistence.
-          const isWorkspaceConn = remote.connectionId.startsWith('workspace-');
-          const remoteTmux =
-            isWorkspaceConn || (cwd ? await resolveRemoteTmuxEnabled(ssh, cwd) : false);
-          const tmuxOpt = remoteTmux ? { sessionName: getTmuxSessionName(id) } : undefined;
 
           const remoteInit = buildRemoteInitKeystrokes({
             cwd,
@@ -1310,9 +1401,10 @@ export function registerPtyIpc(): void {
           return { ok: true, tmux: remoteTmux };
         }
 
-        if (existing) {
+        if (activePty) {
           const wc = event.sender;
           owners.set(id, wc);
+          trackRendererSession(id, rendererSessionId);
           // Still track agent start even when reusing PTY (happens after shell respawn)
           maybeMarkProviderStart(id, providerId as ProviderId);
           return { ok: true, reused: true };
@@ -1344,7 +1436,7 @@ export function registerPtyIpc(): void {
         }
 
         const shellSetup = await resolveShellSetup(cwd);
-        const tmux = await resolveTmuxEnabled(cwd);
+        const tmux = shouldForceTmuxPersistence() || (await resolveTmuxEnabled(cwd));
         const codexBindingStartedAt = providerId === 'codex' ? Date.now() : 0;
 
         // Write Claude Code hook config so it calls back to Emdash on events
@@ -1405,6 +1497,7 @@ export function registerPtyIpc(): void {
 
         const wc = event.sender;
         owners.set(id, wc);
+        trackRendererSession(id, rendererSessionId);
 
         if (!listeners.has(id)) {
           proc.onData((data) => {
@@ -1434,6 +1527,7 @@ export function registerPtyIpc(): void {
               owners.delete(id);
             }
             listeners.delete(id);
+            rendererSessions.delete(id);
             removePtyRecord(id);
           });
           listeners.add(id);
@@ -1458,6 +1552,7 @@ export function registerPtyIpc(): void {
                 } catch {}
                 owners.delete(ptyId);
                 listeners.delete(ptyId);
+                rendererSessions.delete(ptyId);
               }
             }
           });

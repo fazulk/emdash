@@ -1,9 +1,7 @@
 import { Terminal, type ITerminalOptions } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { WebglAddon } from '@xterm/addon-webgl';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { ensureTerminalHost } from './terminalHost';
 import { TerminalInputBuffer } from './TerminalInputBuffer';
 import { classifyActivity } from '../lib/activityClassifier';
 import { agentStatusStore } from '../lib/agentStatusStore';
@@ -32,8 +30,10 @@ import {
 import { scheduleTerminalWriteDrain } from './writeDrainScheduler';
 import { rpc } from '@/lib/rpc';
 import { APP_SHORTCUTS, normalizeShortcutKey } from '@/hooks/useKeyboardShortcuts';
+import { rendererBootSessionId } from '@/lib/rendererBootSession';
 
 const SNAPSHOT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+const ENABLE_TERMINAL_SNAPSHOTS = false;
 const MAX_DATA_WINDOW_BYTES = 128 * 1024 * 1024; // 128 MB soft guardrail
 const FALLBACK_FONTS = 'Menlo, Monaco, Courier New, monospace';
 const DEFAULT_FONT_SIZE = 13;
@@ -102,7 +102,6 @@ export class TerminalSessionManager {
   private readonly fitAddon: FitAddon;
   private readonly serializeAddon: SerializeAddon;
   private readonly webLinksAddon: WebLinksAddon;
-  private webglAddon: WebglAddon | null = null;
   private readonly metrics: TerminalMetrics;
   private readonly container: HTMLDivElement;
   private attachedContainer: HTMLElement | null = null;
@@ -155,6 +154,8 @@ export class TerminalSessionManager {
   private wheelLineRemainder = 0;
   private activeSearchQuery = '';
   private activeSearchMatch: TerminalSearchMatch | null = null;
+  private needsRepaintAfterAttach = false;
+  private reusedPtyUsesTmux = false;
 
   // Timing for startup performance measurement
   private initStartTime: number = 0;
@@ -173,7 +174,6 @@ export class TerminalSessionManager {
       height: '100%',
       display: 'block',
     } as CSSStyleDeclaration);
-    ensureTerminalHost().appendChild(this.container);
 
     const openLink = (uri: string) => {
       if (options.onLinkClick) {
@@ -347,19 +347,9 @@ export class TerminalSessionManager {
       log.warn('Failed to register DECRQM workaround handlers', { error: err });
     }
 
-    try {
-      this.webglAddon = new WebglAddon();
-      this.webglAddon.onContextLoss?.(() => {
-        try {
-          this.webglAddon?.dispose();
-        } catch {}
-        this.webglAddon = null;
-      });
-      this.terminal.loadAddon(this.webglAddon);
-    } catch {
-      this.webglAddon = null;
-    }
-
+    // Keep xterm on its default renderer for stability. Re-attaching terminals,
+    // resizing hidden containers, and rendering TUI apps (e.g. tmux) has been
+    // visually unreliable with the WebGL addon in Electron.
     this.applyTheme(options.theme);
 
     // Custom key event handler: always attached so the dialog guard
@@ -525,6 +515,7 @@ export class TerminalSessionManager {
     requestAnimationFrame(() => {
       if (this.disposed) return;
       this.scheduleFit();
+      this.refreshTerminalSurface();
       // Restore viewport position after fit completes and terminal is fully rendered
       // Use a second requestAnimationFrame to ensure the terminal buffer is ready
       requestAnimationFrame(() => {
@@ -533,6 +524,13 @@ export class TerminalSessionManager {
           if (shouldRestoreFocus) {
             this.focus();
           }
+          this.refreshTerminalSurface();
+          this.maybeRequestRepaintAfterAttach();
+          window.setTimeout(() => {
+            if (this.disposed || !this.attachedContainer) return;
+            this.scheduleFit();
+            this.refreshTerminalSurface();
+          }, 75);
         }
       });
     });
@@ -554,7 +552,9 @@ export class TerminalSessionManager {
       this.clearQueuedResize();
       this.resizeObserver?.disconnect();
       this.resizeObserver = null;
-      ensureTerminalHost().appendChild(this.container);
+      try {
+        this.container.remove();
+      } catch {}
       this.attachedContainer = null;
       this.stopSnapshotTimer();
       // Only capture snapshot on detach if snapshots are enabled
@@ -590,9 +590,9 @@ export class TerminalSessionManager {
     // Clean up stored viewport position when session is disposed
     viewportPositions.delete(this.id);
     try {
-      window.electronAPI.ptyKill(this.id);
+      window.electronAPI.ptyDisconnect(this.id);
     } catch (error) {
-      log.warn('Failed to kill PTY during dispose', { id: this.id, error });
+      log.warn('Failed to disconnect PTY during dispose', { id: this.id, error });
     }
     this.cleanupPtyListeners();
     for (const dispose of this.disposables.splice(0)) {
@@ -1219,6 +1219,47 @@ export class TerminalSessionManager {
    * Fit the terminal to its container while preserving the user's viewport
    * position (prevents jumps when sidebars resize and trigger fits).
    */
+  private refreshTerminalSurface() {
+    if (this.disposed || !this.opened || !this.attachedContainer) return;
+    const rows = this.terminal.rows;
+    if (!Number.isFinite(rows) || rows <= 0) return;
+    try {
+      this.terminal.refresh(0, rows - 1);
+    } catch (error) {
+      log.warn('Failed to refresh terminal surface', { id: this.id, error });
+    }
+  }
+
+  private maybeRequestRepaintAfterAttach() {
+    if (!this.needsRepaintAfterAttach || this.disposed || !this.attachedContainer) return;
+    this.needsRepaintAfterAttach = false;
+
+    // Re-send the current size even if it hasn't changed. TUIs often repaint on
+    // a resize notification, and reused PTYs after a renderer refresh otherwise
+    // have no reliable way to redraw their current screen into a fresh xterm.
+    this.lastSentResize = null;
+    this.sendSizeIfStarted();
+
+    // Follow with Ctrl+L as a lightweight redraw nudge. This is less invasive
+    // than injecting a shell command and helps shells/TUIs/tmux repaint after
+    // the new renderer attaches.
+    requestAnimationFrame(() => {
+      if (this.disposed || !this.ptyStarted) return;
+      try {
+        window.electronAPI.ptyInput({ id: this.id, data: '\f' });
+        log.info('terminalSession:requestedRepaintAfterAttach', {
+          id: this.id,
+          tmux: this.reusedPtyUsesTmux,
+        });
+      } catch (error) {
+        log.warn('Failed to request terminal repaint after attach', {
+          id: this.id,
+          error,
+        });
+      }
+    });
+  }
+
   private fitPreservingViewport() {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
@@ -1334,6 +1375,12 @@ export class TerminalSessionManager {
       this.stopSnapshotTimer();
     }
 
+    // On renderer reload we may reconnect to an already-running PTY with a brand
+    // new xterm instance. Mark that path so the first visible attach can force a
+    // redraw/repaint nudge after fit.
+    this.needsRepaintAfterAttach = Boolean(result?.reused);
+    this.reusedPtyUsesTmux = Boolean(result?.tmux);
+
     // Decide whether to restore snapshot based on PTY result
     try {
       if (result?.tmux) {
@@ -1363,6 +1410,9 @@ export class TerminalSessionManager {
   }
 
   private async fetchSnapshot(): Promise<any | null> {
+    // Snapshots are temporarily disabled because replaying serialized terminal
+    // state on reload/reattach is producing visual corruption and stale UI.
+    if (!ENABLE_TERMINAL_SNAPSHOTS) return null;
     if (this.options.disableSnapshots) return null;
     if (!window.electronAPI.ptyGetSnapshot) return null;
 
@@ -1416,6 +1466,7 @@ export class TerminalSessionManager {
               initialPrompt,
               env,
               resume: hasExistingSession,
+              rendererSessionId: rendererBootSessionId,
             })
           : window.electronAPI.ptyStart({
               id,
@@ -1427,6 +1478,7 @@ export class TerminalSessionManager {
               rows: initialSize.rows,
               autoApprove,
               initialPrompt,
+              rendererSessionId: rendererBootSessionId,
             });
 
       const result = await ptyPromise.catch((error: any) => {
@@ -1611,6 +1663,7 @@ export class TerminalSessionManager {
   }
 
   private captureSnapshot(reason: 'interval' | 'detach' | 'dispose'): Promise<void> {
+    if (!ENABLE_TERMINAL_SNAPSHOTS) return Promise.resolve();
     if (!window.electronAPI.ptySaveSnapshot) return Promise.resolve();
     if (this.disposed) return Promise.resolve();
     // Skip snapshots for non-main chats

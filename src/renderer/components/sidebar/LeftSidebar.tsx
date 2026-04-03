@@ -306,6 +306,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const [changelogCardHeight, setChangelogCardHeight] = useState(0);
 
   const [forceOpenIds, setForceOpenIds] = useState<Set<string>>(new Set());
+  const [projectOpenMap, setProjectOpenMap] = useState<Record<string, boolean>>({});
   const prevTaskCountsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -467,12 +468,18 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       const activeSortMode: TaskSortMode =
                         taskSortModeMap[typedProject.id] ?? 'lastActive';
 
+                      const isProjectOpen =
+                        forceOpenIds.has(typedProject.id) || projectOpenMap[typedProject.id] !== false;
+
                       return (
                         <SidebarMenuItem>
                           <Collapsible
-                            defaultOpen
-                            open={forceOpenIds.has(typedProject.id) ? true : undefined}
-                            onOpenChange={() => {
+                            open={isProjectOpen}
+                            onOpenChange={(nextOpen) => {
+                              setProjectOpenMap((prev) => ({
+                                ...prev,
+                                [typedProject.id]: nextOpen,
+                              }));
                               if (forceOpenIds.has(typedProject.id)) {
                                 setForceOpenIds((s) => {
                                   const n = new Set(s);
@@ -578,7 +585,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                   }}
                                 </ReorderList>
                                 {(archivedTasksByProjectId[typedProject.id]?.length ?? 0) > 0 && (
-                                  <Collapsible className="mt-1">
+                                  <Collapsible className="group/archived mt-1">
                                     <CollapsibleTrigger asChild>
                                       <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-black/5">
                                         <Archive className="h-3 w-3 opacity-50" />

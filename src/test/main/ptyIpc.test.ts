@@ -223,6 +223,7 @@ vi.mock('../../shared/providers/registry', () => ({
   PROVIDER_IDS: ['codex', 'claude', 'opencode'],
   getProvider: vi.fn((id: string) => ({
     name: id === 'codex' ? 'Codex' : id === 'opencode' ? 'OpenCode' : 'Claude Code',
+    cli: id,
   })),
 }));
 
@@ -366,6 +367,86 @@ describe('ptyIpc notification lifecycle', () => {
     expect(notificationShow).not.toHaveBeenCalled();
   });
 
+  it('does not reuse an agent PTY across renderer reloads', async () => {
+    const { registerPtyIpc } = await import('../../main/services/ptyIpc');
+    registerPtyIpc();
+
+    const startDirect = ipcHandleHandlers.get('pty:startDirect');
+    expect(startDirect).toBeTypeOf('function');
+
+    const id = makePtyId('claude', 'main', 'task-renderer-reload');
+    const sender = createSender();
+
+    const first = await startDirect!({ sender }, {
+      id,
+      providerId: 'claude',
+      cwd: '/tmp/task',
+      cols: 120,
+      rows: 32,
+      rendererSessionId: 'renderer-1',
+    });
+    expect(first?.ok).toBe(true);
+    expect(first?.reused).not.toBe(true);
+
+    const firstProc = ptys.get(id);
+    expect(firstProc).toBeDefined();
+    expect(startPtyMock).toHaveBeenCalledTimes(1);
+
+    const second = await startDirect!({ sender }, {
+      id,
+      providerId: 'claude',
+      cwd: '/tmp/task',
+      cols: 120,
+      rows: 32,
+      rendererSessionId: 'renderer-2',
+    });
+    expect(second?.ok).toBe(true);
+    expect(second?.reused).not.toBe(true);
+    expect(killPtyMock).toHaveBeenCalledWith(id);
+    expect(startPtyMock).toHaveBeenCalledTimes(2);
+
+    const secondProc = ptys.get(id);
+    expect(secondProc).toBeDefined();
+    expect(secondProc).not.toBe(firstProc);
+  });
+
+  it('reuses an agent PTY while the same renderer session stays mounted', async () => {
+    const { registerPtyIpc } = await import('../../main/services/ptyIpc');
+    registerPtyIpc();
+
+    const startDirect = ipcHandleHandlers.get('pty:startDirect');
+    expect(startDirect).toBeTypeOf('function');
+
+    const id = makePtyId('claude', 'main', 'task-renderer-stable');
+    const sender = createSender();
+
+    await startDirect!({ sender }, {
+      id,
+      providerId: 'claude',
+      cwd: '/tmp/task',
+      cols: 120,
+      rows: 32,
+      rendererSessionId: 'renderer-1',
+    });
+
+    const firstProc = ptys.get(id);
+    expect(firstProc).toBeDefined();
+
+    const second = await startDirect!({ sender }, {
+      id,
+      providerId: 'claude',
+      cwd: '/tmp/task',
+      cols: 120,
+      rows: 32,
+      rendererSessionId: 'renderer-1',
+    });
+
+    expect(second?.ok).toBe(true);
+    expect(second?.reused).toBe(true);
+    expect(startPtyMock).toHaveBeenCalledTimes(1);
+    expect(ptys.get(id)).toBe(firstProc);
+  });
+
   it('injects remote init commands so provider lookup uses login shell PATH', async () => {
     const { registerPtyIpc } = await import('../../main/services/ptyIpc');
     registerPtyIpc();
@@ -490,7 +571,7 @@ describe('ptyIpc notification lifecycle', () => {
     expect(sender.send).toHaveBeenCalledWith(`pty:data:${id}`, 'Marko Ranđelović');
   });
 
-  it('keeps replacement PTY writable after direct CLI exit triggers shell respawn', async () => {
+  it('routes direct provider sessions through the shell-backed tmux path and keeps them writable', async () => {
     const { registerPtyIpc } = await import('../../main/services/ptyIpc');
     registerPtyIpc();
 
@@ -506,23 +587,14 @@ describe('ptyIpc notification lifecycle', () => {
       { id, providerId: 'codex', cwd: '/tmp/task', cols: 120, rows: 32, resume: true }
     );
     expect(result?.ok).toBe(true);
+    expect(startDirectPtyMock).not.toHaveBeenCalled();
+    expect(startPtyMock).toHaveBeenCalledOnce();
 
-    const directProc = ptys.get(id);
-    expect(directProc).toBeDefined();
-
-    directProc!.emitExit(130, undefined);
-
-    // Shell respawn replaced the old PTY record; stale cleanup must not delete it.
-    const replacementProc = ptys.get(id);
-    expect(replacementProc).toBeDefined();
-    expect(replacementProc).not.toBe(directProc);
-    expect(telemetryCaptureMock).toHaveBeenCalledWith(
-      'agent_run_finish',
-      expect.objectContaining({ provider: 'codex' })
-    );
+    const proc = ptys.get(id);
+    expect(proc).toBeDefined();
 
     ptyInput!({}, { id, data: 'codex resume --last\r' });
-    expect(replacementProc!.write).toHaveBeenCalledWith('codex resume --last\r');
+    expect(proc!.write).toHaveBeenCalledWith('codex resume --last\r');
   });
 
   it('still cleans up direct PTY exit when no replacement PTY exists', async () => {
@@ -967,7 +1039,6 @@ describe('ptyIpc notification lifecycle', () => {
     );
 
     // Setup is still pending — PTY must not be spawned yet
-    expect(startDirectPtyMock).not.toHaveBeenCalled();
     expect(startPtyMock).not.toHaveBeenCalled();
 
     // Unblock setup and wait for the handler to finish
@@ -975,7 +1046,7 @@ describe('ptyIpc notification lifecycle', () => {
     await handlerPromise;
 
     // PTY should now be spawned
-    expect(startDirectPtyMock).toHaveBeenCalledOnce();
+    expect(startPtyMock).toHaveBeenCalledOnce();
   });
 
   it('pty:start waits for in-flight setup before spawning shell PTY', async () => {

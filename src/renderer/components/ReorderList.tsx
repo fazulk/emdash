@@ -11,6 +11,7 @@ interface ReorderListProps<T> {
   itemClassName?: string;
   layoutScroll?: boolean;
   as?: keyof JSX.IntrinsicElements | React.ComponentType<any>;
+  itemAs?: keyof JSX.IntrinsicElements | React.ComponentType<any>;
   getKey?: (item: T, index: number) => string | number;
   children: (item: T, index: number) => React.ReactNode;
 }
@@ -23,6 +24,7 @@ export function ReorderList<T>({
   itemClassName,
   layoutScroll = true,
   as = 'div',
+  itemAs = 'div',
   getKey,
   children,
 }: ReorderListProps<T>) {
@@ -37,6 +39,7 @@ export function ReorderList<T>({
     >
       {items.map((item, index) => (
         <Reorder.Item
+          as={itemAs as any}
           key={(getKey ? getKey(item, index) : (index as any)) as React.Key}
           value={item as any}
           className={itemClassName}

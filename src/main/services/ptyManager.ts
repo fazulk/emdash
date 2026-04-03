@@ -1074,12 +1074,22 @@ export function startSshPty(options: {
   cols?: number;
   rows?: number;
   env?: Record<string, string>;
+  tmuxSessionName?: string;
 }): IPty {
   if (process.env.EMDASH_DISABLE_PTY === '1') {
     throw new Error('PTY disabled via EMDASH_DISABLE_PTY=1');
   }
 
-  const { id, target, sshArgs = [], remoteInitCommand, cols = 120, rows = 32, env } = options;
+  const {
+    id,
+    target,
+    sshArgs = [],
+    remoteInitCommand,
+    cols = 120,
+    rows = 32,
+    env,
+    tmuxSessionName,
+  } = options;
 
   // Lazy load native module
   let pty: typeof import('node-pty');
@@ -1150,7 +1160,7 @@ export function startSshPty(options: {
   });
   suppressPtyPipeErrors(proc);
 
-  ptys.set(id, { id, proc, kind: 'ssh', cols, rows });
+  ptys.set(id, { id, proc, kind: 'ssh', cols, rows, tmuxSessionName });
   return proc;
 }
 

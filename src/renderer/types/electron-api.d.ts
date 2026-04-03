@@ -82,6 +82,7 @@ declare global {
         autoApprove?: boolean;
         initialPrompt?: string;
         skipResume?: boolean;
+        rendererSessionId?: string;
       }) => Promise<{ ok: boolean; tmux?: boolean; error?: string }>;
       ptyStartDirect: (opts: {
         id: string;
@@ -94,6 +95,7 @@ declare global {
         initialPrompt?: string;
         env?: Record<string, string>;
         resume?: boolean;
+        rendererSessionId?: string;
       }) => Promise<{ ok: boolean; reused?: boolean; tmux?: boolean; error?: string }>;
       ptyScpToRemote: (args: { connectionId: string; localPaths: string[] }) => Promise<{
         success: boolean;
@@ -103,6 +105,7 @@ declare global {
       ptyInput: (args: { id: string; data: string }) => void;
       ptyResize: (args: { id: string; cols: number; rows?: number }) => void;
       ptyKill: (id: string) => void;
+      ptyDisconnect: (id: string) => void;
       ptyKillTmux: (id: string) => Promise<{ ok: boolean; error?: string }>;
       onPtyData: (id: string, listener: (data: string) => void) => () => void;
       ptyGetSnapshot: (args: { id: string }) => Promise<{
@@ -1501,6 +1504,7 @@ export interface ElectronAPI {
     autoApprove?: boolean;
     initialPrompt?: string;
     skipResume?: boolean;
+    rendererSessionId?: string;
   }) => Promise<{ ok: boolean; tmux?: boolean; error?: string }>;
   ptyStartDirect: (opts: {
     id: string;
@@ -1512,6 +1516,7 @@ export interface ElectronAPI {
     initialPrompt?: string;
     env?: Record<string, string>;
     resume?: boolean;
+    rendererSessionId?: string;
   }) => Promise<{ ok: boolean; reused?: boolean; tmux?: boolean; error?: string }>;
   ptyScpToRemote: (args: { connectionId: string; localPaths: string[] }) => Promise<{
     success: boolean;
@@ -1521,6 +1526,7 @@ export interface ElectronAPI {
   ptyInput: (args: { id: string; data: string }) => void;
   ptyResize: (args: { id: string; cols: number; rows?: number }) => void;
   ptyKill: (id: string) => void;
+  ptyDisconnect: (id: string) => void;
   ptyKillTmux: (id: string) => Promise<{ ok: boolean; error?: string }>;
   onPtyData: (id: string, listener: (data: string) => void) => () => void;
   ptyGetSnapshot: (args: { id: string }) => Promise<{

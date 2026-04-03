@@ -115,11 +115,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     rows?: number;
     autoApprove?: boolean;
     initialPrompt?: string;
+    rendererSessionId?: string;
   }) => ipcRenderer.invoke('pty:start', opts),
   ptyInput: (args: { id: string; data: string }) => ipcRenderer.send('pty:input', args),
   ptyResize: (args: { id: string; cols: number; rows: number }) =>
     ipcRenderer.send('pty:resize', args),
   ptyKill: (id: string) => ipcRenderer.send('pty:kill', { id }),
+  ptyDisconnect: (id: string) => ipcRenderer.send('pty:disconnect', { id }),
   ptyKillTmux: (id: string) =>
     ipcRenderer.invoke('pty:killTmux', { id }) as Promise<{ ok: boolean; error?: string }>,
 
@@ -136,6 +138,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clickTime?: number;
     env?: Record<string, string>;
     resume?: boolean;
+    rendererSessionId?: string;
   }) => ipcRenderer.invoke('pty:startDirect', opts),
 
   ptyScpToRemote: (args: { connectionId: string; localPaths: string[] }) =>

@@ -301,7 +301,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         type="text"
         value={commitMessage}
         onChange={(e) => setCommitMessage(e.target.value)}
-        placeholder="Enter commit message"
+        placeholder="Leave blank to auto generate..."
         disabled={isLocked}
         className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         onKeyDown={(e) => {

@@ -21,6 +21,7 @@ import { upsertTaskInList } from '../lib/taskListCache';
 import { rpc } from '../lib/rpc';
 import { createTask } from '../lib/taskCreationService';
 import { buildWorkspaceHref, parseWorkspaceRoute } from '../lib/workspaceRoutes';
+import { dispatchFileChangeEvent } from '../lib/fileChangeEvents';
 import { useProjectManagementContext } from '../contexts/ProjectManagementProvider';
 import { useToast } from './use-toast';
 import { useModalContext } from '../contexts/ModalProvider';
@@ -459,6 +460,132 @@ export function useTaskManagement() {
       openTaskModal(targetProject);
     },
     [activateProjectView, projects, selectedProject, openTaskModal]
+  );
+
+  const cleanupFailedSplitTask = useCallback(
+    async (project: Project, task: Task) => {
+      updateTaskCache(project.id, (old) => old.filter((existing) => existing.id !== task.id));
+      const cleanupOps: Promise<unknown>[] = [rpc.db.deleteTask(task.id)];
+      if (task.useWorktree !== false && task.path !== project.path) {
+        cleanupOps.unshift(
+          window.electronAPI.worktreeRemove({
+            projectPath: project.path,
+            worktreeId: task.id,
+            worktreePath: task.path,
+            branch: task.branch,
+            taskName: task.name,
+          })
+        );
+      }
+      cleanupOps.push(window.electronAPI.lifecycleClearTask({ taskId: task.id }));
+      await Promise.allSettled(cleanupOps);
+    },
+    [updateTaskCache]
+  );
+
+  const handleCreateTaskFromCurrentBranch = useCallback(
+    async (
+      sourceTask: Task,
+      taskName: string,
+      agent: Agent = 'claude',
+      overrideProject?: Project
+    ) => {
+      const targetProject = overrideProject ?? projects.find((project) => project.id === sourceTask.projectId);
+      if (!targetProject) {
+        throw new Error('Could not find the project for this task.');
+      }
+      if (sourceTask.metadata?.workspace) {
+        throw new Error('This action is not available for remote workspace tasks yet.');
+      }
+      if ((sourceTask.metadata?.multiAgent?.variants?.length ?? 0) > 0) {
+        throw new Error('This action is not available for multi-agent tasks yet.');
+      }
+
+      setIsCreatingTask(true);
+      let createdTask: Task | null = null;
+      try {
+        const branchStatus = await window.electronAPI.getBranchStatus({
+          taskPath: sourceTask.path,
+          taskId: sourceTask.id,
+        });
+        const baseRef =
+          (branchStatus?.success ? branchStatus.branch : undefined) ||
+          sourceTask.branch ||
+          targetProject.gitInfo.branch ||
+          undefined;
+
+        const { task, warning } = await createTask({
+          project: targetProject,
+          taskName,
+          agentRuns: [{ agent, runs: 1 }],
+          linkedLinearIssue: null,
+          linkedGithubIssue: null,
+          linkedJiraIssue: null,
+          linkedPlainThread: null,
+          linkedGitlabIssue: null,
+          linkedForgejoIssue: null,
+          autoApprove: false,
+          nameGenerated: false,
+          useWorktree: true,
+          baseRef,
+        });
+        createdTask = task;
+        updateTaskCache(targetProject.id, (old) => upsertTaskInList(old, task));
+
+        const moveResult = await window.electronAPI.gitMoveWorkingChanges({
+          sourceTaskPath: sourceTask.path,
+          targetTaskPath: task.path,
+          sourceTaskId: sourceTask.id,
+          targetTaskId: task.id,
+        });
+        if (!moveResult?.success) {
+          throw new Error(moveResult?.error || 'Failed to move changes to the new task.');
+        }
+
+        dispatchFileChangeEvent(sourceTask.path);
+        dispatchFileChangeEvent(task.path);
+        navigate(
+          buildWorkspaceHref({
+            kind: 'task',
+            projectId: task.projectId,
+            taskId: task.id,
+          }),
+          { replace: true }
+        );
+        saveActiveIds(task.projectId, task.id);
+        queryClient.invalidateQueries({ queryKey: ['tasks', targetProject.id] });
+        toast({
+          title: moveResult.movedChanges ? 'Task created and changes moved' : 'Task created',
+          description: task.name,
+        });
+        if (warning) {
+          toast({ title: 'Warning', description: warning });
+        }
+        return task;
+      } catch (error) {
+        if (createdTask) {
+          await cleanupFailedSplitTask(targetProject, createdTask);
+        }
+        queryClient.invalidateQueries({ queryKey: ['tasks', targetProject.id] });
+        const description =
+          error instanceof Error ? error.message : 'Failed to create a task from this branch.';
+        toast({ title: 'Error', description, variant: 'destructive' });
+        throw error instanceof Error ? error : new Error(description);
+      } finally {
+        setIsCreatingTask(false);
+      }
+    },
+    [cleanupFailedSplitTask, navigate, projects, queryClient, toast, updateTaskCache]
+  );
+
+  const handleOpenCreateTaskFromCurrentBranchModal = useCallback(
+    (project: Project, task: Task) => {
+      showModal('moveChangesToTaskModal', {
+        initialProject: project,
+        sourceTask: task,
+      });
+    },
+    [showModal]
   );
 
   // ---------------------------------------------------------------------------
@@ -1120,6 +1247,7 @@ export function useTaskManagement() {
     linkedGithubIssueMap,
     isCreatingTask,
     handleCreateTask,
+    handleCreateTaskFromCurrentBranch,
     handleTaskInterfaceReady,
     openTaskModal,
     handleSelectTask,
@@ -1128,6 +1256,7 @@ export function useTaskManagement() {
     handlePrevTask,
     handleNewTask,
     handleStartCreateTaskFromSidebar,
+    handleOpenCreateTaskFromCurrentBranchModal,
     handleDeleteTask,
     handleRenameTask,
     handleArchiveTask,

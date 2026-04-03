@@ -434,6 +434,16 @@ declare global {
         action?: 'reverted';
         error?: string;
       }>;
+      gitMoveWorkingChanges: (args: {
+        sourceTaskPath: string;
+        targetTaskPath: string;
+        sourceTaskId?: string;
+        targetTaskId?: string;
+      }) => Promise<{
+        success: boolean;
+        movedChanges?: boolean;
+        error?: string;
+      }>;
       gitCommit: (args: { taskPath: string; message?: string; body?: string }) => Promise<{
         success: boolean;
         hash?: string;

@@ -329,6 +329,16 @@ declare global {
         action?: 'reverted';
         error?: string;
       }>;
+      gitMoveWorkingChanges: (args: {
+        sourceTaskPath: string;
+        targetTaskPath: string;
+        sourceTaskId?: string;
+        targetTaskId?: string;
+      }) => Promise<{
+        success: boolean;
+        movedChanges?: boolean;
+        error?: string;
+      }>;
       listRemoteBranches: (args: { projectPath: string; remote?: string }) => Promise<{
         success: boolean;
         branches?: Array<{ ref: string; remote: string; branch: string; label: string }>;

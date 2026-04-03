@@ -291,6 +291,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     archivedTasksByProjectId,
     handleSelectTask: onSelectTask,
     handleStartCreateTaskFromSidebar: onCreateTaskForProject,
+    handleOpenCreateTaskFromCurrentBranchModal,
     handleRenameTask: onRenameTask,
     handleArchiveTask: onArchiveTask,
     handleRestoreTask: onRestoreTask,
@@ -573,6 +574,18 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                           showDirectBadge={false}
                                           isPinned={!!typedTask.metadata?.isPinned}
                                           onPin={() => handlePinTask(typedTask)}
+                                          onCreateTaskFromCurrentBranch={
+                                            typedTask.metadata?.workspace ||
+                                            (typedTask.metadata?.multiAgent?.variants?.length ?? 0) > 0
+                                              ? undefined
+                                              : () =>
+                                                  handleNavigationWithCloseSettings(() =>
+                                                    handleOpenCreateTaskFromCurrentBranchModal(
+                                                      typedProject,
+                                                      typedTask
+                                                    )
+                                                  )
+                                          }
                                           onRename={(n) =>
                                             onRenameTask?.(typedProject, typedTask, n)
                                           }

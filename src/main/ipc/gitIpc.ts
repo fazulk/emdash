@@ -674,6 +674,134 @@ export function registerGitIpc() {
     return `'${arg.replace(/'/g, "'\\''")}'`;
   }
 
+  const moveWorkingChangesLocal = async (
+    sourceTaskPath: string,
+    targetTaskPath: string
+  ): Promise<{ movedChanges: boolean }> => {
+    const { stdout: statusOut } = await execFileAsync(
+      GIT,
+      ['status', '--porcelain', '--untracked-files=all'],
+      { cwd: sourceTaskPath }
+    );
+    if (!statusOut.trim()) {
+      return { movedChanges: false };
+    }
+
+    const stashTag = `emdash-move-${randomUUID()}`;
+    await execFileAsync(GIT, ['stash', 'push', '--include-untracked', '--message', stashTag], {
+      cwd: sourceTaskPath,
+    });
+
+    const { stdout: stashListOut } = await execFileAsync(
+      GIT,
+      ['stash', 'list', '--format=%gd::%s'],
+      { cwd: sourceTaskPath }
+    );
+    const stashRef = (stashListOut || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.endsWith(`::${stashTag}`))
+      ?.split('::')[0];
+
+    if (!stashRef) {
+      throw new Error('Failed to locate the temporary stash for moving changes.');
+    }
+
+    try {
+      await execFileAsync(GIT, ['stash', 'apply', '--index', stashRef], { cwd: targetTaskPath });
+    } catch (error) {
+      try {
+        await execFileAsync(GIT, ['stash', 'apply', '--index', stashRef], { cwd: sourceTaskPath });
+      } catch (restoreError) {
+        log.warn('Failed to restore source changes after move failure:', restoreError);
+      }
+      throw error;
+    }
+
+    try {
+      await execFileAsync(GIT, ['stash', 'drop', stashRef], { cwd: targetTaskPath });
+    } catch (dropError) {
+      log.warn('Failed to drop temporary stash after moving changes:', dropError);
+    }
+
+    return { movedChanges: true };
+  };
+
+  const moveWorkingChangesRemote = async (
+    connectionId: string,
+    sourceTaskPath: string,
+    targetTaskPath: string
+  ): Promise<{ movedChanges: boolean }> => {
+    const statusResult = await remoteGitService.execGit(
+      connectionId,
+      sourceTaskPath,
+      'status --porcelain --untracked-files=all'
+    );
+    if (statusResult.exitCode !== 0) {
+      throw new Error(statusResult.stderr || 'Failed to inspect git status');
+    }
+    if (!statusResult.stdout.trim()) {
+      return { movedChanges: false };
+    }
+
+    const stashTag = `emdash-move-${randomUUID()}`;
+    const stashResult = await remoteGitService.execGit(
+      connectionId,
+      sourceTaskPath,
+      `stash push --include-untracked --message ${quoteGhArg(stashTag)}`
+    );
+    if (stashResult.exitCode !== 0) {
+      throw new Error(stashResult.stderr || 'Failed to stash current changes');
+    }
+
+    const stashListResult = await remoteGitService.execGit(
+      connectionId,
+      sourceTaskPath,
+      'stash list --format=%gd::%s'
+    );
+    if (stashListResult.exitCode !== 0) {
+      throw new Error(stashListResult.stderr || 'Failed to read stash list');
+    }
+    const stashRef = (stashListResult.stdout || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.endsWith(`::${stashTag}`))
+      ?.split('::')[0];
+
+    if (!stashRef) {
+      throw new Error('Failed to locate the temporary stash for moving changes.');
+    }
+
+    const applyResult = await remoteGitService.execGit(
+      connectionId,
+      targetTaskPath,
+      `stash apply --index ${quoteGhArg(stashRef)}`
+    );
+    if (applyResult.exitCode !== 0) {
+      try {
+        await remoteGitService.execGit(
+          connectionId,
+          sourceTaskPath,
+          `stash apply --index ${quoteGhArg(stashRef)}`
+        );
+      } catch (restoreError) {
+        log.warn('Failed to restore remote source changes after move failure:', restoreError);
+      }
+      throw new Error(applyResult.stderr || 'Failed to apply changes in the new worktree');
+    }
+
+    const dropResult = await remoteGitService.execGit(
+      connectionId,
+      targetTaskPath,
+      `stash drop ${quoteGhArg(stashRef)}`
+    );
+    if (dropResult.exitCode !== 0) {
+      log.warn('Failed to drop remote temporary stash after moving changes:', dropResult.stderr);
+    }
+
+    return { movedChanges: true };
+  };
+
   const countStatusBuckets = (
     changes: Array<{ status?: string; isStaged?: boolean }>
   ): { staged: number; unstaged: number; untracked: number } => {
@@ -2676,6 +2804,62 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
         return { success: true, remotePushed };
       } catch (error) {
         log.error('Failed to rename branch:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'git:move-working-changes',
+    async (
+      _,
+      args: {
+        sourceTaskPath: string;
+        targetTaskPath: string;
+        sourceTaskId?: string;
+        targetTaskId?: string;
+      }
+    ) => {
+      try {
+        const sourceTaskPath = args?.sourceTaskPath?.trim();
+        const targetTaskPath = args?.targetTaskPath?.trim();
+        if (!sourceTaskPath) return { success: false, error: 'sourceTaskPath is required' };
+        if (!targetTaskPath) return { success: false, error: 'targetTaskPath is required' };
+        if (sourceTaskPath === targetTaskPath) {
+          return { success: false, error: 'Source and target worktrees must be different' };
+        }
+
+        const sourceRemote = await resolveRemoteContext(sourceTaskPath, args?.sourceTaskId);
+        const targetRemote = await resolveRemoteContext(targetTaskPath, args?.targetTaskId);
+        if (Boolean(sourceRemote) !== Boolean(targetRemote)) {
+          return {
+            success: false,
+            error: 'Source and target worktrees must both be local or both be remote',
+          };
+        }
+        if (
+          sourceRemote &&
+          targetRemote &&
+          sourceRemote.connectionId !== targetRemote.connectionId
+        ) {
+          return {
+            success: false,
+            error: 'Source and target worktrees must use the same remote connection',
+          };
+        }
+
+        const result = sourceRemote
+          ? await moveWorkingChangesRemote(
+              sourceRemote.connectionId,
+              sourceRemote.remotePath,
+              targetRemote?.remotePath || targetTaskPath
+            )
+          : await moveWorkingChangesLocal(sourceTaskPath, targetTaskPath);
+
+        broadcastGitStatusChange(sourceTaskPath);
+        broadcastGitStatusChange(targetTaskPath);
+        return { success: true, movedChanges: result.movedChanges };
+      } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
     }

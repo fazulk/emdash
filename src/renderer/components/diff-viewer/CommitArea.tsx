@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, ArrowDown, Undo2, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowUp, ArrowDown, Undo2, Loader2, GitBranchPlus } from 'lucide-react';
 import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import { useToast } from '../../hooks/use-toast';
 import type { FileChange } from '../../hooks/useFileChanges';
 import { subscribeToFileChanges } from '../../lib/fileChangeEvents';
+import { useTaskManagementContext } from '../../contexts/TaskManagementContext';
+import { useProjectManagementContext } from '../../contexts/ProjectManagementProvider';
 
 interface CommitAreaProps {
   taskPath?: string;
@@ -54,6 +56,8 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   onRefreshChanges,
 }) => {
   const { toast } = useToast();
+  const { selectedProject } = useProjectManagementContext();
+  const { activeTask, handleOpenCreateTaskFromCurrentBranchModal } = useTaskManagementContext();
   const { operation, beginOperation, endOperation, isLocked } = useGitWorkspaceBusyForTask(taskPath);
   const [commitMessage, setCommitMessage] = useState('');
   const [description, setDescription] = useState('');
@@ -64,10 +68,13 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
 
   const hasStagedFiles = fileChanges.some((f) => f.isStaged);
   const hasOnlyUnstagedChanges = fileChanges.length > 0 && !hasStagedFiles;
-  const isCommitting = operation === 'commit' || operation === 'commitAndPush';
+  const canCreateTaskFromCurrentBranch =
+    !!selectedProject &&
+    !!activeTask &&
+    activeTask.path === taskPath &&
+    !activeTask.metadata?.workspace &&
+    (activeTask.metadata?.multiAgent?.variants?.length ?? 0) === 0;
   const isPushing = operation === 'push';
-  const isPulling = operation === 'pull';
-  const isUndoing = operation === 'undo';
   const canCommit = hasStagedFiles && !isLocked;
 
   const fetchBranch = useCallback(async () => {
@@ -281,6 +288,18 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         disabled={isLocked}
         className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       />
+
+      {canCreateTaskFromCurrentBranch && activeTask ? (
+        <button
+          type="button"
+          onClick={() => handleOpenCreateTaskFromCurrentBranchModal(selectedProject, activeTask)}
+          disabled={isLocked}
+          className="flex items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <GitBranchPlus className="h-3.5 w-3.5" />
+          New Task from Branch
+        </button>
+      ) : null}
 
       {/* Commit & Push & Pull buttons */}
       <div className="flex gap-2">

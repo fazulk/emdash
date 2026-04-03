@@ -416,6 +416,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:update-index', args),
   revertFile: (args: { taskPath: string; taskId?: string; filePath: string }) =>
     ipcRenderer.invoke('git:revert-file', args),
+  gitMoveWorkingChanges: (args: {
+    sourceTaskPath: string;
+    targetTaskPath: string;
+    sourceTaskId?: string;
+    targetTaskId?: string;
+  }) => ipcRenderer.invoke('git:move-working-changes', args),
   gitCommit: (args: { taskPath: string; message?: string; body?: string }) =>
     ipcRenderer.invoke('git:commit', args),
   gitPush: (args: { taskPath: string }) => ipcRenderer.invoke('git:push', args),

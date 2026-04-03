@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { AlertCircle, Archive, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { AlertCircle, Archive, GitBranchPlus, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import { WorktreeIcon } from './icons/WorktreeIcon';
 
 import { useTaskChanges } from '../hooks/useTaskChanges';
@@ -59,6 +59,7 @@ interface TaskItemProps {
   onArchive?: () => void | Promise<void | boolean>;
   onRename?: (newName: string) => void | Promise<void>;
   onPin?: () => void | Promise<void>;
+  onCreateTaskFromCurrentBranch?: () => void | Promise<void>;
   isPinned?: boolean;
   showDelete?: boolean;
   showDirectBadge?: boolean;
@@ -71,6 +72,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   onArchive,
   onRename,
   onPin,
+  onCreateTaskFromCurrentBranch,
   isPinned,
   showDelete,
   showDirectBadge = true,
@@ -340,7 +342,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   );
 
   // Wrap with context menu if rename, delete, archive, or pin is available
-  if (onRename || onDelete || onArchive || onPin) {
+  if (onRename || onDelete || onArchive || onPin || onCreateTaskFromCurrentBranch) {
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>{taskContent}</ContextMenuTrigger>
@@ -363,6 +365,17 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                   Pin
                 </>
               )}
+            </ContextMenuItem>
+          )}
+          {onCreateTaskFromCurrentBranch && (
+            <ContextMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateTaskFromCurrentBranch();
+              }}
+            >
+              <GitBranchPlus className="mr-2 h-3.5 w-3.5" />
+              New task from current branch
             </ContextMenuItem>
           )}
           {onRename && (

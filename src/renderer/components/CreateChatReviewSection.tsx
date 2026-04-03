@@ -13,6 +13,7 @@ interface CreateChatReviewSectionProps {
   reviewPrompt: string;
   onReviewPromptChange: (prompt: string) => void;
   installedAgents: string[];
+  hiddenAgents?: string[];
 }
 
 export function CreateChatReviewSection({
@@ -23,6 +24,7 @@ export function CreateChatReviewSection({
   reviewPrompt,
   onReviewPromptChange,
   installedAgents,
+  hiddenAgents = [],
 }: CreateChatReviewSectionProps) {
   return (
     <div className="space-y-3">
@@ -50,6 +52,7 @@ export function CreateChatReviewSection({
               value={reviewAgent}
               onChange={onReviewAgentChange}
               installedAgents={installedAgents}
+              hiddenAgents={hiddenAgents}
             />
           </div>
 

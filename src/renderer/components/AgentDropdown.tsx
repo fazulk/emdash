@@ -12,6 +12,8 @@ interface AgentDropdownProps {
   onChange: (agent: Agent) => void;
   installedAgents: string[];
   disabledAgents?: string[];
+  /** Agents hidden entirely (e.g. disabled in settings) */
+  hiddenAgents?: string[];
   className?: string;
 }
 
@@ -20,6 +22,7 @@ export const AgentDropdown: React.FC<AgentDropdownProps> = ({
   onChange,
   installedAgents,
   disabledAgents = [],
+  hiddenAgents = [],
   className = '',
 }) => {
   const installedSet = new Set(installedAgents);
@@ -31,7 +34,7 @@ export const AgentDropdown: React.FC<AgentDropdownProps> = ({
         </SelectTrigger>
         <SelectContent side="top" className="z-[120]">
           {Object.entries(agentConfig)
-            .filter(([key]) => installedSet.has(key))
+            .filter(([key]) => installedSet.has(key) && !hiddenAgents.includes(key))
             .map(([key, config]) => {
               const isDisabled = disabledAgents.includes(key);
               const content = (

@@ -17,6 +17,7 @@ import { isValidProviderId } from '@shared/providers/registry';
 import type { Agent } from '../types';
 import { rpc } from '@/lib/rpc';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
+import { getDisabledProviderIds } from '@/lib/agentAvailability';
 import { getReviewSettings } from '@/lib/reviewChat';
 import { agentMeta } from '@/providers/meta';
 import { buildReviewConversationMetadata } from '@shared/reviewPreset';
@@ -43,6 +44,7 @@ export function CreateChatModal({
   installedAgents,
 }: CreateChatModalProps) {
   const { settings } = useAppSettings();
+  const settingsDisabledAgents = getDisabledProviderIds(settings);
   const [selectedAgent, setSelectedAgent] = useState<Agent>(DEFAULT_AGENT);
   const [reviewEnabled, setReviewEnabled] = useState(false);
   const [reviewAgent, setReviewAgent] = useState<Agent>(DEFAULT_AGENT);
@@ -172,6 +174,7 @@ export function CreateChatModal({
                 value={selectedAgent}
                 onChange={setSelectedAgent}
                 installedAgents={installedAgents}
+                hiddenAgents={settingsDisabledAgents}
               />
             </div>
           ) : null}
@@ -188,6 +191,7 @@ export function CreateChatModal({
               reviewPrompt={reviewPrompt}
               onReviewPromptChange={setReviewPrompt}
               installedAgents={installedAgents}
+              hiddenAgents={settingsDisabledAgents}
             />
           ) : null}
           {error && <p className="text-xs text-destructive">{error}</p>}

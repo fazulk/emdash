@@ -77,15 +77,17 @@ const renderAgentRow = (
         </span>
       }
       rightExtra={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <TooltipProvider delayDuration={150}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Switch
-                  checked={!isDisabled}
-                  onCheckedChange={(checked) => onToggleAgentDisabled?.(agent.id, !checked)}
-                  aria-label={`${isDisabled ? 'Enable' : 'Disable'} ${agent.name}`}
-                />
+                <span>
+                  <Switch
+                    checked={!isDisabled}
+                    onCheckedChange={(checked) => onToggleAgentDisabled?.(agent.id, !checked)}
+                    aria-label={`${isDisabled ? 'Show' : 'Hide'} ${agent.name}`}
+                  />
+                </span>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
                 {isDisabled ? 'Show in New Task and New Agent' : 'Hide from New Task and New Agent'}

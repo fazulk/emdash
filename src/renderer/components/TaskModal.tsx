@@ -18,7 +18,6 @@ import { useIntegrationStatus } from './hooks/useIntegrationStatus';
 import { type Agent } from '../types';
 import { type AgentRun } from '../types/chat';
 import { agentMeta } from '../providers/meta';
-import { isValidProviderId } from '@shared/providers/registry';
 import { type LinearIssueSummary } from '../types/linear';
 import { type GitHubIssueSummary } from '../types/github';
 import { type JiraIssueSummary } from '../types/jira';
@@ -35,13 +34,13 @@ import { generateTaskNameFromContext } from '../lib/branchNameGenerator';
 import type { Project } from '../types/app';
 import { useProjectManagementContext } from '../contexts/ProjectManagementProvider';
 import { useTaskManagementContext } from '../contexts/TaskManagementContext';
-import { rpc } from '@/lib/rpc';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
 import { filterDisabledProviders, getDisabledProviderIds } from '@/lib/agentAvailability';
 import { PROVIDER_IDS } from '@shared/providers/registry';
 import { useCliAgentDetection } from '@/hooks/useCliAgentDetection';
 import { WorktreeIcon } from './icons/WorktreeIcon';
+import { resolveDefaultTaskAgent } from '@/lib/defaultTaskAgent';
 
 const DEFAULT_AGENT: Agent = 'claude';
 
@@ -234,6 +233,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
   const userHasTypedRef = useRef(false);
   const autoNameInitializedRef = useRef(false);
   const customNameTrackedRef = useRef(false);
+  const didResetOnOpenRef = useRef(false);
+  const settingsInitializedRef = useRef(false);
+  const agentSelectionIsAutomaticRef = useRef(true);
   // True when the name was derived from context (prompt/issue) — already descriptive
   const nameFromContextRef = useRef(false);
 
@@ -296,8 +298,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
     if (!hasAutoApproveSupport && autoApprove) setAutoApprove(false);
   }, [hasAutoApproveSupport, autoApprove]);
 
-  // Reset form and load settings on mount
+  // Reset form on mount
   useEffect(() => {
+    if (didResetOnOpenRef.current) return;
+    didResetOnOpenRef.current = true;
+
     void refreshBranches();
     // Reset state
     setTaskName('');
@@ -312,11 +317,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
     setSelectedGitlabIssue(null);
     setSelectedPlainThread(null);
     setSelectedForgejoIssue(null);
+    setAgentRuns([{ agent: DEFAULT_AGENT, runs: 1 }]);
     setAutoApprove(false);
     setUseWorktree(true);
     userHasTypedRef.current = false;
     autoNameInitializedRef.current = false;
     customNameTrackedRef.current = false;
+    settingsInitializedRef.current = false;
+    agentSelectionIsAutomaticRef.current = true;
     nameFromContextRef.current = false;
     userChangedBranchRef.current = false;
     setSelectedBranch(defaultBranch);
@@ -327,29 +335,29 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
     setTaskName(suggested);
     setError(validate(suggested));
     autoNameInitializedRef.current = true;
+  }, [defaultBranch, normalizedExisting, refreshBranches, validate]);
 
-    // Load settings
-    let cancel = false;
-    rpc.appSettings.get().then((settings) => {
-      if (cancel) return;
+  useEffect(() => {
+    if (!appSettings) return;
 
-      const settingsAgent = settings?.defaultProvider;
-      const firstVisibleAgent = (visibleAgents[0] as Agent | undefined) ?? undefined;
-      const firstEnabledAgent = (enabledAgents[0] as Agent | undefined) ?? DEFAULT_AGENT;
-      const agent: Agent =
-        isValidProviderId(settingsAgent) && visibleAgents.includes(settingsAgent)
-          ? (settingsAgent as Agent)
-          : (firstVisibleAgent ?? firstEnabledAgent);
+    const agent = resolveDefaultTaskAgent(
+      appSettings.defaultProvider,
+      enabledAgents,
+      visibleAgents
+    );
+
+    if (!settingsInitializedRef.current) {
+      settingsInitializedRef.current = true;
+      agentSelectionIsAutomaticRef.current = true;
       setAgentRuns([{ agent, runs: 1 }]);
 
-      const autoApproveByDefault = settings?.tasks?.autoApproveByDefault ?? false;
+      const autoApproveByDefault = appSettings.tasks?.autoApproveByDefault ?? false;
       setAutoApprove(autoApproveByDefault && !!agentMeta[agent]?.autoApproveFlag);
 
-      const createWorktreeByDefault = settings?.tasks?.createWorktreeByDefault ?? true;
+      const createWorktreeByDefault = appSettings.tasks?.createWorktreeByDefault ?? true;
       setUseWorktree(createWorktreeByDefault);
 
-      // Handle auto-generate setting
-      const shouldAutoGenerate = settings?.tasks?.autoGenerateName !== false;
+      const shouldAutoGenerate = appSettings.tasks?.autoGenerateName !== false;
       setAutoGenerateName(shouldAutoGenerate);
       if (!shouldAutoGenerate && !userHasTypedRef.current) {
         setAutoGeneratedName('');
@@ -357,14 +365,19 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
         setError(null);
       }
 
-      // Handle auto-infer setting
-      setAutoInferTaskNames(settings?.tasks?.autoInferTaskNames === true);
-    });
+      setAutoInferTaskNames(appSettings.tasks?.autoInferTaskNames === true);
+      return;
+    }
 
-    return () => {
-      cancel = true;
-    };
-  }, [disabledAgents, enabledAgents]);
+    if (!agentSelectionIsAutomaticRef.current) return;
+
+    setAgentRuns((current) => {
+      if (current.length !== 1 || current[0]?.agent !== agent) {
+        return [{ agent, runs: 1 }];
+      }
+      return current;
+    });
+  }, [appSettings, enabledAgents, visibleAgents]);
 
   useEffect(() => {
     if (!visibleAgents.length) return;
@@ -584,7 +597,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
             <Label className="shrink-0">Agent</Label>
             <MultiAgentDropdown
               agentRuns={agentRuns}
-              onChange={setAgentRuns}
+              onChange={(nextAgentRuns) => {
+                agentSelectionIsAutomaticRef.current = false;
+                setAgentRuns(nextAgentRuns);
+              }}
               disabledAgents={disabledAgents}
               visibleAgents={visibleAgents}
             />

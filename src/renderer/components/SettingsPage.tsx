@@ -33,7 +33,7 @@ import { WorkspaceProviderInfoCard } from './WorkspaceProviderInfoCard';
 import { useTaskSettings } from '../hooks/useTaskSettings';
 import type { SettingsPageTab } from '../types/settings';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
-import type { ProviderId } from '@shared/providers/registry';
+import { PROVIDER_IDS, type ProviderId } from '@shared/providers/registry';
 export type { SettingsPageTab } from '../types/settings';
 
 // Helper functions from SettingsModal
@@ -186,6 +186,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ initialTab, onClose 
     });
   }, [cliAgents]);
   const disabledAgentIds = settings?.disabledProviders ?? [];
+  const availableAgentIds = React.useMemo(() => {
+    const connectedAgentIds = new Set(
+      cliAgents.filter((agent) => agent.status === 'connected').map((agent) => agent.id)
+    );
+    return PROVIDER_IDS.filter(
+      (agentId) => connectedAgentIds.has(agentId) && !disabledAgentIds.includes(agentId)
+    );
+  }, [cliAgents, disabledAgentIds]);
 
   const handleToggleAgentDisabled = useCallback(
     (agentId: string, disabled: boolean) => {
@@ -235,8 +243,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ initialTab, onClose 
       title: 'Agents',
       description: 'Manage CLI agents and model configurations.',
       sections: [
-        { component: <DefaultAgentSettingsCard /> },
-        { component: <ReviewAgentSettingsCard /> },
+        { component: <DefaultAgentSettingsCard availableAgentIds={availableAgentIds} /> },
+        { component: <ReviewAgentSettingsCard availableAgentIds={availableAgentIds} /> },
         {
           title: 'CLI agents',
           component: (

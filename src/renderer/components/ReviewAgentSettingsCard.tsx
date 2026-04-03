@@ -12,8 +12,6 @@ import {
   type ReviewSettings,
 } from '@shared/reviewPreset';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
-import { filterDisabledProviders, getFirstEnabledProvider } from '@/lib/agentAvailability';
-import { PROVIDER_IDS } from '@shared/providers/registry';
 
 const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
   enabled: false,
@@ -21,19 +19,22 @@ const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
   prompt: DEFAULT_REVIEW_PROMPT,
 };
 
-const ReviewAgentSettingsCard: React.FC = () => {
+interface ReviewAgentSettingsCardProps {
+  availableAgentIds: string[];
+}
+
+const ReviewAgentSettingsCard: React.FC<ReviewAgentSettingsCardProps> = ({ availableAgentIds }) => {
   const { settings, updateSettings, isLoading: loading, isSaving: saving } = useAppSettings();
 
   const reviewSettings = useMemo<ReviewSettings>(() => {
     const configured = settings?.review;
-    const enabledAgents = filterDisabledProviders(PROVIDER_IDS, settings);
     const fallbackAgent =
-      getFirstEnabledProvider(enabledAgents, settings) ?? DEFAULT_REVIEW_SETTINGS.agent;
+      (availableAgentIds[0] as Agent | undefined) ?? DEFAULT_REVIEW_SETTINGS.agent;
     const configuredAgent = isValidProviderId(configured?.agent) ? configured.agent : undefined;
     return {
       enabled: configured?.enabled ?? DEFAULT_REVIEW_SETTINGS.enabled,
       agent:
-        configuredAgent && !settings?.disabledProviders?.includes(configuredAgent)
+        configuredAgent && availableAgentIds.includes(configuredAgent)
           ? configuredAgent
           : fallbackAgent,
       prompt:
@@ -41,7 +42,7 @@ const ReviewAgentSettingsCard: React.FC = () => {
           ? configured.prompt
           : DEFAULT_REVIEW_SETTINGS.prompt,
     };
-  }, [settings]);
+  }, [availableAgentIds, settings]);
 
   const [promptDraft, setPromptDraft] = useState(reviewSettings.prompt);
 
@@ -92,6 +93,7 @@ const ReviewAgentSettingsCard: React.FC = () => {
             onChange={(agent) => updateSettings({ review: { agent } })}
             disabled={loading || saving}
             disabledAgents={settings?.disabledProviders ?? []}
+            availableAgents={availableAgentIds}
             className="w-full"
           />
         </div>

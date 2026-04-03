@@ -15,6 +15,7 @@ interface AgentSelectorProps {
   onChange: (agent: Agent) => void;
   disabled?: boolean;
   disabledAgents?: string[];
+  availableAgents?: string[];
   className?: string;
 }
 
@@ -23,8 +24,11 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   onChange,
   disabled = false,
   disabledAgents = [],
+  availableAgents,
   className = '',
 }) => {
+  const availableSet = availableAgents ? new Set(availableAgents) : null;
+
   return (
     <div className={`relative block w-[12rem] min-w-0 ${className}`}>
       <Select
@@ -60,23 +64,25 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
         <SelectContent side="top" className="z-[120]">
           <TooltipProvider delayDuration={150}>
             {Object.entries(agentConfig)
-              .filter(([key]) => !disabledAgents.includes(key))
+              .filter(
+                ([key]) => !disabledAgents.includes(key) && (!availableSet || availableSet.has(key))
+              )
               .map(([key, config]) => (
-              <AgentTooltipRow key={key} id={key as UiAgent}>
-                <SelectItem value={key}>
-                  <div className="flex items-center gap-2">
-                    <AgentLogo
-                      logo={config.logo}
-                      alt={config.alt}
-                      isSvg={config.isSvg}
-                      invertInDark={config.invertInDark}
-                      className="h-4 w-4 rounded-sm"
-                    />
-                    <span>{config.name}</span>
-                  </div>
-                </SelectItem>
-              </AgentTooltipRow>
-            ))}
+                <AgentTooltipRow key={key} id={key as UiAgent}>
+                  <SelectItem value={key}>
+                    <div className="flex items-center gap-2">
+                      <AgentLogo
+                        logo={config.logo}
+                        alt={config.alt}
+                        isSvg={config.isSvg}
+                        invertInDark={config.invertInDark}
+                        className="h-4 w-4 rounded-sm"
+                      />
+                      <span>{config.name}</span>
+                    </div>
+                  </SelectItem>
+                </AgentTooltipRow>
+              ))}
             {false && (
               <RoutingTooltipRow>
                 <SelectItem

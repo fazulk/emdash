@@ -3,20 +3,24 @@ import { AgentSelector } from './AgentSelector';
 import type { Agent } from '../types';
 import { isValidProviderId } from '@shared/providers/registry';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
-import { filterDisabledProviders, getFirstEnabledProvider } from '@/lib/agentAvailability';
-import { PROVIDER_IDS } from '@shared/providers/registry';
 
 const DEFAULT_AGENT: Agent = 'claude';
 
-const DefaultAgentSettingsCard: React.FC = () => {
+interface DefaultAgentSettingsCardProps {
+  availableAgentIds: string[];
+}
+
+const DefaultAgentSettingsCard: React.FC<DefaultAgentSettingsCardProps> = ({
+  availableAgentIds,
+}) => {
   const { settings, updateSettings, isLoading: loading, isSaving: saving } = useAppSettings();
 
-  const enabledAgents = filterDisabledProviders(PROVIDER_IDS, settings);
-  const fallbackAgent = getFirstEnabledProvider(enabledAgents, settings) ?? DEFAULT_AGENT;
+  const fallbackAgent = (availableAgentIds[0] as Agent | undefined) ?? DEFAULT_AGENT;
   const defaultAgent: Agent =
-    isValidProviderId(settings?.defaultProvider) && !settings?.disabledProviders?.includes(settings.defaultProvider)
+    isValidProviderId(settings?.defaultProvider) &&
+    availableAgentIds.includes(settings.defaultProvider)
       ? (settings.defaultProvider as Agent)
-      : (fallbackAgent as Agent);
+      : fallbackAgent;
 
   const handleChange = (agent: Agent) => {
     void import('../lib/telemetryClient').then(({ captureTelemetry }) => {
@@ -39,6 +43,7 @@ const DefaultAgentSettingsCard: React.FC = () => {
           onChange={handleChange}
           disabled={loading || saving}
           disabledAgents={settings?.disabledProviders ?? []}
+          availableAgents={availableAgentIds}
           className="w-full"
         />
       </div>

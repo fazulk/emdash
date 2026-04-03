@@ -15,6 +15,7 @@ interface AgentDropdownProps {
   /** Agents hidden entirely (e.g. disabled in settings) */
   hiddenAgents?: string[];
   className?: string;
+  triggerRef?: React.Ref<HTMLButtonElement>;
 }
 
 export const AgentDropdown: React.FC<AgentDropdownProps> = ({
@@ -24,12 +25,13 @@ export const AgentDropdown: React.FC<AgentDropdownProps> = ({
   disabledAgents = [],
   hiddenAgents = [],
   className = '',
+  triggerRef,
 }) => {
   const installedSet = new Set(installedAgents);
   return (
     <TooltipProvider delayDuration={150}>
       <Select value={value} onValueChange={(v) => onChange(v as Agent)}>
-        <SelectTrigger className={`h-9 w-full border-none bg-muted ${className}`}>
+        <SelectTrigger ref={triggerRef} className={`h-9 w-full border-none bg-muted ${className}`}>
           <SelectValue placeholder="Select agent" />
         </SelectTrigger>
         <SelectContent side="top" className="z-[120]">

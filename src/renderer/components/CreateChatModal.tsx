@@ -57,6 +57,7 @@ export function CreateChatModal({
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
+  const agentTriggerRef = useRef<HTMLButtonElement>(null);
 
   const installedSet = useMemo(() => new Set(installedAgents), [installedAgents]);
   const reviewSettings = useMemo(() => getReviewSettings(settings), [settings]);
@@ -190,6 +191,7 @@ export function CreateChatModal({
                 }}
                 installedAgents={installedAgents}
                 hiddenAgents={settingsDisabledAgents}
+                triggerRef={agentTriggerRef}
               />
             </div>
           ) : null}
@@ -221,6 +223,12 @@ export function CreateChatModal({
               ref={createButtonRef}
               type="submit"
               disabled={!!error || isCreating || (reviewEnabled && !reviewAvailable)}
+              onKeyDown={(event) => {
+                if (event.key === 'Tab' && !event.shiftKey && !reviewEnabled) {
+                  event.preventDefault();
+                  agentTriggerRef.current?.focus();
+                }
+              }}
             >
               {isCreating ? 'Creating...' : 'Create'}
             </Button>

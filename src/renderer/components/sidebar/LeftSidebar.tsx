@@ -40,11 +40,13 @@ import { useTaskManagementContext } from '../../contexts/TaskManagementContext';
 import { useAppSettings } from '../../contexts/AppSettingsProvider';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { getProjectGithubUrl } from '../../lib/projectUtils';
 import { ProjectsGroupLabel } from './ProjectsGroupLabel';
 import { useChangelogNotification } from '@/hooks/useChangelogNotification';
 import { useModalContext } from '@/contexts/ModalProvider';
 import { ChangelogNotificationCard } from './ChangelogNotificationCard';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import githubLogo from '../../../assets/images/github.png';
 
 const PROJECT_ORDER_KEY = 'sidebarProjectOrder';
 const TASK_ORDER_KEY = 'sidebarTaskOrder';
@@ -83,10 +85,6 @@ interface ProjectItemProps {
 const ProjectItem = React.memo<ProjectItemProps>(({ project }) => {
   const remote = useRemoteProject(project);
   const connectionId = getConnectionId(project);
-
-  if (!connectionId && !isRemoteProject(project)) {
-    return <span className="flex-1 truncate">{project.name}</span>;
-  }
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -482,6 +480,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
                       const isProjectOpen =
                         forceOpenIds.has(typedProject.id) || projectOpenMap[typedProject.id] !== false;
+                      const githubUrl = getProjectGithubUrl(typedProject);
 
                       return (
                         <SidebarMenuItem>
@@ -526,6 +525,25 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                               >
                                 <ProjectItem project={typedProject} />
                               </motion.button>
+                              {githubUrl ? (
+                                <button
+                                  type="button"
+                                  className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void window.electronAPI.openExternal(githubUrl);
+                                  }}
+                                  aria-label={`Open ${typedProject.name} on GitHub`}
+                                  title="Open on GitHub"
+                                >
+                                  <img
+                                    src={githubLogo}
+                                    alt=""
+                                    aria-hidden="true"
+                                    className="h-3.5 w-3.5 flex-shrink-0 opacity-70 dark:invert"
+                                  />
+                                </button>
+                              ) : null}
                               {/* Sort picker — visible on hover */}
                               <span className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/project:opacity-100">
                                 <SortModePicker

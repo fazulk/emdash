@@ -1,5 +1,9 @@
 import type { Project } from '../types/app';
 
+export function isGithubRemoteUrl(remoteUrl: string | null | undefined): boolean {
+  return /github\.com[:/]/i.test(remoteUrl ?? '');
+}
+
 /**
  * Normalizes file paths for cross-platform comparison.
  * On Windows, paths are case-insensitive. On Unix, they are case-sensitive.
@@ -102,6 +106,37 @@ export function withRepoKey(project: Project, platform?: string): Project {
  * to a disconnected local result so the project is never blocked from
  * being added.
  */
+export function getProjectGithubUrl(
+  project: Pick<Project, 'gitInfo' | 'githubInfo'>
+): string | null {
+  const repository = project.githubInfo?.repository?.trim();
+  if (repository) return `https://github.com/${repository}`;
+
+  const remote = project.gitInfo.remote?.trim();
+  if (!remote || !isGithubRemoteUrl(remote)) return null;
+
+  const patterns = [
+    /^https?:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i,
+    /^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/i,
+    /^ssh:\/\/git@github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = remote.match(pattern);
+    if (match?.[1]) {
+      return `https://github.com/${match[1]}`;
+    }
+  }
+
+  return null;
+}
+
+export function projectHasGithubRepo(
+  project: Pick<Project, 'gitInfo' | 'githubInfo'>
+): boolean {
+  return Boolean(getProjectGithubUrl(project));
+}
+
 export async function resolveProjectGithubInfo(
   projectPath: string,
   remoteUrl: string,
@@ -110,7 +145,7 @@ export async function resolveProjectGithubInfo(
     path: string
   ) => Promise<{ success: boolean; repository?: string; error?: string }>
 ): Promise<{ connected: boolean; repository: string; source: 'github' | 'local' }> {
-  const isGithubRemote = /github\.com[:/]/i.test(remoteUrl);
+  const isGithubRemote = isGithubRemoteUrl(remoteUrl);
 
   if (isAuthenticated && isGithubRemote) {
     try {

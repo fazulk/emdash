@@ -1,5 +1,87 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveProjectGithubInfo } from '../../renderer/lib/projectUtils';
+import {
+  getProjectGithubUrl,
+  projectHasGithubRepo,
+  resolveProjectGithubInfo,
+  isGithubRemoteUrl,
+} from '../../renderer/lib/projectUtils';
+
+describe('isGithubRemoteUrl', () => {
+  it('returns true for HTTPS GitHub remotes', () => {
+    expect(isGithubRemoteUrl('https://github.com/user/repo.git')).toBe(true);
+  });
+
+  it('returns true for SSH GitHub remotes', () => {
+    expect(isGithubRemoteUrl('git@github.com:user/repo.git')).toBe(true);
+  });
+
+  it('returns false for non-GitHub remotes', () => {
+    expect(isGithubRemoteUrl('https://gitlab.com/user/repo.git')).toBe(false);
+  });
+});
+
+describe('getProjectGithubUrl', () => {
+  it('builds a URL from the saved repository when present', () => {
+    expect(
+      getProjectGithubUrl({
+        gitInfo: { isGitRepo: true, remote: 'https://example.com/user/repo.git' },
+        githubInfo: { connected: false, repository: 'user/repo' },
+      })
+    ).toBe('https://github.com/user/repo');
+  });
+
+  it('builds a URL from an HTTPS GitHub remote', () => {
+    expect(
+      getProjectGithubUrl({
+        gitInfo: { isGitRepo: true, remote: 'https://github.com/user/repo.git' },
+      })
+    ).toBe('https://github.com/user/repo');
+  });
+
+  it('builds a URL from an SSH GitHub remote', () => {
+    expect(
+      getProjectGithubUrl({
+        gitInfo: { isGitRepo: true, remote: 'git@github.com:user/repo.git' },
+      })
+    ).toBe('https://github.com/user/repo');
+  });
+
+  it('returns null for non-GitHub remotes', () => {
+    expect(
+      getProjectGithubUrl({
+        gitInfo: { isGitRepo: true, remote: 'https://gitlab.com/user/repo.git' },
+      })
+    ).toBeNull();
+  });
+});
+
+describe('projectHasGithubRepo', () => {
+  it('returns true when the project has a GitHub remote even if disconnected', () => {
+    expect(
+      projectHasGithubRepo({
+        gitInfo: { isGitRepo: true, remote: 'https://github.com/user/repo.git' },
+        githubInfo: { connected: false, repository: '' },
+      })
+    ).toBe(true);
+  });
+
+  it('returns true when the saved GitHub repository is present', () => {
+    expect(
+      projectHasGithubRepo({
+        gitInfo: { isGitRepo: true, remote: 'https://example.com/user/repo.git' },
+        githubInfo: { connected: false, repository: 'user/repo' },
+      })
+    ).toBe(true);
+  });
+
+  it('returns false when the project is not on GitHub', () => {
+    expect(
+      projectHasGithubRepo({
+        gitInfo: { isGitRepo: true, remote: 'https://gitlab.com/user/repo.git' },
+      })
+    ).toBe(false);
+  });
+});
 
 describe('resolveProjectGithubInfo', () => {
   const projectPath = '/path/to/project';

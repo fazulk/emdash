@@ -1,32 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  ArrowUpRight,
-  AlertCircle,
-  Archive,
-
-  Pencil,
-  Pin,
-  PinOff,
-  Trash2,
-} from 'lucide-react';
-
-const ArrowSplitIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth={2}
-    {...props}
-  >
-    <path d="M21 17h-5.397a5 5 0 0 1-4.096-2.133l-.514-.734A5 5 0 0 0 6.897 12H3" />
-    <path d="M21 7h-5.395a5 5 0 0 0-4.098 2.135l-.51.73A5 5 0 0 1 6.9 12H3" />
-    <path d="m18 10 3-3-3-3" />
-    <path d="m18 20 3-3-3-3" />
-  </svg>
-);
+import { AlertCircle, Archive, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { WorktreeIcon } from './icons/WorktreeIcon';
 
 import { useTaskChanges } from '../hooks/useTaskChanges';
 import { ChangesBadge } from './TaskChanges';
@@ -357,7 +331,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             title="Worktree task"
             className="inline-flex items-center text-muted-foreground"
           >
-            <ArrowSplitIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <WorktreeIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           </span>
         )}
         {rightBadge}

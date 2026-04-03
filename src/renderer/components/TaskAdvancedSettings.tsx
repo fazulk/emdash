@@ -18,7 +18,6 @@ import JiraSetupForm from './integrations/JiraSetupForm';
 import GitLabSetupForm from './integrations/GitLabSetupForm';
 import PlainSetupForm from './integrations/PlainSetupForm';
 import ForgejoSetupForm from './integrations/ForgejoSetupForm';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { type LinearIssueSummary } from '../types/linear';
 import { type GitHubIssueSummary } from '../types/github';
 import { type GitHubIssueLink } from '../types/chat';
@@ -30,15 +29,6 @@ import { type ForgejoIssueSummary } from '../types/forgejo';
 interface TaskAdvancedSettingsProps {
   isOpen: boolean;
   projectPath?: string;
-
-  // Worktree
-  useWorktree: boolean;
-  onUseWorktreeChange: (value: boolean) => void;
-
-  // Remote workspace
-  useRemoteWorkspace: boolean;
-  onUseRemoteWorkspaceChange: (value: boolean) => void;
-  hasWorkspaceProvider: boolean;
 
   // Auto-approve
   autoApprove: boolean;
@@ -93,11 +83,6 @@ interface TaskAdvancedSettingsProps {
 export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
   isOpen,
   projectPath,
-  useWorktree,
-  onUseWorktreeChange,
-  useRemoteWorkspace,
-  onUseRemoteWorkspaceChange,
-  hasWorkspaceProvider,
   autoApprove,
   onAutoApproveChange,
   hasAutoApproveSupport,
@@ -133,7 +118,6 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
   onForgejoConnect,
 }) => {
   const shouldReduceMotion = useReducedMotion();
-  const workspaceProviderEnabled = useFeatureFlag('workspace-provider');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Linear setup state
@@ -438,55 +422,6 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
           </AccordionTrigger>
           <AccordionContent className="space-y-4 overflow-hidden px-0 pt-2" id="task-advanced">
             <div className="flex flex-col gap-4 p-2">
-              <div className="flex items-center gap-4">
-                <Label className="w-32 shrink-0">Workspace</Label>
-                <div className="min-w-0 flex-1 space-y-2">
-                  <label className="inline-flex cursor-pointer items-start gap-2 text-sm leading-tight">
-                    <Checkbox
-                      checked={useWorktree && !useRemoteWorkspace}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          onUseWorktreeChange(true);
-                          onUseRemoteWorkspaceChange(false);
-                        } else {
-                          onUseWorktreeChange(false);
-                          onUseRemoteWorkspaceChange(false);
-                        }
-                      }}
-                      className="mt-[1px]"
-                    />
-                    <div className="space-y-1">
-                      <span className="text-muted-foreground">Local worktree (recommended)</span>
-                      {!useWorktree && !useRemoteWorkspace && (
-                        <p className="text-xs text-destructive">
-                          Changes will affect your current working directory
-                        </p>
-                      )}
-                    </div>
-                  </label>
-                  {hasWorkspaceProvider && workspaceProviderEnabled && (
-                    <label className="inline-flex cursor-pointer items-start gap-2 text-sm leading-tight">
-                      <Checkbox
-                        checked={useRemoteWorkspace}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            onUseRemoteWorkspaceChange(true);
-                            onUseWorktreeChange(false);
-                          } else {
-                            onUseRemoteWorkspaceChange(false);
-                            onUseWorktreeChange(true);
-                          }
-                        }}
-                        className="mt-[1px]"
-                      />
-                      <span className="text-muted-foreground">
-                        Remote workspace (provision via script)
-                      </span>
-                    </label>
-                  )}
-                </div>
-              </div>
-
               {hasAutoApproveSupport ? (
                 <div className="flex items-center gap-4">
                   <Label className="w-32 shrink-0">Auto-approve</Label>

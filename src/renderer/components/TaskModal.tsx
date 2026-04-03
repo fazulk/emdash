@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FolderOpen, Server } from 'lucide-react';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import {
@@ -40,6 +41,7 @@ import { useAppSettings } from '@/contexts/AppSettingsProvider';
 import { filterDisabledProviders, getDisabledProviderIds } from '@/lib/agentAvailability';
 import { PROVIDER_IDS } from '@shared/providers/registry';
 import { useCliAgentDetection } from '@/hooks/useCliAgentDetection';
+import { WorktreeIcon } from './icons/WorktreeIcon';
 
 const DEFAULT_AGENT: Agent = 'claude';
 
@@ -181,6 +183,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
     provisionCommand: string;
     terminateCommand: string;
   } | null>(null);
+  const hasRemoteWorkspaceOption = workspaceProviderEnabled && !!workspaceProviderConfig;
 
   // Load workspace provider config from .emdash.json (only when feature flag is on)
   useEffect(() => {
@@ -238,7 +241,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
   const integrations = useIntegrationStatus(true);
 
   const disabledAgents = useMemo(() => getDisabledProviderIds(appSettings), [appSettings]);
-  const enabledAgents = useMemo(() => filterDisabledProviders(PROVIDER_IDS, appSettings), [appSettings]);
+  const enabledAgents = useMemo(
+    () => filterDisabledProviders(PROVIDER_IDS, appSettings),
+    [appSettings]
+  );
   const visibleAgents = useMemo(
     () =>
       cliAgents
@@ -499,6 +505,21 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
     taskNameInputRef.current?.focus({ preventScroll: true });
   }, []);
 
+  const workspaceMode = useRemoteWorkspace ? 'remote' : useWorktree ? 'worktree' : 'direct';
+
+  const handleWorkspaceModeChange = useCallback(
+    (mode: 'worktree' | 'direct' | 'remote') => {
+      if (mode === 'remote') {
+        setUseRemoteWorkspace(true);
+        setUseWorktree(false);
+        return;
+      }
+      setUseRemoteWorkspace(false);
+      setUseWorktree(mode === 'worktree');
+    },
+    [setUseRemoteWorkspace, setUseWorktree]
+  );
+
   return (
     <DialogContent
       className="flex max-h-[calc(100vh-48px)] max-w-md flex-col overflow-hidden p-0"
@@ -569,14 +590,60 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
             />
           </div>
 
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <Label className="shrink-0">Workspace</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={workspaceMode === 'worktree' ? 'secondary' : 'ghost'}
+                  className="h-8 gap-1.5 px-2.5 text-xs"
+                  onClick={() => handleWorkspaceModeChange('worktree')}
+                >
+                  <WorktreeIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span>Worktree</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={workspaceMode === 'direct' ? 'secondary' : 'ghost'}
+                  className="h-8 gap-1.5 px-2.5 text-xs"
+                  onClick={() => handleWorkspaceModeChange('direct')}
+                >
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+                  <span>Direct</span>
+                </Button>
+                {hasRemoteWorkspaceOption && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={workspaceMode === 'remote' ? 'secondary' : 'ghost'}
+                    className="h-8 gap-1.5 px-2.5 text-xs"
+                    onClick={() => handleWorkspaceModeChange('remote')}
+                  >
+                    <Server className="h-3.5 w-3.5 shrink-0" />
+                    <span>Remote</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            {workspaceMode === 'direct' ? (
+              <p className="text-xs text-destructive">Direct changes your current branch</p>
+            ) : workspaceMode === 'remote' ? (
+              <p className="text-xs text-muted-foreground">
+                Remote workspace provisioned via script
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Recommended: isolated in a new worktree
+              </p>
+            )}
+          </div>
+
           <TaskAdvancedSettings
             isOpen={true}
             projectPath={projectPath}
-            useWorktree={useWorktree}
-            onUseWorktreeChange={setUseWorktree}
-            useRemoteWorkspace={useRemoteWorkspace}
-            onUseRemoteWorkspaceChange={setUseRemoteWorkspace}
-            hasWorkspaceProvider={!!workspaceProviderConfig}
             autoApprove={autoApprove}
             onAutoApproveChange={setAutoApprove}
             hasAutoApproveSupport={hasAutoApproveSupport}

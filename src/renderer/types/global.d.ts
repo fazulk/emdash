@@ -221,6 +221,9 @@ declare global {
       lifecycleClearTask: (args: {
         taskId: string;
       }) => Promise<{ success: boolean; error?: string }>;
+      lifecycleGetCustomScripts: (args: {
+        projectPath: string;
+      }) => Promise<{ success: boolean; scripts: Record<string, string>; error?: string }>;
       onLifecycleEvent: (listener: (data: any) => void) => () => void;
 
       openProject: () => Promise<{ success: boolean; path?: string; error?: string }>;

@@ -7,6 +7,7 @@ import { Spinner } from './ui/spinner';
 import { Switch } from './ui/switch';
 import { Textarea } from './ui/textarea';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { Plus, Trash2 } from 'lucide-react';
 
 type LifecycleScripts = {
   setup: string;
@@ -21,9 +22,12 @@ type WorkspaceProviderConfig = {
   terminateCommand: string;
 };
 
+type CustomScript = { name: string; command: string };
+
 type ConfigShape = Record<string, unknown> & {
   preservePatterns?: string[];
   scripts?: Partial<LifecycleScripts>;
+  customScripts?: Record<string, string>;
   shellSetup?: string;
   tmux?: boolean;
   workspaceProvider?: WorkspaceProviderConfig;
@@ -62,6 +66,25 @@ function scriptsFromConfig(config: ConfigShape): LifecycleScripts {
     stop: typeof obj.stop === 'string' ? obj.stop : '',
     teardown: typeof obj.teardown === 'string' ? obj.teardown : '',
   };
+}
+
+function customScriptsFromConfig(config: ConfigShape): CustomScript[] {
+  const raw = config.customScripts;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  return Object.entries(raw)
+    .filter(([, cmd]) => typeof cmd === 'string')
+    .map(([name, command]) => ({ name, command: command as string }));
+}
+
+function applyCustomScripts(config: ConfigShape, customScripts: CustomScript[]): ConfigShape {
+  const { customScripts: _cs, ...rest } = config;
+  const nonEmpty = customScripts.filter((s) => s.name.trim() && s.command.trim());
+  if (nonEmpty.length === 0) return rest;
+  const obj: Record<string, string> = {};
+  for (const s of nonEmpty) {
+    obj[s.name.trim()] = s.command.trim();
+  }
+  return { ...rest, customScripts: obj };
 }
 
 function applyScripts(config: ConfigShape, scripts: LifecycleScripts): ConfigShape {
@@ -160,6 +183,8 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
   const [originalWpProvisionCommand, setOriginalWpProvisionCommand] = useState('');
   const [wpTerminateCommand, setWpTerminateCommand] = useState('');
   const [originalWpTerminateCommand, setOriginalWpTerminateCommand] = useState('');
+  const [customScriptsList, setCustomScriptsList] = useState<CustomScript[]>([]);
+  const [originalCustomScriptsList, setOriginalCustomScriptsList] = useState<CustomScript[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -180,9 +205,10 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
     const withShellSetup = applyShellSetup(withPatterns, shellSetup);
     const withTmux = applyTmux(withShellSetup, tmux);
     const withWp = applyWorkspaceProvider(withTmux, wpProvisionCommand, wpTerminateCommand);
-    const withScripts = applyScripts(withWp, scripts);
+    const withCustomScripts = applyCustomScripts(withWp, customScriptsList);
+    const withScripts = applyScripts(withCustomScripts, scripts);
     return `${JSON.stringify(withScripts, null, 2)}\n`;
-  }, [config, preservePatterns, shellSetup, tmux, wpProvisionCommand, wpTerminateCommand, scripts]);
+  }, [config, preservePatterns, shellSetup, tmux, wpProvisionCommand, wpTerminateCommand, customScriptsList, scripts]);
 
   const scriptsDirty = useMemo(
     () =>
@@ -194,7 +220,8 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       shellSetup !== originalShellSetup ||
       tmux !== originalTmux ||
       wpProvisionCommand !== originalWpProvisionCommand ||
-      wpTerminateCommand !== originalWpTerminateCommand,
+      wpTerminateCommand !== originalWpTerminateCommand ||
+      JSON.stringify(customScriptsList) !== JSON.stringify(originalCustomScriptsList),
     [
       originalShellSetup,
       originalPreservePatternsInput,
@@ -205,6 +232,8 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       originalTmux,
       originalWpProvisionCommand,
       originalWpTerminateCommand,
+      customScriptsList,
+      originalCustomScriptsList,
       shellSetup,
       preservePatternsInput,
       scripts.run,
@@ -256,6 +285,7 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
         wp && typeof wp === 'object' && typeof wp.terminateCommand === 'string'
           ? wp.terminateCommand
           : '';
+      const nextCustomScripts = customScriptsFromConfig(parsed);
       setConfig(parsed);
       setScripts(nextScripts);
       setOriginalScripts(nextScripts);
@@ -269,6 +299,8 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalWpProvisionCommand(nextWpProvision);
       setWpTerminateCommand(nextWpTerminate);
       setOriginalWpTerminateCommand(nextWpTerminate);
+      setCustomScriptsList(nextCustomScripts);
+      setOriginalCustomScriptsList(nextCustomScripts);
     } catch (err) {
       setConfig({});
       setScripts({ ...EMPTY_SCRIPTS });
@@ -283,6 +315,8 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalWpProvisionCommand('');
       setWpTerminateCommand('');
       setOriginalWpTerminateCommand('');
+      setCustomScriptsList([]);
+      setOriginalCustomScriptsList([]);
       setError(err instanceof Error ? err.message : 'Failed to load config');
       setLoadFailed(true);
     } finally {
@@ -335,13 +369,16 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       }
 
       const nextConfig = applyScripts(
-        applyWorkspaceProvider(
-          applyTmux(
-            applyShellSetup(applyPreservePatterns(config, preservePatterns), shellSetup),
-            tmux
+        applyCustomScripts(
+          applyWorkspaceProvider(
+            applyTmux(
+              applyShellSetup(applyPreservePatterns(config, preservePatterns), shellSetup),
+              tmux
+            ),
+            wpProvisionCommand,
+            wpTerminateCommand
           ),
-          wpProvisionCommand,
-          wpTerminateCommand
+          customScriptsList
         ),
         scripts
       );
@@ -352,6 +389,7 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalTmux(tmux);
       setOriginalWpProvisionCommand(wpProvisionCommand);
       setOriginalWpTerminateCommand(wpTerminateCommand);
+      setOriginalCustomScriptsList(customScriptsList);
 
       if (
         wpProvisionCommand !== originalWpProvisionCommand ||
@@ -382,6 +420,7 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
     tmux,
     wpProvisionCommand,
     wpTerminateCommand,
+    customScriptsList,
   ]);
 
   return (
@@ -582,6 +621,81 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
                 <p className="text-xs text-muted-foreground">
                   Runs when a task is being deleted or archived.
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Scripts</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setCustomScriptsList((prev) => [...prev, { name: '', command: '' }]);
+                      setError(null);
+                    }}
+                    disabled={isSaving}
+                    aria-label="Add script"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Custom commands that appear in the terminal dropdown for quick access.
+                </p>
+                {customScriptsList.length > 0 && (
+                  <div className="space-y-2">
+                    {customScriptsList.map((script, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <div className="flex min-w-0 flex-1 gap-2">
+                          <Input
+                            value={script.name}
+                            onChange={(e) => {
+                              setCustomScriptsList((prev) =>
+                                prev.map((s, i) =>
+                                  i === index ? { ...s, name: e.target.value } : s
+                                )
+                              );
+                              setError(null);
+                            }}
+                            placeholder="Name (e.g. type-check)"
+                            className="w-40 shrink-0 font-mono text-xs"
+                            disabled={isSaving}
+                          />
+                          <Input
+                            value={script.command}
+                            onChange={(e) => {
+                              setCustomScriptsList((prev) =>
+                                prev.map((s, i) =>
+                                  i === index ? { ...s, command: e.target.value } : s
+                                )
+                              );
+                              setError(null);
+                            }}
+                            placeholder="Command (e.g. npx tsc --noEmit --watch)"
+                            className="min-w-0 flex-1 font-mono text-xs"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="mt-1 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            setCustomScriptsList((prev) => prev.filter((_, i) => i !== index));
+                            setError(null);
+                          }}
+                          disabled={isSaving}
+                          aria-label={`Remove script ${script.name || index + 1}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -163,6 +163,24 @@ export function registerLifecycleIpc(): void {
     }
   });
 
+  ipcMain.handle(
+    'lifecycle:getCustomScripts',
+    async (
+      _event,
+      args: {
+        projectPath: string;
+      }
+    ) => {
+      try {
+        const scripts = lifecycleScriptsService.getCustomScripts(args.projectPath);
+        return { success: true, scripts };
+      } catch (error) {
+        log.error('Failed to get custom scripts:', error);
+        return { success: false, error: (error as Error).message, scripts: {} };
+      }
+    }
+  );
+
   const forward = (evt: any) => {
     const all = BrowserWindow.getAllWindows();
     for (const win of all) {

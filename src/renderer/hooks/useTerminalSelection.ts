@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-type SelectedMode = 'task' | 'global' | 'lifecycle';
+type SelectedMode = 'task' | 'global' | 'lifecycle' | 'script';
 type LifecyclePhase = 'setup' | 'run' | 'teardown';
 
 interface TerminalStore {
@@ -24,6 +24,7 @@ export interface TerminalSelection {
   onCreateTerminal: (mode: 'task' | 'global', id: string) => void;
   activeTerminalId: string | null;
   selectedLifecycle: LifecyclePhase | null;
+  selectedScript: string | null;
 }
 
 export function parseTerminalValue(value: string): { mode: SelectedMode; id: string } | null {
@@ -78,8 +79,8 @@ export function resolveSelection(params: {
     return '';
   }
 
-  // 4. Lifecycle mode — don't interfere
-  if (parsed.mode === 'lifecycle') return null;
+  // 4. Lifecycle or script mode — don't interfere
+  if (parsed.mode === 'lifecycle' || parsed.mode === 'script') return null;
 
   // 5. Selected terminal still exists — no change needed
   const terminals = parsed.mode === 'task' ? taskTerminals.terminals : globalTerminals.terminals;
@@ -173,8 +174,10 @@ export function useTerminalSelection(options: UseTerminalSelectionOptions): Term
     setIsOpen(false);
   }, []);
 
-  const activeTerminalId = parsed?.mode === 'lifecycle' ? null : (parsed?.id ?? null);
+  const activeTerminalId =
+    parsed?.mode === 'lifecycle' || parsed?.mode === 'script' ? null : (parsed?.id ?? null);
   const selectedLifecycle = parsed?.mode === 'lifecycle' ? (parsed.id as LifecyclePhase) : null;
+  const selectedScript = parsed?.mode === 'script' ? parsed.id : null;
 
   return {
     value: selectedValue,
@@ -185,5 +188,6 @@ export function useTerminalSelection(options: UseTerminalSelectionOptions): Term
     onCreateTerminal,
     activeTerminalId,
     selectedLifecycle,
+    selectedScript,
   };
 }

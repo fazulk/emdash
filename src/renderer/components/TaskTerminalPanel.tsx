@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef, type MutableRefObject } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { LifecycleTerminalView } from './LifecycleTerminalView';
 import { Plus, Play, RotateCw, Square, X, Maximize2 } from 'lucide-react';
@@ -30,6 +30,58 @@ import {
 } from '@shared/lifecycle';
 import { shouldDisablePlay } from '../lib/lifecycleUi';
 import ExpandedTerminalModal from './ExpandedTerminalModal';
+
+/**
+ * Hook that fetches custom scripts from .emdash.json for a project.
+ */
+function useCustomScripts(projectPath: string | undefined): Record<string, string> {
+  const [scripts, setScripts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!projectPath) {
+      setScripts({});
+      return;
+    }
+    let cancelled = false;
+    const api = window.electronAPI as any;
+    if (typeof api?.lifecycleGetCustomScripts !== 'function') return;
+    void api.lifecycleGetCustomScripts({ projectPath }).then((res: any) => {
+      if (!cancelled && res?.success && res.scripts) {
+        setScripts(res.scripts);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [projectPath]);
+  return scripts;
+}
+
+/**
+ * Manages a pool of terminals dedicated to custom scripts.
+ * Each script name maps to a terminal id that gets reused.
+ */
+function useScriptTerminals(
+  scriptTerminalMapRef: MutableRefObject<Map<string, string>>,
+  taskTerminals: ReturnType<typeof useTaskTerminals>,
+  taskPath: string | undefined,
+) {
+  const getOrCreateTerminal = useCallback(
+    (scriptName: string): string => {
+      const existing = scriptTerminalMapRef.current.get(scriptName);
+      // Check if the terminal still exists
+      if (existing && taskTerminals.terminals.some((t) => t.id === existing)) {
+        return existing;
+      }
+      const newId = taskTerminals.createTerminal({
+        title: scriptName,
+        cwd: taskPath,
+      });
+      scriptTerminalMapRef.current.set(scriptName, newId);
+      return newId;
+    },
+    [taskTerminals, taskPath, scriptTerminalMapRef]
+  );
+
+  return { getOrCreateTerminal };
+}
 
 interface Task {
   id: string;
@@ -84,6 +136,20 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
   const globalTerminals = useTaskTerminals(globalKey, effectiveCwd);
 
   const selection = useTerminalSelection({ task, taskTerminals, globalTerminals });
+
+  // Custom project scripts from .emdash.json
+  const customScripts = useCustomScripts(projectPath);
+  const customScriptNames = useMemo(() => Object.keys(customScripts), [customScripts]);
+  const scriptTerminalMapRef = useRef<Map<string, string>>(new Map());
+  const { getOrCreateTerminal: getOrCreateScriptTerminal } = useScriptTerminals(
+    scriptTerminalMapRef,
+    taskTerminals,
+    task?.path,
+  );
+  // Track which script name is currently active (selected via Scripts group)
+  const [activeScriptName, setActiveScriptName] = useState<string | null>(null);
+  // Track which script terminals are currently running
+  const [runningScripts, setRunningScripts] = useState<Set<string>>(new Set());
 
   const [expandedTerminalId, setExpandedTerminalId] = useState<string | null>(null);
   // Tracks which terminal needs a key bump to force re-attach after modal close
@@ -278,10 +344,11 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
 
   const isRunSelection = !selection.selectedLifecycle || selection.selectedLifecycle === 'run';
   const selectedTerminalScope = useMemo(() => {
+    if (activeScriptName) return 'SCRIPT';
     if (selection.parsed?.mode === 'task') return 'WORKTREE';
     if (selection.parsed?.mode === 'global') return projectPath ? 'PROJECT' : 'GLOBAL';
     return null;
-  }, [selection.parsed?.mode, projectPath]);
+  }, [activeScriptName, selection.parsed?.mode, projectPath]);
   const {
     isSearchOpen,
     searchQuery,
@@ -400,6 +467,58 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     }
   }, [task?.id, task?.path, task?.name, projectPath, refreshLifecycleState]);
 
+  // --- Custom script play/stop ---
+  const handleScriptPlay = useCallback(
+    (scriptName: string) => {
+      const command = customScripts[scriptName];
+      if (!command) return;
+      const terminalId = getOrCreateScriptTerminal(scriptName);
+      // Select the script terminal so the user sees it
+      selection.onChange(`task::${terminalId}`);
+      // Small delay to ensure terminal is spawned before sending input
+      setTimeout(() => {
+        const api = window.electronAPI as any;
+        // Send the command + Enter to the terminal
+        api?.ptyInput?.({ id: terminalId, data: `${command}\r` });
+      }, 300);
+      setRunningScripts((prev) => new Set(prev).add(scriptName));
+    },
+    [customScripts, getOrCreateScriptTerminal, selection]
+  );
+
+  const handleScriptStop = useCallback(
+    (scriptName: string) => {
+      const terminalId = scriptTerminalMapRef.current.get(scriptName);
+      if (!terminalId) return;
+      // Send Ctrl+C to the terminal
+      const api = window.electronAPI as any;
+      api?.ptyInput?.({ id: terminalId, data: '\x03' });
+      setRunningScripts((prev) => {
+        const next = new Set(prev);
+        next.delete(scriptName);
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleScriptRestart = useCallback(
+    (scriptName: string) => {
+      const terminalId = scriptTerminalMapRef.current.get(scriptName);
+      if (!terminalId) return;
+      const api = window.electronAPI as any;
+      // Ctrl+C then re-run after a brief delay
+      api?.ptyInput?.({ id: terminalId, data: '\x03' });
+      setTimeout(() => {
+        const command = customScripts[scriptName];
+        if (command) {
+          api?.ptyInput?.({ id: terminalId, data: `${command}\r` });
+        }
+      }, 200);
+    },
+    [customScripts]
+  );
+
   const [nativeTheme, setNativeTheme] = useState<{
     background?: string;
     foreground?: string;
@@ -501,7 +620,20 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
       <div className="flex items-center gap-2 border-b border-border bg-muted px-2 py-1.5 dark:bg-background">
         <Select
           value={selection.value}
-          onValueChange={selection.onChange}
+          onValueChange={(value) => {
+            // Intercept script:: selections: create/reuse a terminal, then select it
+            if (value.startsWith('script::')) {
+              const scriptName = value.slice('script::'.length);
+              const terminalId = getOrCreateScriptTerminal(scriptName);
+              setActiveScriptName(scriptName);
+              selection.onChange(`task::${terminalId}`);
+              selection.setIsOpen(false);
+              return;
+            }
+            // Clear active script when switching to a non-script terminal
+            setActiveScriptName(null);
+            selection.onChange(value);
+          }}
           open={selection.isOpen}
           onOpenChange={selection.setIsOpen}
         >
@@ -565,6 +697,23 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
               </SelectGroup>
             )}
 
+            {customScriptNames.length > 0 && (
+              <SelectGroup>
+                <div className="px-2 py-1.5">
+                  <span className="text-[11px] font-bold text-muted-foreground">Scripts</span>
+                </div>
+                {customScriptNames.map((name) => (
+                  <SelectItem
+                    key={`script::${name}`}
+                    value={`script::${name}`}
+                    className="text-xs font-normal pl-5"
+                  >
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+
             {(projectPath || !task) && (
               <>
                 {task && (
@@ -615,7 +764,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
           </span>
         )}
 
-        {task && (
+        {task && !activeScriptName && (
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -666,6 +815,62 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                 </p>
               </TooltipContent>
             </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {/* Script play/stop/restart buttons */}
+        {activeScriptName && (
+          <TooltipProvider delayDuration={200}>
+            {runningScripts.has(activeScriptName) ? (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleScriptStop(activeScriptName)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">Stop {activeScriptName}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleScriptRestart(activeScriptName)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <RotateCw className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">Restart {activeScriptName}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleScriptPlay(activeScriptName)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs">Run {activeScriptName}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </TooltipProvider>
         )}
 

@@ -12,6 +12,7 @@ export interface WorkspaceProviderConfig {
 export interface EmdashConfig {
   preservePatterns?: string[];
   scripts?: LifecycleScriptConfig;
+  customScripts?: Record<string, string>;
   shellSetup?: string;
   tmux?: boolean;
   workspaceProvider?: WorkspaceProviderConfig;
@@ -69,6 +70,23 @@ class LifecycleScriptsService {
   getTmuxEnabled(projectPath: string): boolean {
     const config = this.readConfig(projectPath);
     return config?.tmux === true;
+  }
+
+  /**
+   * Get user-defined custom scripts from .emdash.json.
+   * Returns a name→command map, or an empty object if none configured.
+   */
+  getCustomScripts(projectPath: string): Record<string, string> {
+    const config = this.readConfig(projectPath);
+    const raw = config?.customScripts;
+    if (!raw || typeof raw !== 'object') return {};
+    const result: Record<string, string> = {};
+    for (const [name, cmd] of Object.entries(raw)) {
+      if (typeof cmd === 'string' && cmd.trim().length > 0) {
+        result[name] = cmd.trim();
+      }
+    }
+    return result;
   }
 }
 

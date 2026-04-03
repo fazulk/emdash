@@ -150,8 +150,9 @@ describe('FileChangesPanel', () => {
     await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
 
     expect(screen.getByPlaceholderText('Enter commit message...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Commit' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeDisabled();
+    // Unstaged-only changes: commit actions stage everything first, so they stay enabled.
+    expect(screen.getByRole('button', { name: 'Commit' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled();
   });
 
@@ -221,26 +222,17 @@ describe('FileChangesPanel', () => {
 
     const toastArg = toastMock.mock.calls.at(-1)?.[0];
     expect(React.isValidElement(toastArg.description)).toBe(true);
-    expect(React.isValidElement(toastArg.action)).toBe(true);
+    // Copy button is now provided globally by the Toaster, so no per-toast action needed
+    expect(toastArg.action).toBeUndefined();
 
     const toastUi = render(
       <>
         {toastArg.description}
-        {toastArg.action}
       </>
     );
 
     expect(toastUi.getByText('Changes committed with message:')).toBeInTheDocument();
     expect(toastUi.getByText('Update src/file.ts')).toBeInTheDocument();
-    expect(toastUi.getByText('Copy message')).toBeInTheDocument();
-
-    fireEvent.click(toastUi.getByText('Copy message'));
-
-    await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        'Committed and Pushed\nChanges committed with message:\nUpdate src/file.ts'
-      )
-    );
   });
 
   it('queries check runs with the resolved PR number', async () => {

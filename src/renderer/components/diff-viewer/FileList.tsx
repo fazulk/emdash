@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import type { FileChange } from '../../hooks/useFileChanges';
 import { getChangeStatusDotClass } from '../../lib/gitChangePresentation';
 
@@ -32,6 +33,7 @@ export const FileList: React.FC<FileListProps> = ({
   readOnly,
 }) => {
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
+  const { isLocked } = useGitWorkspaceBusyForTask(taskPath);
 
   const tracked = fileChanges
     .filter((f) => f.status !== 'added')
@@ -45,7 +47,7 @@ export const FileList: React.FC<FileListProps> = ({
   const untrackedAllStaged = untracked.length > 0 && untracked.every((f) => f.isStaged);
 
   const handleStageAll = async (checked: boolean) => {
-    if (!taskPath) return;
+    if (!taskPath || isLocked) return;
     try {
       if (checked) {
         await window.electronAPI.updateIndex({ taskPath, action: 'stage', scope: 'all' });
@@ -67,7 +69,7 @@ export const FileList: React.FC<FileListProps> = ({
   };
 
   const handleGroupStage = async (files: FileChange[], checked: boolean) => {
-    if (!taskPath) return;
+    if (!taskPath || isLocked) return;
     try {
       if (checked) {
         const filePaths = files.filter((file) => !file.isStaged).map((file) => file.path);
@@ -97,7 +99,7 @@ export const FileList: React.FC<FileListProps> = ({
   };
 
   const handleFileStage = async (filePath: string, checked: boolean) => {
-    if (!taskPath) return;
+    if (!taskPath || isLocked) return;
     try {
       await window.electronAPI.updateIndex({
         taskPath,
@@ -112,7 +114,7 @@ export const FileList: React.FC<FileListProps> = ({
   };
 
   const executeRestore = async () => {
-    if (!taskPath || !restoreTarget) return;
+    if (!taskPath || !restoreTarget || isLocked) return;
     try {
       await window.electronAPI.revertFile({ taskPath, filePath: restoreTarget });
       setRestoreTarget(null);
@@ -145,7 +147,9 @@ export const FileList: React.FC<FileListProps> = ({
         {!readOnly && (
           <>
             <button
-              className="flex-shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/file:opacity-100"
+              type="button"
+              disabled={isLocked}
+              className="flex-shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/file:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
               onClick={(e) => {
                 e.stopPropagation();
                 setRestoreTarget(file.path);
@@ -156,6 +160,7 @@ export const FileList: React.FC<FileListProps> = ({
             </button>
             <Checkbox
               checked={file.isStaged}
+              disabled={isLocked}
               onCheckedChange={(checked) => {
                 void handleFileStage(file.path, checked === true);
               }}
@@ -197,6 +202,7 @@ export const FileList: React.FC<FileListProps> = ({
             <div className="flex h-9 items-center gap-2 border-b border-border px-3">
               <Checkbox
                 checked={allStaged}
+                disabled={isLocked}
                 onCheckedChange={(checked) => void handleStageAll(checked === true)}
               />
               <span className="text-xs font-medium text-muted-foreground">Stage All</span>
@@ -208,6 +214,7 @@ export const FileList: React.FC<FileListProps> = ({
                 <div className="flex items-center gap-2 px-3 py-1.5">
                   <Checkbox
                     checked={trackedAllStaged}
+                    disabled={isLocked}
                     onCheckedChange={(checked) => void handleGroupStage(tracked, checked === true)}
                   />
                   <span className="text-xs font-medium tracking-wide text-muted-foreground">
@@ -225,6 +232,7 @@ export const FileList: React.FC<FileListProps> = ({
                 <div className="flex items-center gap-2 px-3 py-1.5">
                   <Checkbox
                     checked={untrackedAllStaged}
+                    disabled={isLocked}
                     onCheckedChange={(checked) =>
                       void handleGroupStage(untracked, checked === true)
                     }

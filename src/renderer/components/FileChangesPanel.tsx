@@ -44,10 +44,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import { useGitWorkspaceBusyForTask } from '../contexts/GitWorkspaceBusyContext';
 import { useTaskScope } from './TaskScopeContext';
 import { fetchPrBaseDiff, parseDiffToFileChanges } from '../lib/parsePrDiff';
 import { formatDiffCount } from '../lib/gitChangePresentation';
-import { ToastAction } from './ui/toast';
 
 type ActiveTab = 'changes' | 'checks';
 type PrMode = 'create' | 'draft' | 'merge';
@@ -149,50 +149,6 @@ function CommitMessageToastDescription({ message }: { message: string }) {
   );
 }
 
-function CopyCommitMessageToastAction({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copyResetRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (copyResetRef.current !== null) {
-        window.clearTimeout(copyResetRef.current);
-      }
-    };
-  }, []);
-
-  const handleCopy = async () => {
-    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      if (copyResetRef.current !== null) {
-        window.clearTimeout(copyResetRef.current);
-      }
-      copyResetRef.current = window.setTimeout(() => {
-        setCopied(false);
-        copyResetRef.current = null;
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to copy commit message', error);
-      setCopied(false);
-    }
-  };
-
-  const CopyIcon = copied ? Check : Copy;
-
-  return (
-    <ToastAction altText="Copy commit message" onClick={() => void handleCopy()}>
-      <span className="inline-flex items-center gap-1">
-        {copied ? 'Copied' : 'Copy message'}
-        <CopyIcon className="h-3 w-3" />
-      </span>
-    </ToastAction>
-  );
-}
 
 const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   taskId,
@@ -204,6 +160,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const resolvedTaskId = taskId ?? scopedTaskId;
   const resolvedTaskPath = taskPath ?? scopedTaskPath;
   const safeTaskPath = resolvedTaskPath ?? '';
+  const { operation, beginOperation, endOperation, isLocked } = useGitWorkspaceBusyForTask(
+    resolvedTaskPath || undefined
+  );
   const canRender = Boolean(resolvedTaskId && resolvedTaskPath);
   const taskPathRef = useRef(safeTaskPath);
   taskPathRef.current = safeTaskPath;
@@ -256,8 +215,6 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const [revertingFiles, setRevertingFiles] = useState<Set<string>>(new Set());
   const [isStagingAll, setIsStagingAll] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
-  const [commitAction, setCommitAction] = useState<'commit' | 'commitAndPush' | null>(null);
-  const [isPushing, setIsPushing] = useState(false);
   const [showPushAfterCommit, setShowPushAfterCommit] = useState(false);
   const [isMergingToMain, setIsMergingToMain] = useState(false);
   const [showMergeConfirm, setShowMergeConfirm] = useState(false);
@@ -325,8 +282,6 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   useEffect(() => {
     setIsMergingToMain(false);
     setCommitMessage('');
-    setCommitAction(null);
-    setIsPushing(false);
     setShowPushAfterCommit(false);
     setStagingFiles(new Set());
     setRevertingFiles(new Set());
@@ -381,6 +336,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
   const handleFileStage = async (filePath: string, stage: boolean, event: React.MouseEvent) => {
     event.stopPropagation();
+    if (isLocked) return;
     setStagingFiles((prev) => new Set(prev).add(filePath));
     try {
       await window.electronAPI.updateIndex({
@@ -409,6 +365,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   };
 
   const handleStageAll = async () => {
+    if (isLocked) return;
     setIsStagingAll(true);
     try {
       await window.electronAPI.updateIndex({
@@ -432,7 +389,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
   const executeRestore = async () => {
     const filePath = restoreTarget;
-    if (!filePath) return;
+    if (!filePath || isLocked) return;
     setRestoreTarget(null);
     setRevertingFiles((prev) => new Set(prev).add(filePath));
     try {
@@ -494,7 +451,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
       return;
     }
 
-    setCommitAction(action);
+    if (isLocked) return;
+
+    beginOperation(action);
     try {
       if (hasOnlyUnstagedChanges) {
         await window.electronAPI.updateIndex({
@@ -528,11 +487,6 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             ? <CommitMessageToastDescription message={committedMessage} />
             : 'Changes committed successfully.',
           descriptionClassName: committedMessage ? 'line-clamp-none opacity-100' : undefined,
-          action: committedMessage ? (
-            <CopyCommitMessageToastAction
-              text={`${action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed'}\nChanges committed with message:\n${committedMessage}`}
-            />
-          ) : undefined,
         });
         setCommitMessage('');
         await refreshChanges();
@@ -564,18 +518,19 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setCommitAction(null);
+      endOperation();
     }
   };
 
-  const isCommitting = commitAction !== null;
+  const isPushingOp = operation === 'push';
 
   const handleCommitAndPush = async () => {
     await handleCommit('commitAndPush');
   };
 
   const handlePush = async () => {
-    setIsPushing(true);
+    if (!safeTaskPath || isLocked) return;
+    beginOperation('push');
     try {
       const taskPathAtPush = safeTaskPath;
       const result = await window.electronAPI.gitPush({ taskPath: safeTaskPath });
@@ -603,7 +558,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsPushing(false);
+      endOperation();
     }
   };
 
@@ -722,7 +677,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     return null;
   }
 
-  const isActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain || isPushing;
+  const isActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain || isLocked;
   const hasDisplayChanges = displayChanges.length > 0;
   const pushCount = Math.max(branchAhead ?? 0, showPushAfterCommit ? 1 : 0);
 
@@ -842,7 +797,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     className="h-8 shrink-0 px-2 text-xs"
                     title="Stage all files for commit"
                     onClick={handleStageAll}
-                    disabled={isStagingAll}
+                    disabled={isStagingAll || isLocked}
                   >
                     {isStagingAll ? (
                       <Spinner size="sm" />
@@ -869,12 +824,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 className="h-8 flex-1 text-sm"
+                disabled={isLocked}
                 onKeyDown={(e) => {
                   if (
                     e.key === 'Enter' &&
                     !e.shiftKey &&
                     (hasStagedChanges || hasOnlyUnstagedChanges) &&
-                    !isCommitting
+                    !isLocked
                   ) {
                     e.preventDefault();
                     void handleCommitAndPush();
@@ -891,9 +847,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     : 'Commit staged changes without pushing'
                 }
                 onClick={() => void handleCommit('commit')}
-                disabled={isCommitting || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
+                disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
-                {commitAction === 'commit' ? <Spinner size="sm" /> : 'Commit'}
+                {operation === 'commit' ? <Spinner size="sm" /> : 'Commit'}
               </Button>
               <Button
                 variant="outline"
@@ -905,9 +861,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     : 'Commit all staged changes and push'
                 }
                 onClick={() => void handleCommitAndPush()}
-                disabled={isCommitting || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
+                disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
-                {commitAction === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
+                {operation === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
               </Button>
               <Button
                 variant="outline"
@@ -915,9 +871,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 className="h-8 px-2 text-xs"
                 title="Push committed changes"
                 onClick={() => void handlePush()}
-                disabled={isPushing || isCommitting || pushCount <= 0}
+                disabled={isLocked || pushCount <= 0}
               >
-                {isPushing ? <Spinner size="sm" /> : `Push (${pushCount})`}
+                {isPushingOp ? <Spinner size="sm" /> : `Push (${pushCount})`}
               </Button>
             </div>
           </div>
@@ -1144,7 +1100,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                             className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-foreground"
                             onClick={(e) => handleFileStage(change.path, !change.isStaged, e)}
                             disabled={
-                              stagingFiles.has(change.path) || revertingFiles.has(change.path)
+                              isLocked ||
+                              stagingFiles.has(change.path) ||
+                              revertingFiles.has(change.path)
                             }
                           >
                             {stagingFiles.has(change.path) ? (
@@ -1176,7 +1134,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                               setRestoreTarget(change.path);
                             }}
                             disabled={
-                              stagingFiles.has(change.path) || revertingFiles.has(change.path)
+                              isLocked ||
+                              stagingFiles.has(change.path) ||
+                              revertingFiles.has(change.path)
                             }
                           >
                             {revertingFiles.has(change.path) ? (

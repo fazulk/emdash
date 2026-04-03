@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, ArrowDown, Undo2, Loader2, Check, Copy } from 'lucide-react';
+import { ArrowUp, ArrowDown, Undo2, Loader2 } from 'lucide-react';
+import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import { useToast } from '../../hooks/use-toast';
 import type { FileChange } from '../../hooks/useFileChanges';
 import { subscribeToFileChanges } from '../../lib/fileChangeEvents';
-import { ToastAction } from '../ui/toast';
 
 interface CommitAreaProps {
   taskPath?: string;
@@ -29,50 +29,6 @@ function CommitMessageToastDescription({ message }: { message: string }) {
   );
 }
 
-function CopyCommitMessageToastAction({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copyResetRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (copyResetRef.current !== null) {
-        window.clearTimeout(copyResetRef.current);
-      }
-    };
-  }, []);
-
-  const handleCopy = async () => {
-    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      if (copyResetRef.current !== null) {
-        window.clearTimeout(copyResetRef.current);
-      }
-      copyResetRef.current = window.setTimeout(() => {
-        setCopied(false);
-        copyResetRef.current = null;
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to copy commit message', error);
-      setCopied(false);
-    }
-  };
-
-  const CopyIcon = copied ? Check : Copy;
-
-  return (
-    <ToastAction altText="Copy commit message" onClick={() => void handleCopy()}>
-      <span className="inline-flex items-center gap-1">
-        {copied ? 'Copied' : 'Copy message'}
-        <CopyIcon className="h-3 w-3" />
-      </span>
-    </ToastAction>
-  );
-}
 
 function friendlyGitError(raw: string): string {
   const s = raw.toLowerCase();
@@ -98,21 +54,21 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   onRefreshChanges,
 }) => {
   const { toast } = useToast();
+  const { operation, beginOperation, endOperation, isLocked } = useGitWorkspaceBusyForTask(taskPath);
   const [commitMessage, setCommitMessage] = useState('');
   const [description, setDescription] = useState('');
   const [branch, setBranch] = useState<string | null>(null);
   const [latestCommit, setLatestCommit] = useState<LatestCommit | null>(null);
-  const [commitAction, setCommitAction] = useState<'commit' | 'commitAndPush' | null>(null);
-  const [isPushing, setIsPushing] = useState(false);
-  const [isPulling, setIsPulling] = useState(false);
-  const [isUndoing, setIsUndoing] = useState(false);
   const [aheadCount, setAheadCount] = useState(0);
   const [behindCount, setBehindCount] = useState(0);
 
   const hasStagedFiles = fileChanges.some((f) => f.isStaged);
   const hasOnlyUnstagedChanges = fileChanges.length > 0 && !hasStagedFiles;
-  const isCommitting = commitAction !== null;
-  const canCommit = hasStagedFiles && !isCommitting;
+  const isCommitting = operation === 'commit' || operation === 'commitAndPush';
+  const isPushing = operation === 'push';
+  const isPulling = operation === 'pull';
+  const isUndoing = operation === 'undo';
+  const canCommit = hasStagedFiles && !isLocked;
 
   const fetchBranch = useCallback(async () => {
     if (!taskPath) return;
@@ -149,8 +105,8 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   }, [taskPath, fetchBranch, fetchLatestCommit]);
 
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
-    if (!taskPath || (!hasStagedFiles && !hasOnlyUnstagedChanges)) return;
-    setCommitAction(action);
+    if (!taskPath || (!hasStagedFiles && !hasOnlyUnstagedChanges) || isLocked) return;
+    beginOperation(action);
     try {
       const subject = commitMessage.trim();
       const body = description.trim();
@@ -183,11 +139,6 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
             ? <CommitMessageToastDescription message={committedMessage} />
             : 'Changes committed successfully.',
           descriptionClassName: committedMessage ? 'line-clamp-none opacity-100' : undefined,
-          action: committedMessage ? (
-            <CopyCommitMessageToastAction
-              text={`${action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed'}\nChanges committed with message:\n${committedMessage}`}
-            />
-          ) : undefined,
         });
       } else {
         toast({
@@ -203,15 +154,15 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setCommitAction(null);
+      endOperation();
     }
   };
 
   const hasUnpushed = aheadCount > 0 || (latestCommit != null && !latestCommit.isPushed);
 
   const handlePush = async () => {
-    if (!taskPath || !hasUnpushed || isPushing) return;
-    setIsPushing(true);
+    if (!taskPath || !hasUnpushed || isLocked) return;
+    beginOperation('push');
     try {
       const result = await window.electronAPI.gitPush({ taskPath });
       if (result?.success) {
@@ -232,13 +183,13 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsPushing(false);
+      endOperation();
     }
   };
 
   const handlePull = async () => {
-    if (!taskPath || isPulling) return;
-    setIsPulling(true);
+    if (!taskPath || isLocked) return;
+    beginOperation('pull');
     try {
       const result = await window.electronAPI.gitPull({ taskPath });
       if (!result?.success) {
@@ -260,13 +211,13 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsPulling(false);
+      endOperation();
     }
   };
 
   const handleUndo = async () => {
-    if (!taskPath || isUndoing) return;
-    setIsUndoing(true);
+    if (!taskPath || isLocked) return;
+    beginOperation('undo');
     try {
       const result = await window.electronAPI.gitSoftReset({ taskPath });
       if (result.success) {
@@ -293,7 +244,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setIsUndoing(false);
+      endOperation();
     }
   };
 
@@ -312,7 +263,8 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         value={commitMessage}
         onChange={(e) => setCommitMessage(e.target.value)}
         placeholder="Enter commit message"
-        className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        disabled={isLocked}
+        className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && canCommit) {
             void handleCommit('commit');
@@ -326,17 +278,18 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description"
         rows={3}
-        className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        disabled={isLocked}
+        className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       />
 
       {/* Commit & Push & Pull buttons */}
       <div className="flex gap-2">
         <button
           onClick={() => void handleCommit('commit')}
-          disabled={!hasStagedFiles && !hasOnlyUnstagedChanges}
+          disabled={(!hasStagedFiles && !hasOnlyUnstagedChanges) || isLocked}
           className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {commitAction === 'commit' ? (
+          {operation === 'commit' ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" />
               Committing...
@@ -347,10 +300,10 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         </button>
         <button
           onClick={() => void handleCommit('commitAndPush')}
-          disabled={!hasStagedFiles && !hasOnlyUnstagedChanges}
+          disabled={(!hasStagedFiles && !hasOnlyUnstagedChanges) || isLocked}
           className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {commitAction === 'commitAndPush' ? (
+          {operation === 'commitAndPush' ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" />
               Committing...
@@ -361,7 +314,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         </button>
         <button
           onClick={() => void handlePush()}
-          disabled={!hasUnpushed || isPushing || isCommitting}
+          disabled={!hasUnpushed || isLocked}
           className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           title={
             hasUnpushed
@@ -379,7 +332,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         {behindCount > 0 && (
           <button
             onClick={() => void handlePull()}
-            disabled={isPulling}
+            disabled={isLocked}
             className="flex items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             title={`Pull ${behindCount} commit${behindCount > 1 ? 's' : ''} from remote`}
           >
@@ -404,7 +357,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
           {!latestCommit.isPushed && (
             <button
               onClick={() => void handleUndo()}
-              disabled={isUndoing}
+              disabled={isLocked}
               className="flex flex-shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               title="Undo last commit"
             >

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  getGithubUrlFromRemote,
   getProjectGithubUrl,
   projectHasGithubRepo,
   resolveProjectGithubInfo,
@@ -20,6 +21,24 @@ describe('isGithubRemoteUrl', () => {
   });
 });
 
+describe('getGithubUrlFromRemote', () => {
+  it('builds a URL from an HTTPS GitHub remote', () => {
+    expect(getGithubUrlFromRemote('https://github.com/user/repo.git')).toBe(
+      'https://github.com/user/repo'
+    );
+  });
+
+  it('builds a URL from an SSH GitHub remote', () => {
+    expect(getGithubUrlFromRemote('git@github.com:user/repo.git')).toBe(
+      'https://github.com/user/repo'
+    );
+  });
+
+  it('returns null for non-GitHub remotes', () => {
+    expect(getGithubUrlFromRemote('https://gitlab.com/user/repo.git')).toBeNull();
+  });
+});
+
 describe('getProjectGithubUrl', () => {
   it('builds a URL from the saved repository when present', () => {
     expect(
@@ -28,6 +47,15 @@ describe('getProjectGithubUrl', () => {
         githubInfo: { connected: false, repository: 'user/repo' },
       })
     ).toBe('https://github.com/user/repo');
+  });
+
+  it('prefers the actual git remote over the saved GitHub repository', () => {
+    expect(
+      getProjectGithubUrl({
+        gitInfo: { isGitRepo: true, remote: 'https://github.com/fazulk/emdash.git' },
+        githubInfo: { connected: true, repository: 'generalaction/emdash' },
+      })
+    ).toBe('https://github.com/fazulk/emdash');
   });
 
   it('builds a URL from an HTTPS GitHub remote', () => {
@@ -46,7 +74,7 @@ describe('getProjectGithubUrl', () => {
     ).toBe('https://github.com/user/repo');
   });
 
-  it('returns null for non-GitHub remotes', () => {
+  it('returns null when neither remote nor saved repository points to GitHub', () => {
     expect(
       getProjectGithubUrl({
         gitInfo: { isGitRepo: true, remote: 'https://gitlab.com/user/repo.git' },

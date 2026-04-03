@@ -853,7 +853,11 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 onClick={() => void handleCommit('commit')}
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
-                {operation === 'commit' ? <Spinner size="sm" /> : 'Commit'}
+                {operation === 'commit' ? (
+                  <Spinner size="sm" className="[animation-duration:0.65s]" />
+                ) : (
+                  'Commit'
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -867,7 +871,11 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 onClick={() => void handleCommitAndPush()}
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
-                {operation === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
+                {operation === 'commitAndPush' ? (
+                  <Spinner size="sm" className="[animation-duration:0.65s]" />
+                ) : (
+                  'Commit & Push'
+                )}
               </Button>
               <div className="flex">
                 <Button
@@ -878,7 +886,11 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                   onClick={() => void handlePush()}
                   disabled={isLocked || pushCount <= 0}
                 >
-                  {isPushingOp ? <Spinner size="sm" /> : `Push (${pushCount})`}
+                  {isPushingOp ? (
+                    <Spinner size="sm" className="[animation-duration:0.65s]" />
+                  ) : (
+                    `Push (${pushCount})`
+                  )}
                 </Button>
                 <Popover>
                   <PopoverTrigger asChild>

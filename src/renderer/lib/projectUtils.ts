@@ -4,6 +4,26 @@ export function isGithubRemoteUrl(remoteUrl: string | null | undefined): boolean
   return /github\.com[:/]/i.test(remoteUrl ?? '');
 }
 
+export function getGithubUrlFromRemote(remoteUrl: string | null | undefined): string | null {
+  const remote = remoteUrl?.trim();
+  if (!remote || !isGithubRemoteUrl(remote)) return null;
+
+  const patterns = [
+    /^https?:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i,
+    /^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/i,
+    /^ssh:\/\/git@github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = remote.match(pattern);
+    if (match?.[1]) {
+      return `https://github.com/${match[1]}`;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Normalizes file paths for cross-platform comparison.
  * On Windows, paths are case-insensitive. On Unix, they are case-sensitive.
@@ -109,24 +129,11 @@ export function withRepoKey(project: Project, platform?: string): Project {
 export function getProjectGithubUrl(
   project: Pick<Project, 'gitInfo' | 'githubInfo'>
 ): string | null {
+  const remoteUrl = getGithubUrlFromRemote(project.gitInfo.remote);
+  if (remoteUrl) return remoteUrl;
+
   const repository = project.githubInfo?.repository?.trim();
   if (repository) return `https://github.com/${repository}`;
-
-  const remote = project.gitInfo.remote?.trim();
-  if (!remote || !isGithubRemoteUrl(remote)) return null;
-
-  const patterns = [
-    /^https?:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i,
-    /^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/i,
-    /^ssh:\/\/git@github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = remote.match(pattern);
-    if (match?.[1]) {
-      return `https://github.com/${match[1]}`;
-    }
-  }
 
   return null;
 }

@@ -332,7 +332,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         >
           {operation === 'commit' ? (
             <>
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin [animation-duration:0.65s]" />
               Committing...
             </>
           ) : (
@@ -346,7 +346,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         >
           {operation === 'commitAndPush' ? (
             <>
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin [animation-duration:0.65s]" />
               Committing...
             </>
           ) : (
@@ -365,7 +365,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
             }
           >
             {isPushing ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin [animation-duration:0.65s]" />
             ) : (
               <ArrowUp className="h-3 w-3" />
             )}

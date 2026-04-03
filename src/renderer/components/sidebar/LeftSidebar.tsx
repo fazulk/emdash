@@ -40,7 +40,7 @@ import { useTaskManagementContext } from '../../contexts/TaskManagementContext';
 import { useAppSettings } from '../../contexts/AppSettingsProvider';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { getProjectGithubUrl } from '../../lib/projectUtils';
+import { getGithubUrlFromRemote, getProjectGithubUrl } from '../../lib/projectUtils';
 import { ProjectsGroupLabel } from './ProjectsGroupLabel';
 import { useChangelogNotification } from '@/hooks/useChangelogNotification';
 import { useModalContext } from '@/contexts/ModalProvider';
@@ -257,6 +257,24 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     TASK_SORT_MODE_KEY,
     {}
   );
+
+  const handleOpenProjectGithub = useCallback(async (project: Project) => {
+    let githubUrl = getProjectGithubUrl(project);
+
+    if (!project.isRemote) {
+      try {
+        const gitInfo = await window.electronAPI.getGitInfo(project.path);
+        const liveGithubUrl = getGithubUrlFromRemote(gitInfo.remote);
+        if (liveGithubUrl) githubUrl = liveGithubUrl;
+      } catch {
+        // Fall back to persisted project data.
+      }
+    }
+
+    if (githubUrl) {
+      await window.electronAPI.openExternal(githubUrl);
+    }
+  }, []);
 
   /**
    * Called when the user drags a task to a new position.
@@ -531,7 +549,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                   className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    void window.electronAPI.openExternal(githubUrl);
+                                    void handleOpenProjectGithub(typedProject);
                                   }}
                                   aria-label={`Open ${typedProject.name} on GitHub`}
                                   title="Open on GitHub"

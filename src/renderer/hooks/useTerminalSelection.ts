@@ -28,7 +28,7 @@ export interface TerminalSelection {
 }
 
 export function parseTerminalValue(value: string): { mode: SelectedMode; id: string } | null {
-  const match = value.match(/^(task|global|lifecycle)::(.+)$/);
+  const match = value.match(/^(task|global|lifecycle|script)::(.+)$/);
   if (!match) return null;
   return { mode: match[1] as SelectedMode, id: match[2] };
 }

@@ -13,6 +13,7 @@ interface UseTerminalSelectionOptions {
   task: { id: string } | null;
   taskTerminals: TerminalStore;
   globalTerminals: TerminalStore;
+  allowTaskTerminals?: boolean;
 }
 
 export interface TerminalSelection {
@@ -43,12 +44,21 @@ export function resolveSelection(params: {
   prevTaskId: string | null;
   taskTerminals: { terminals: { id: string }[]; activeTerminalId: string | null };
   globalTerminals: { terminals: { id: string }[]; activeTerminalId: string | null };
+  allowTaskTerminals?: boolean;
 }): string | null {
-  const { currentValue, taskId, prevTaskId, taskTerminals, globalTerminals } = params;
+  const {
+    currentValue,
+    taskId,
+    prevTaskId,
+    taskTerminals,
+    globalTerminals,
+    allowTaskTerminals = true,
+  } = params;
+  const canUseTaskTerminals = Boolean(taskId && allowTaskTerminals);
 
   // 1. Task switch — always reset to worktree 1
   if (taskId !== prevTaskId) {
-    if (taskTerminals.terminals.length > 0) {
+    if (canUseTaskTerminals && taskTerminals.terminals.length > 0) {
       return `task::${taskTerminals.terminals[0].id}`;
     }
     if (globalTerminals.terminals.length > 0) {
@@ -59,7 +69,7 @@ export function resolveSelection(params: {
 
   // 2. No selection — pick first available
   if (!currentValue) {
-    if (taskTerminals.terminals.length > 0) {
+    if (canUseTaskTerminals && taskTerminals.terminals.length > 0) {
       return `task::${taskTerminals.terminals[0].id}`;
     }
     if (globalTerminals.terminals.length > 0) {
@@ -71,8 +81,8 @@ export function resolveSelection(params: {
   const parsed = parseTerminalValue(currentValue);
   if (!parsed) return '';
 
-  // 3. No task but mode is task — switch to global
-  if (!taskId && parsed.mode === 'task') {
+  // 3. Task terminals unavailable — switch to global
+  if ((!taskId || !allowTaskTerminals) && parsed.mode === 'task') {
     if (globalTerminals.terminals.length > 0) {
       return `global::${globalTerminals.terminals[0].id}`;
     }
@@ -88,18 +98,21 @@ export function resolveSelection(params: {
   if (exists) return null;
 
   // 6. Terminal gone (deleted) — stay in same type if possible
-  const sameTypeStore = parsed.mode === 'task' ? taskTerminals : globalTerminals;
-  if (
-    sameTypeStore.activeTerminalId &&
-    sameTypeStore.terminals.some((t) => t.id === sameTypeStore.activeTerminalId)
-  ) {
-    return `${parsed.mode}::${sameTypeStore.activeTerminalId}`;
+  if (parsed.mode !== 'task' || allowTaskTerminals) {
+    const sameTypeStore = parsed.mode === 'task' ? taskTerminals : globalTerminals;
+    if (
+      sameTypeStore.activeTerminalId &&
+      sameTypeStore.terminals.some((t) => t.id === sameTypeStore.activeTerminalId)
+    ) {
+      return `${parsed.mode}::${sameTypeStore.activeTerminalId}`;
+    }
   }
 
   // Cross-type fallback
   const otherMode = parsed.mode === 'task' ? 'global' : 'task';
   const otherStore = parsed.mode === 'task' ? globalTerminals : taskTerminals;
-  if (otherStore.terminals.length > 0) {
+  const canFallbackToOtherType = otherMode !== 'task' || allowTaskTerminals;
+  if (canFallbackToOtherType && otherStore.terminals.length > 0) {
     return `${otherMode}::${otherStore.terminals[0].id}`;
   }
 
@@ -107,11 +120,11 @@ export function resolveSelection(params: {
 }
 
 export function useTerminalSelection(options: UseTerminalSelectionOptions): TerminalSelection {
-  const { task, taskTerminals, globalTerminals } = options;
+  const { task, taskTerminals, globalTerminals, allowTaskTerminals = true } = options;
 
   const [isOpen, setIsOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState<string>(() => {
-    if (task && taskTerminals.activeTerminalId) {
+    if (task && allowTaskTerminals && taskTerminals.activeTerminalId) {
       return `task::${taskTerminals.activeTerminalId}`;
     }
     if (globalTerminals.activeTerminalId) {
@@ -132,6 +145,7 @@ export function useTerminalSelection(options: UseTerminalSelectionOptions): Term
       prevTaskId,
       taskTerminals,
       globalTerminals,
+      allowTaskTerminals,
     });
 
     // Always update the ref after reading it
@@ -148,6 +162,7 @@ export function useTerminalSelection(options: UseTerminalSelectionOptions): Term
     taskTerminals.activeTerminalId,
     globalTerminals.terminals,
     globalTerminals.activeTerminalId,
+    allowTaskTerminals,
   ]);
 
   const parsed = selectedValue ? parseTerminalValue(selectedValue) : null;

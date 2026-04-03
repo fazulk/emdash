@@ -60,6 +60,18 @@ describe('resolveSelection', () => {
       expect(result).toBe('global::g1');
     });
 
+    it('uses global terminals on task switch when task terminals are disabled', () => {
+      const result = resolveSelection({
+        currentValue: 'task::old',
+        taskId: 'task-2',
+        prevTaskId: 'task-1',
+        taskTerminals: makeTerminals(['t1']),
+        globalTerminals: makeTerminals(['g1']),
+        allowTaskTerminals: false,
+      });
+      expect(result).toBe('global::g1');
+    });
+
     it('clears selection if no terminals at all on task switch', () => {
       const result = resolveSelection({
         currentValue: 'task::old',
@@ -105,6 +117,18 @@ describe('resolveSelection', () => {
       });
       expect(result).toBe('global::g1');
     });
+
+    it('picks first global terminal when task terminals are disabled', () => {
+      const result = resolveSelection({
+        currentValue: '',
+        taskId: 'task-1',
+        prevTaskId: 'task-1',
+        taskTerminals: makeTerminals(['t1']),
+        globalTerminals: makeTerminals(['g1']),
+        allowTaskTerminals: false,
+      });
+      expect(result).toBe('global::g1');
+    });
   });
 
   describe('task deselected', () => {
@@ -115,6 +139,18 @@ describe('resolveSelection', () => {
         prevTaskId: null,
         taskTerminals: makeTerminals([]),
         globalTerminals: makeTerminals(['g1']),
+      });
+      expect(result).toBe('global::g1');
+    });
+
+    it('switches to global when task mode is selected but task terminals are disabled', () => {
+      const result = resolveSelection({
+        currentValue: 'task::t1',
+        taskId: 'task-1',
+        prevTaskId: 'task-1',
+        taskTerminals: makeTerminals(['t1']),
+        globalTerminals: makeTerminals(['g1']),
+        allowTaskTerminals: false,
       });
       expect(result).toBe('global::g1');
     });
@@ -189,6 +225,18 @@ describe('resolveSelection', () => {
         globalTerminals: makeTerminals([], null),
       });
       expect(result).toBe('task::t1');
+    });
+
+    it('does not fall back to task terminals when they are disabled', () => {
+      const result = resolveSelection({
+        currentValue: 'global::g1',
+        taskId: 'task-1',
+        prevTaskId: 'task-1',
+        taskTerminals: makeTerminals(['t1']),
+        globalTerminals: makeTerminals([], null),
+        allowTaskTerminals: false,
+      });
+      expect(result).toBe('');
     });
 
     it('clears when no terminals remain anywhere', () => {

@@ -4,6 +4,7 @@ import { LifecycleTerminalView } from './LifecycleTerminalView';
 import { Plus, Play, RotateCw, Square, X, Maximize2 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useTaskTerminals } from '@/lib/taskTerminalsStore';
+import { getGlobalTerminalKey } from '@/lib/terminalScope';
 import { useTerminalSelection } from '../hooks/useTerminalSelection';
 import { cn } from '@/lib/utils';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
@@ -67,6 +68,11 @@ interface Task {
   branch: string;
   path: string;
   status: 'active' | 'idle' | 'running';
+  useWorktree?: boolean;
+  metadata?: {
+    workspace?: unknown;
+    multiAgent?: unknown;
+  } | null;
 }
 
 interface Props {
@@ -102,18 +108,22 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
   // Use path in the key to differentiate multi-agent variants that share the same task.id
   const taskKey = task ? `${task.id}::${task.path}` : 'task-placeholder';
   const taskTerminals = useTaskTerminals(taskKey, task?.path);
-  // Global terminals are scoped per variant (or project when no task) so each
-  // agent worktree gets its own global terminal and simultaneous variants don't conflict.
-  const effectiveCwd = projectPath;
-  // Use a stable key for the home page case so terminals aren't orphaned.
-  const globalKey = task?.path
-    ? `global::${task.path}`
-    : projectPath
-      ? `global::${projectPath}`
-      : 'global::home';
+  // Project/global terminals follow the repository root when available so the
+  // same project terminal remains visible from repo home and worktree views.
+  const effectiveCwd = projectPath || task?.path;
+  const globalKey = getGlobalTerminalKey({ projectPath, taskPath: task?.path });
   const globalTerminals = useTaskTerminals(globalKey, effectiveCwd);
+  const taskHasDedicatedTerminal = Boolean(
+    task &&
+      (task.useWorktree !== false || task.metadata?.workspace || task.metadata?.multiAgent)
+  );
 
-  const selection = useTerminalSelection({ task, taskTerminals, globalTerminals });
+  const selection = useTerminalSelection({
+    task,
+    taskTerminals,
+    globalTerminals,
+    allowTaskTerminals: taskHasDedicatedTerminal,
+  });
 
   // Custom project scripts from .emdash.json
   const customScripts = useCustomScripts(projectPath);
@@ -295,7 +305,8 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     }
   }, [runStatus, selection.onChange]);
 
-  const totalTerminals = taskTerminals.terminals.length + globalTerminals.terminals.length;
+  const totalTerminals =
+    (taskHasDedicatedTerminal ? taskTerminals.terminals.length : 0) + globalTerminals.terminals.length;
 
   const lifecycleLogContent = useMemo(() => {
     if (!selection.selectedLifecycle) return '';
@@ -315,10 +326,10 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
   const isRunSelection = !selection.selectedLifecycle || selection.selectedLifecycle === 'run';
   const selectedTerminalScope = useMemo(() => {
     if (selection.selectedScript) return 'SCRIPT';
-    if (selection.parsed?.mode === 'task') return 'WORKTREE';
+    if (selection.parsed?.mode === 'task') return task?.metadata?.workspace ? 'WORKSPACE' : 'WORKTREE';
     if (selection.parsed?.mode === 'global') return projectPath ? 'PROJECT' : 'GLOBAL';
     return null;
-  }, [selection.selectedScript, selection.parsed?.mode, projectPath]);
+  }, [selection.selectedScript, selection.parsed?.mode, projectPath, task?.metadata?.workspace]);
   const {
     isSearchOpen,
     searchQuery,
@@ -596,10 +607,12 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
             </span>
           </SelectTrigger>
           <SelectContent>
-            {task && (
+            {task && taskHasDedicatedTerminal && (
               <SelectGroup>
                 <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-[11px] font-bold text-muted-foreground">Worktree</span>
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    {task.metadata?.workspace ? 'Workspace' : 'Worktree'}
+                  </span>
                   <button
                     type="button"
                     className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -983,7 +996,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
               </div>
             ) : (
               <>
-                {task &&
+                {taskHasDedicatedTerminal &&
                   taskTerminals.terminals.map((terminal) => {
                     const isActive =
                       selection.parsed?.mode === 'task' &&
@@ -1000,7 +1013,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                           key={`${terminal.id}${reattachId === terminal.id ? `::${reattachCounter.current}` : ''}`}
                           ref={(r) => setTerminalRef(terminal.id, r)}
                           id={terminal.id}
-                          cwd={remote?.projectPath || terminal.cwd || task.path}
+                          cwd={remote?.projectPath || terminal.cwd || task?.path}
                           remote={
                             remote?.connectionId ? { connectionId: remote.connectionId } : undefined
                           }
@@ -1033,7 +1046,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                         key={`${terminal.id}${reattachId === terminal.id ? `::${reattachCounter.current}` : ''}`}
                         ref={(r) => setTerminalRef(terminal.id, r)}
                         id={terminal.id}
-                        cwd={terminal.cwd || projectPath}
+                        cwd={terminal.cwd || effectiveCwd}
                         remote={
                           remote?.connectionId ? { connectionId: remote.connectionId } : undefined
                         }

@@ -75,7 +75,11 @@ function PrActionButton({ mode, onModeChange, onExecute, isLoading }: PrActionBu
         disabled={isLoading}
         onClick={onExecute}
       >
-        {isLoading ? <Spinner size="sm" /> : PR_MODE_LABELS[mode]}
+        {isLoading ? (
+          <Spinner size="sm" className="[animation-duration:0.25s]" />
+        ) : (
+          PR_MODE_LABELS[mode]
+        )}
       </Button>
       <Popover>
         <PopoverTrigger asChild>
@@ -804,7 +808,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     disabled={isStagingAll || isLocked}
                   >
                     {isStagingAll ? (
-                      <Spinner size="sm" />
+                      <Spinner size="sm" className="[animation-duration:0.25s]" />
                     ) : (
                       <>
                         <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
@@ -953,7 +957,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 )}
                 {isPrLoading ? (
                   <div className="flex items-center justify-center p-1">
-                    <Spinner size="sm" className="h-3.5 w-3.5" />
+                    <Spinner size="sm" className="h-3.5 w-3.5 [animation-duration:0.25s]" />
                   </div>
                 ) : pr ? (
                   <button

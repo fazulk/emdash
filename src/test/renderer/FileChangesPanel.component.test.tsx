@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileChangesPanel } from '../../renderer/components/FileChangesPanel';
 
 const getBranchStatusMock = vi.fn();
+const gitCommitMock = vi.fn();
 const gitCommitAndPushMock = vi.fn();
 const toastMock = vi.fn();
 const refreshChangesMock = vi.fn();
@@ -89,6 +90,7 @@ describe('FileChangesPanel', () => {
     refreshChangesMock.mockReset();
     refreshPrMock.mockReset();
     getBranchStatusMock.mockReset();
+    gitCommitMock.mockReset();
     gitCommitAndPushMock.mockReset();
     useFileChangesMock.mockReset();
     usePrStatusMock.mockReset();
@@ -101,6 +103,11 @@ describe('FileChangesPanel', () => {
       branch: 'main',
       ahead: 2,
       behind: 0,
+    });
+    gitCommitMock.mockResolvedValue({
+      success: true,
+      hash: 'abc123',
+      message: 'Update src/file.ts',
     });
     gitCommitAndPushMock.mockResolvedValue({
       success: true,
@@ -135,6 +142,7 @@ describe('FileChangesPanel', () => {
       configurable: true,
       value: {
         getBranchStatus: getBranchStatusMock,
+        gitCommit: gitCommitMock,
         gitCommitAndPush: gitCommitAndPushMock,
         onGitStatusChanged: onGitStatusChangedMock,
       },
@@ -191,6 +199,66 @@ describe('FileChangesPanel', () => {
     render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled());
+
+    getBranchStatusMock.mockResolvedValue({
+      success: true,
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+    });
+
+    statusListener?.({ taskPath: '/tmp/repo' });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Push (0)' })).toBeDisabled());
+  });
+
+  it('clears the optimistic push count when a synced status update reports nothing to push', async () => {
+    let statusListener: ((data: { taskPath: string; error?: string }) => void) | undefined;
+    onGitStatusChangedMock.mockImplementation(
+      (listener: (data: { taskPath: string; error?: string }) => void) => {
+        statusListener = listener;
+        return () => {
+          if (statusListener === listener) statusListener = undefined;
+        };
+      }
+    );
+
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: true,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    getBranchStatusMock
+      .mockResolvedValueOnce({
+        success: true,
+        branch: 'main',
+        ahead: 0,
+        behind: 0,
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        branch: 'main',
+        ahead: 1,
+        behind: 0,
+      });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Push (0)' })).toBeDisabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => expect(gitCommitMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Push (1)' })).toBeEnabled());
 
     getBranchStatusMock.mockResolvedValue({
       success: true,

@@ -319,8 +319,10 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
           taskId: resolvedTaskId,
         });
         if (!cancelled) {
+          const nextAhead = res?.success ? (res?.ahead ?? 0) : 0;
           setBranchName(res?.success ? (res?.branch ?? null) : null);
-          setBranchAhead(res?.success ? (res?.ahead ?? 0) : 0);
+          setBranchAhead(nextAhead);
+          if (nextAhead <= 0) setShowPushAfterCommit(false);
         }
       } catch {
         // Network or IPC error - default to 0
@@ -430,8 +432,10 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
           taskId: resolvedTaskId,
         });
         if (taskPathRef.current !== taskPath) return;
+        const nextAhead = status?.success ? (status?.ahead ?? 0) : 0;
         setBranchName(status?.success ? (status?.branch ?? null) : null);
-        setBranchAhead(status?.success ? (status?.ahead ?? 0) : 0);
+        setBranchAhead(nextAhead);
+        if (nextAhead <= 0) setShowPushAfterCommit(false);
       } catch {
         if (taskPathRef.current === taskPath) {
           setBranchName(null);

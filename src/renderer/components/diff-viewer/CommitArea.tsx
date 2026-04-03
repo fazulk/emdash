@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowUp, ArrowDown, Undo2, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUp, ArrowDown, Undo2, Loader2, Check, Copy } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import type { FileChange } from '../../hooks/useFileChanges';
 import { subscribeToFileChanges } from '../../lib/fileChangeEvents';
+import { ToastAction } from '../ui/toast';
 
 interface CommitAreaProps {
   taskPath?: string;
@@ -15,6 +16,62 @@ interface LatestCommit {
   subject: string;
   body: string;
   isPushed: boolean;
+}
+
+function CommitMessageToastDescription({ message }: { message: string }) {
+  return (
+    <div className="space-y-2">
+      <p>Changes committed with message:</p>
+      <code className="block whitespace-pre-wrap break-words rounded-md border border-border/70 bg-muted/60 px-2 py-1.5 font-mono text-xs text-foreground">
+        {message}
+      </code>
+    </div>
+  );
+}
+
+function CopyCommitMessageToastAction({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copyResetRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetRef.current !== null) {
+        window.clearTimeout(copyResetRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (copyResetRef.current !== null) {
+        window.clearTimeout(copyResetRef.current);
+      }
+      copyResetRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyResetRef.current = null;
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy commit message', error);
+      setCopied(false);
+    }
+  };
+
+  const CopyIcon = copied ? Check : Copy;
+
+  return (
+    <ToastAction altText="Copy commit message" onClick={() => void handleCopy()}>
+      <span className="inline-flex items-center gap-1">
+        {copied ? 'Copied' : 'Copy message'}
+        <CopyIcon className="h-3 w-3" />
+      </span>
+    </ToastAction>
+  );
 }
 
 function friendlyGitError(raw: string): string {
@@ -114,14 +171,24 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
               body: body || undefined,
             });
       if (result.success) {
+        const committedMessage = result.message || subject;
         setCommitMessage('');
         setDescription('');
         await onRefreshChanges?.();
         await fetchLatestCommit();
         await fetchBranch();
-        if (action === 'commitAndPush') {
-          toast({ title: 'Committed and pushed' });
-        }
+        toast({
+          title: action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed',
+          description: committedMessage
+            ? <CommitMessageToastDescription message={committedMessage} />
+            : 'Changes committed successfully.',
+          descriptionClassName: committedMessage ? 'line-clamp-none opacity-100' : undefined,
+          action: committedMessage ? (
+            <CopyCommitMessageToastAction
+              text={`${action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed'}\nChanges committed with message:\n${committedMessage}`}
+            />
+          ) : undefined,
+        });
       } else {
         toast({
           title: action === 'commitAndPush' ? 'Commit & push failed' : 'Commit failed',
@@ -180,6 +247,8 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
           description: friendlyGitError(result?.error || 'Unknown error'),
           variant: 'destructive',
         });
+      } else {
+        toast({ title: 'Pulled successfully' });
       }
       await fetchBranch();
       await fetchLatestCommit();
@@ -206,6 +275,10 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         await onRefreshChanges?.();
         await fetchLatestCommit();
         await fetchBranch();
+        toast({
+          title: 'Commit undone',
+          description: result.subject || 'The last commit was moved back to staged changes.',
+        });
       } else {
         toast({
           title: 'Undo failed',

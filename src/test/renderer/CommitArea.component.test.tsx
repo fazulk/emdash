@@ -18,6 +18,7 @@ describe('CommitArea', () => {
   const gitPush = vi.fn();
   const gitCommitAndPush = vi.fn();
   const gitSoftReset = vi.fn();
+  const gitPull = vi.fn();
 
   beforeEach(() => {
     toastMock.mockReset();
@@ -27,6 +28,7 @@ describe('CommitArea', () => {
     gitPush.mockReset();
     gitCommitAndPush.mockReset();
     gitSoftReset.mockReset();
+    gitPull.mockReset();
 
     getBranchStatus.mockResolvedValue({
       success: true,
@@ -45,7 +47,9 @@ describe('CommitArea', () => {
     });
     gitCommit.mockResolvedValue({ success: true, hash: 'abc123' });
     gitPush.mockResolvedValue({ success: true });
-    gitCommitAndPush.mockResolvedValue({ success: true, branch: 'main' });
+    gitCommitAndPush.mockResolvedValue({ success: true, branch: 'main', message: 'ship it' });
+    gitPull.mockResolvedValue({ success: true });
+    gitSoftReset.mockResolvedValue({ success: true, subject: 'test commit', body: '' });
 
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
@@ -56,6 +60,7 @@ describe('CommitArea', () => {
         gitPush,
         gitCommitAndPush,
         gitSoftReset,
+        gitPull,
       },
     });
   });
@@ -72,7 +77,7 @@ describe('CommitArea', () => {
     expect(gitCommitAndPush).not.toHaveBeenCalled();
   });
 
-  it('commits and pushes without creating a new branch', async () => {
+  it('commits and pushes without creating a new branch and shows a toast', async () => {
     render(
       <CommitArea
         taskPath="/tmp/repo"
@@ -98,6 +103,12 @@ describe('CommitArea', () => {
       })
     );
     expect(gitPush).not.toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Committed and Pushed',
+        descriptionClassName: 'line-clamp-none opacity-100',
+      })
+    );
   });
 
   it('allows commit and push with a blank subject so the backend can generate one', async () => {
@@ -124,6 +135,43 @@ describe('CommitArea', () => {
         createBranchIfOnDefault: false,
       })
     );
+  });
+
+  it('shows a success toast after pull', async () => {
+    getBranchStatus.mockResolvedValue({
+      success: true,
+      branch: 'main',
+      ahead: 0,
+      behind: 2,
+    });
+    gitGetLatestCommit.mockResolvedValue({
+      success: true,
+      commit: {
+        hash: 'abc123',
+        subject: 'test commit',
+        body: '',
+        isPushed: true,
+      },
+    });
+
+    render(<CommitArea taskPath="/tmp/repo" fileChanges={[]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /pull \(2\)/i }));
+
+    await waitFor(() => expect(gitPull).toHaveBeenCalledWith({ taskPath: '/tmp/repo' }));
+    expect(toastMock).toHaveBeenCalledWith({ title: 'Pulled successfully' });
+  });
+
+  it('shows a success toast after undo', async () => {
+    render(<CommitArea taskPath="/tmp/repo" fileChanges={[]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /undo/i }));
+
+    await waitFor(() => expect(gitSoftReset).toHaveBeenCalledWith({ taskPath: '/tmp/repo' }));
+    expect(toastMock).toHaveBeenCalledWith({
+      title: 'Commit undone',
+      description: 'test commit',
+    });
   });
 
   it('shows the push button disabled when there is nothing to push', async () => {

@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
-import { ArrowUp, Tag } from 'lucide-react';
+import { ArrowUp, Loader2, Tag, Undo2 } from 'lucide-react';
+import { useToast } from '../../hooks/use-toast';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '../ui/context-menu';
 
 interface Commit {
   hash: string;
@@ -86,21 +93,33 @@ function AuthorAvatar({ author, authorEmail }: { author: string; authorEmail: st
   );
 }
 
+function friendlyGitError(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s.includes('cannot undo the initial commit')) return 'Cannot undo the initial commit.';
+  if (s.includes('cannot undo a commit that has already been pushed')) {
+    return 'Cannot undo a commit that has already been pushed.';
+  }
+  const firstLine = raw.split('\n').find((l) => l.trim().length > 0) || raw;
+  return firstLine.length > 120 ? firstLine.slice(0, 120) + '...' : firstLine;
+}
+
 export const CommitList: React.FC<CommitListProps> = ({
   taskPath,
   selectedCommit,
   onSelectCommit,
 }) => {
+  const { toast } = useToast();
   const [commits, setCommits] = useState<Commit[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [aheadCount, setAheadCount] = useState<number | undefined>(undefined);
+  const [undoingCommitHash, setUndoingCommitHash] = useState<string | null>(null);
 
   const onSelectCommitRef = useRef(onSelectCommit);
   onSelectCommitRef.current = onSelectCommit;
 
-  useEffect(() => {
+  const loadInitialCommits = useCallback(async () => {
     if (!taskPath) {
       setCommits([]);
       setHasMore(false);
@@ -108,41 +127,47 @@ export const CommitList: React.FC<CommitListProps> = ({
       return;
     }
 
-    let cancelled = false;
     setLoading(true);
+    try {
+      const res = await window.electronAPI.gitGetLog({ taskPath, maxCount: PAGE_SIZE });
+      if (!res?.success || !res.commits) return;
 
-    const load = async () => {
-      try {
-        const res = await window.electronAPI.gitGetLog({ taskPath, maxCount: PAGE_SIZE });
-        if (!cancelled && res?.success && res.commits) {
-          setCommits(res.commits);
-          setAheadCount(res.aheadCount);
-          setHasMore(res.commits.length >= PAGE_SIZE);
-          // Auto-select the latest commit if none is selected
-          if (res.commits.length > 0 && !selectedCommit) {
-            const c = res.commits[0];
-            onSelectCommitRef.current({
-              hash: c.hash,
-              subject: c.subject,
-              body: c.body,
-              author: c.author,
-            });
-          }
-        }
-      } catch {
-        // ignore
-      } finally {
-        if (!cancelled) setLoading(false);
+      setCommits(res.commits);
+      setAheadCount(res.aheadCount);
+      setHasMore(res.commits.length >= PAGE_SIZE);
+
+      const nextSelected = selectedCommit
+        ? res.commits.find((commit) => commit.hash === selectedCommit) ?? null
+        : null;
+      const fallback = res.commits[0] ?? null;
+      const commitToSelect = nextSelected ?? fallback;
+
+      if (commitToSelect && commitToSelect.hash !== selectedCommit) {
+        onSelectCommitRef.current({
+          hash: commitToSelect.hash,
+          subject: commitToSelect.subject,
+          body: commitToSelect.body,
+          author: commitToSelect.author,
+        });
       }
-    };
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [taskPath, selectedCommit]);
 
-    load();
-    return () => {
-      cancelled = true;
-    };
-    // Intentionally only re-run on taskPath change. onSelectCommit and selectedCommit
-    // are excluded to avoid re-fetching commits when the parent re-renders with new callbacks.
-  }, [taskPath]);
+  useEffect(() => {
+    void loadInitialCommits();
+  }, [loadInitialCommits]);
+
+  useEffect(() => {
+    if (!taskPath || !window.electronAPI.onGitStatusChanged) return;
+    return window.electronAPI.onGitStatusChanged((event) => {
+      if (event?.taskPath !== taskPath) return;
+      void loadInitialCommits();
+    });
+  }, [taskPath, loadInitialCommits]);
 
   const loadMore = useCallback(async () => {
     if (!taskPath || loadingMore || !hasMore) return;
@@ -168,6 +193,40 @@ export const CommitList: React.FC<CommitListProps> = ({
     }
   }, [taskPath, loadingMore, hasMore, commits.length, aheadCount]);
 
+  const handleUndoCommit = useCallback(
+    async (commit: Commit, index: number) => {
+      if (!taskPath || undoingCommitHash) return;
+      if (index !== 0 || commit.isPushed) return;
+
+      setUndoingCommitHash(commit.hash);
+      try {
+        const result = await window.electronAPI.gitSoftReset({ taskPath });
+        if (result?.success) {
+          toast({
+            title: 'Commit undone',
+            description: result.subject || commit.subject || 'The last commit was undone.',
+          });
+          await loadInitialCommits();
+        } else {
+          toast({
+            title: 'Undo failed',
+            description: friendlyGitError(result?.error || 'Unknown error'),
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        toast({
+          title: 'Undo failed',
+          description: friendlyGitError(error instanceof Error ? error.message : String(error)),
+          variant: 'destructive',
+        });
+      } finally {
+        setUndoingCommitHash(null);
+      }
+    },
+    [taskPath, toast, undoingCommitHash, loadInitialCommits]
+  );
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -186,49 +245,77 @@ export const CommitList: React.FC<CommitListProps> = ({
 
   return (
     <div className="overflow-y-auto">
-      {commits.map((commit) => (
-        <button
-          key={commit.hash}
-          className={`w-full cursor-pointer border-b border-border/50 px-3 py-2 text-left ${
-            selectedCommit === commit.hash ? 'bg-accent' : 'hover:bg-muted/50'
-          }`}
-          onClick={() =>
-            onSelectCommit({
-              hash: commit.hash,
-              subject: commit.subject,
-              body: commit.body,
-              author: commit.author,
-            })
-          }
-        >
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              {commit.subject ? <div className="truncate text-sm">{commit.subject}</div> : null}
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <AuthorAvatar author={commit.author} authorEmail={commit.authorEmail} />
-                <span className="truncate">
-                  {commit.author} &middot; {formatRelativeDate(commit.date)}
-                </span>
-              </div>
-            </div>
-            {commit.tags.length > 0 &&
-              commit.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="flex shrink-0 items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+      {commits.map((commit, index) => {
+        const canUndo = index === 0 && !commit.isPushed;
+        const isUndoingThisCommit = undoingCommitHash === commit.hash;
+
+        return (
+          <ContextMenu key={commit.hash}>
+            <ContextMenuTrigger asChild>
+              <button
+                className={`w-full cursor-pointer border-b border-border/50 px-3 py-2 text-left ${
+                  selectedCommit === commit.hash ? 'bg-accent' : 'hover:bg-muted/50'
+                }`}
+                onClick={() =>
+                  onSelectCommit({
+                    hash: commit.hash,
+                    subject: commit.subject,
+                    body: commit.body,
+                    author: commit.author,
+                  })
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    {commit.subject ? <div className="truncate text-sm">{commit.subject}</div> : null}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <AuthorAvatar author={commit.author} authorEmail={commit.authorEmail} />
+                      <span className="truncate">
+                        {commit.author} &middot; {formatRelativeDate(commit.date)}
+                      </span>
+                    </div>
+                  </div>
+                  {commit.tags.length > 0 &&
+                    commit.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="flex shrink-0 items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                      >
+                        <Tag className="h-2.5 w-2.5" />
+                        {tag}
+                      </span>
+                    ))}
+                  {!commit.isPushed && (
+                    <span title="Not yet pushed to remote">
+                      <ArrowUp
+                        className="h-4 w-4 shrink-0 text-muted-foreground"
+                        strokeWidth={2.5}
+                      />
+                    </span>
+                  )}
+                </div>
+              </button>
+            </ContextMenuTrigger>
+            {canUndo && (
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() => void handleUndoCommit(commit, index)}
+                  disabled={isUndoingThisCommit}
                 >
-                  <Tag className="h-2.5 w-2.5" />
-                  {tag}
-                </span>
-              ))}
-            {!commit.isPushed && (
-              <span title="Not yet pushed to remote">
-                <ArrowUp className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.5} />
-              </span>
+                  <span className="inline-flex items-center gap-2">
+                    {isUndoingThisCommit ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Undo2 className="h-3.5 w-3.5" />
+                    )}
+                    Undo commit
+                  </span>
+                </ContextMenuItem>
+              </ContextMenuContent>
             )}
-          </div>
-        </button>
-      ))}
+          </ContextMenu>
+        );
+      })}
       {hasMore && (
         <button
           onClick={() => void loadMore()}

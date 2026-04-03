@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getProviderStatusMock = vi.fn();
-const getProviderCustomConfigMock = vi.fn(() => undefined);
+const getProviderCustomConfigMock = vi.fn((_providerId?: string) => undefined);
 
 vi.mock('../../main/services/providerStatusCache', () => ({
   providerStatusCache: {

@@ -537,6 +537,52 @@ describe('ptyIpc', () => {
     expect(clearPersistedStateMock).toHaveBeenCalledTimes(1);
   });
 
+  it('autosaves PTY replay state shortly after a terminal starts', async () => {
+    vi.useFakeTimers();
+    await loadPtyIpc();
+
+    createOrAttachMock.mockResolvedValue({
+      id: 'pty-autosave',
+      created: true,
+      replay: { data: '', cols: 80, rows: 24 },
+    });
+    serializeStateMock.mockResolvedValue({
+      version: 1,
+      savedAt: '2026-04-03T00:00:00.000Z',
+      layout: { attachedIds: ['pty-autosave'], detachedIds: [] },
+      terminals: [
+        {
+          id: 'pty-autosave',
+          kind: 'local',
+          persistentRequest: {
+            mode: 'shell',
+            id: 'pty-autosave',
+            cwd: '/tmp/project',
+            shell: '/bin/zsh',
+          },
+          replay: { data: 'saved output', cols: 80, rows: 24 },
+        },
+      ],
+    });
+
+    const sender = new MockWebContents(7);
+    browserWindows.push({ webContents: sender });
+
+    const start = getInvokeHandler('pty:start');
+    await start(
+      { sender },
+      {
+        id: 'pty-autosave',
+        cwd: '/tmp/project',
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(serializeStateMock).toHaveBeenCalledTimes(1);
+    expect(writePersistedStateMock).toHaveBeenCalledTimes(1);
+  });
+
   it('reports partial failures when bulk cleanup kills multiple agent PTYs', async () => {
     await loadPtyIpc();
 
@@ -610,6 +656,50 @@ describe('ptyIpc', () => {
       ],
       { attachedIds: [], detachedIds: ['pty-revive'] }
     );
-    expect(clearPersistedStateMock).toHaveBeenCalledTimes(1);
+    expect(clearPersistedStateMock).not.toHaveBeenCalled();
+  });
+
+  it('returns persisted replay when a PTY launch cannot be rebuilt', async () => {
+    await loadPtyIpc();
+
+    prepareLocalShellLaunchMock.mockImplementation(() => {
+      throw new Error('shell missing');
+    });
+    readPersistedStateMock.mockResolvedValue({
+      version: 1,
+      savedAt: '2026-04-03T00:00:00.000Z',
+      layout: { attachedIds: [], detachedIds: ['pty-replay-only'] },
+      terminals: [
+        {
+          id: 'pty-replay-only',
+          kind: 'local',
+          persistentRequest: {
+            mode: 'shell',
+            id: 'pty-replay-only',
+            cwd: '/tmp/project',
+            shell: '/bin/zsh',
+          },
+          replay: { data: 'persisted replay', cols: 90, rows: 33 },
+        },
+      ],
+    });
+
+    const sender = new MockWebContents(8);
+    browserWindows.push({ webContents: sender });
+
+    const start = getInvokeHandler('pty:start');
+    const result = await start(
+      { sender },
+      {
+        id: 'pty-replay-only',
+        cwd: '/tmp/project',
+        shell: '/bin/zsh',
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      replay: { data: 'persisted replay', cols: 90, rows: 33 },
+    });
   });
 });

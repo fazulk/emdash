@@ -47,8 +47,14 @@ const ptyDataBuffers = new Map<string, string>();
 const ptyDataTimers = new Map<string, NodeJS.Timeout>();
 const PTY_DATA_FLUSH_MS = 16;
 const PTY_ACTIVITY_SAMPLE_CHARS = 8_192;
+const PTY_STATE_AUTOSAVE_MS = 1_000;
+const PTY_STATE_AUTOSAVE_TIMEOUT_MS = 750;
 
 type FinishCause = 'process_exit' | 'manual_kill';
+
+let ptyStatePersistTimer: NodeJS.Timeout | null = null;
+let ptyStatePersistInFlight: Promise<void> | null = null;
+let ptyStatePersistDirty = false;
 
 function execFileAsync(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -81,6 +87,72 @@ function safeSendToOwner(id: string, channel: string, payload: unknown): boolean
 
 function sendPtyExitGlobal(id: string): void {
   safeSendToOwner(id, 'pty:exit:global', { id });
+}
+
+async function writeCurrentPtyHostStateSnapshot(
+  timeoutMs = PTY_STATE_AUTOSAVE_TIMEOUT_MS
+): Promise<void> {
+  registerHostListeners();
+
+  try {
+    const state = (await Promise.race([
+      ptyHostService.serializeState(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ])) as SerializedPtyHostState | null;
+
+    if (!state || state.terminals.length === 0) {
+      await ptyHostService.clearPersistedState();
+      return;
+    }
+
+    await ptyHostService.writePersistedState(state);
+  } catch (error) {
+    log.warn('Failed to persist PTY host state snapshot', {
+      error: String(error),
+    });
+  }
+}
+
+async function flushScheduledPtyStatePersist(): Promise<void> {
+  if (ptyStatePersistInFlight) {
+    return ptyStatePersistInFlight;
+  }
+
+  ptyStatePersistInFlight = (async () => {
+    while (ptyStatePersistDirty) {
+      ptyStatePersistDirty = false;
+      await writeCurrentPtyHostStateSnapshot();
+    }
+  })().finally(() => {
+    ptyStatePersistInFlight = null;
+  });
+
+  return ptyStatePersistInFlight;
+}
+
+function schedulePtyStatePersist(delayMs = PTY_STATE_AUTOSAVE_MS): void {
+  ptyStatePersistDirty = true;
+  if (ptyStatePersistTimer) return;
+
+  ptyStatePersistTimer = setTimeout(() => {
+    ptyStatePersistTimer = null;
+    void flushScheduledPtyStatePersist();
+  }, delayMs);
+}
+
+async function getPersistedReplayForId(
+  id: string
+): Promise<{ data: string; cols: number; rows: number } | undefined> {
+  try {
+    const persisted = await ptyHostService.readPersistedState();
+    return persisted?.terminals.find((terminal) => terminal.id === id)?.replay;
+  } catch (error) {
+    log.warn('Failed to read persisted PTY replay', {
+      id,
+      error: String(error),
+    });
+    return undefined;
+  }
 }
 
 function flushPtyData(id: string): void {
@@ -778,6 +850,7 @@ function registerHostListeners(): void {
 
   ptyHostService.on('data', ({ id, chunk }) => {
     bufferedSendPtyData(id, chunk);
+    schedulePtyStatePersist();
   });
 
   ptyHostService.on('exit', ({ id, exitCode, signal }: { id: string; exitCode: number; signal?: number }) => {
@@ -788,6 +861,7 @@ function registerHostListeners(): void {
     sendPtyExitGlobal(id);
     owners.delete(id);
     maybeMarkProviderFinish(id, exitCode, signal, 'process_exit');
+    schedulePtyStatePersist();
   });
 
   ptyHostService.on('started', ({ id }: { id: string }) => {
@@ -849,6 +923,7 @@ async function attachPreparedLaunch(
   } catch (error) {
     pendingAttaches.delete(launch.id);
     owners.delete(launch.id);
+    const replay = await getPersistedReplayForId(launch.id);
     const formattedError = formatLaunchError(launch, error, providerId);
     log.error('pty:attachPreparedLaunch failed', {
       id: launch.id,
@@ -862,8 +937,11 @@ async function attachPreparedLaunch(
     });
     return {
       ok: false,
+      replay,
       error: formattedError,
     };
+  } finally {
+    schedulePtyStatePersist();
   }
 }
 
@@ -874,6 +952,7 @@ async function cleanupPtySession(id: string): Promise<void> {
   sendPtyExitGlobal(id);
   owners.delete(id);
   await ptyHostService.kill(id);
+  schedulePtyStatePersist();
 }
 
 async function detachPtySession(id: string): Promise<void> {
@@ -882,6 +961,7 @@ async function detachPtySession(id: string): Promise<void> {
   clearPtyData(id);
   owners.delete(id);
   await ptyHostService.detach(id, shortGrace);
+  schedulePtyStatePersist();
 }
 
 export async function revivePersistedPtys(): Promise<void> {
@@ -921,32 +1001,13 @@ export async function revivePersistedPtys(): Promise<void> {
     }
   }
 
-  await ptyHostService.clearPersistedState();
   if (reviveLaunches.length === 0) return;
 
   await ptyHostService.revive(reviveLaunches, persisted.layout);
 }
 
 export async function persistPtyHostStateForQuit(timeoutMs = 2_000): Promise<void> {
-  registerHostListeners();
-
-  try {
-    const state = (await Promise.race([
-      ptyHostService.serializeState(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-    ])) as SerializedPtyHostState | null;
-
-    if (!state || state.terminals.length === 0) {
-      await ptyHostService.clearPersistedState();
-      return;
-    }
-
-    await ptyHostService.writePersistedState(state);
-  } catch (error) {
-    log.warn('Failed to persist PTY host state on quit', {
-      error: String(error),
-    });
-  }
+  await writeCurrentPtyHostStateSnapshot(timeoutMs);
 }
 
 export function registerPtyIpc(): void {
@@ -984,6 +1045,7 @@ export function registerPtyIpc(): void {
         const launch = await buildPreparedShellLaunch(args);
         return await attachPreparedLaunch(event, launch);
       } catch (error) {
+        const replay = await getPersistedReplayForId(args.id);
         const formattedError = formatStartRequestError(
           {
             mode: 'shell',
@@ -1000,7 +1062,7 @@ export function registerPtyIpc(): void {
           shell: args.shell,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { ok: false, error: formattedError };
+        return { ok: false, replay, error: formattedError };
       }
     }
   );
@@ -1035,6 +1097,7 @@ export function registerPtyIpc(): void {
         const launch = await buildPreparedDirectLaunch(args);
         return await attachPreparedLaunch(event, launch, args.providerId as ProviderId);
       } catch (error) {
+        const replay = await getPersistedReplayForId(args.id);
         const formattedError = formatStartRequestError(
           {
             mode: 'direct',
@@ -1052,7 +1115,7 @@ export function registerPtyIpc(): void {
           remoteConnectionId: args.remote?.connectionId,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { ok: false, error: formattedError };
+        return { ok: false, replay, error: formattedError };
       }
     }
   );
@@ -1095,6 +1158,7 @@ export function registerPtyIpc(): void {
         error: String(error),
       });
     });
+    schedulePtyStatePersist();
   });
 
   ipcMain.on('pty:kill', (_event, args: { id: string }) => {

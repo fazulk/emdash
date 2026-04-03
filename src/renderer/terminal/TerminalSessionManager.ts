@@ -1382,10 +1382,11 @@ export class TerminalSessionManager {
         return { ok: false, error: message };
       });
 
+      if (result?.replay) {
+        this.applyReplay(result.replay);
+      }
+
       if (result?.ok) {
-        if (result.replay) {
-          this.applyReplay(result.replay);
-        }
         if (result.attachToken) {
           try {
             await window.electronAPI.ptyConfirmAttach({

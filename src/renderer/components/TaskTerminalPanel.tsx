@@ -517,7 +517,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
             {task && (
               <SelectGroup>
                 <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-[10px] font-semibold text-muted-foreground">Worktree</span>
+                  <span className="text-[11px] font-bold text-muted-foreground">Worktree</span>
                   <button
                     type="button"
                     className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -540,45 +540,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                   <SelectItem
                     key={`task::${terminal.id}`}
                     value={`task::${terminal.id}`}
-                    className="text-xs"
-                  >
-                    {terminal.title}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-
-            {(projectPath || !task) && (
-              <SelectGroup>
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-[10px] font-semibold text-muted-foreground">
-                    {projectPath ? 'Project' : 'Global'}
-                  </span>
-                  <button
-                    type="button"
-                    className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void (async () => {
-                        const { captureTelemetry } = await import('../lib/telemetryClient');
-                        captureTelemetry('terminal_new_terminal_created', {
-                          scope: projectPath ? 'project' : 'global',
-                        });
-                      })();
-                      const newId = globalTerminals.createTerminal({ cwd: effectiveCwd });
-                      selection.onCreateTerminal('global', newId);
-                    }}
-                    title={projectPath ? 'New project terminal' : 'New global terminal'}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                </div>
-                {globalTerminals.terminals.map((terminal) => (
-                  <SelectItem
-                    key={`global::${terminal.id}`}
-                    value={`global::${terminal.id}`}
-                    className="text-xs"
+                    className="text-xs font-normal pl-5"
                   >
                     {terminal.title}
                   </SelectItem>
@@ -589,18 +551,61 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
             {task && (
               <SelectGroup>
                 <div className="px-2 py-1.5">
-                  <span className="text-[10px] font-semibold text-muted-foreground">Lifecycle</span>
+                  <span className="text-[11px] font-bold text-muted-foreground">Lifecycle</span>
                 </div>
-                <SelectItem value="lifecycle::setup" className="text-xs">
+                <SelectItem value="lifecycle::setup" className="text-xs font-normal pl-5">
                   Setup
                 </SelectItem>
-                <SelectItem value="lifecycle::run" className="text-xs">
+                <SelectItem value="lifecycle::run" className="text-xs font-normal pl-5">
                   Run
                 </SelectItem>
-                <SelectItem value="lifecycle::teardown" className="text-xs">
+                <SelectItem value="lifecycle::teardown" className="text-xs font-normal pl-5">
                   Teardown
                 </SelectItem>
               </SelectGroup>
+            )}
+
+            {(projectPath || !task) && (
+              <>
+                {task && (
+                  <div className="my-1 border-t border-border" />
+                )}
+                <SelectGroup>
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <span className="text-[11px] font-bold text-muted-foreground">
+                      {projectPath ? 'Project' : 'Global'}
+                    </span>
+                    <button
+                      type="button"
+                      className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void (async () => {
+                          const { captureTelemetry } = await import('../lib/telemetryClient');
+                          captureTelemetry('terminal_new_terminal_created', {
+                            scope: projectPath ? 'project' : 'global',
+                          });
+                        })();
+                        const newId = globalTerminals.createTerminal({ cwd: effectiveCwd });
+                        selection.onCreateTerminal('global', newId);
+                      }}
+                      title={projectPath ? 'New project terminal' : 'New global terminal'}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {globalTerminals.terminals.map((terminal) => (
+                    <SelectItem
+                      key={`global::${terminal.id}`}
+                      value={`global::${terminal.id}`}
+                      className="text-xs font-normal pl-5"
+                    >
+                      {terminal.title}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
             )}
           </SelectContent>
         </Select>

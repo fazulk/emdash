@@ -423,14 +423,6 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     const trimmedMessage = commitMessage.trim();
-    if (!trimmedMessage) {
-      toast({
-        title: 'Commit Message Required',
-        description: 'Please enter a commit message.',
-        variant: 'destructive',
-      });
-      return;
-    }
 
     if (!hasStagedChanges) {
       toast({
@@ -448,20 +440,23 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
           ? await window.electronAPI.gitCommitAndPush({
               taskPath: safeTaskPath,
               taskId: resolvedTaskId,
-              commitMessage: trimmedMessage,
+              commitMessage: trimmedMessage || undefined,
               createBranchIfOnDefault: false,
             })
           : await window.electronAPI.gitCommit({
               taskPath: safeTaskPath,
-              message: trimmedMessage,
+              message: trimmedMessage || undefined,
             });
 
       if (result.success) {
         const taskPathAtCommit = safeTaskPath;
+        const committedMessage = result.message || trimmedMessage;
         setShowPushAfterCommit(action === 'commit');
         toast({
           title: action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed',
-          description: `Changes committed with message: "${trimmedMessage}"`,
+          description: committedMessage
+            ? `Changes committed with message: "${committedMessage}"`
+            : 'Changes committed successfully.',
         });
         setCommitMessage('');
         await refreshChanges();
@@ -799,7 +794,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 onChange={(e) => setCommitMessage(e.target.value)}
                 className="h-8 flex-1 text-sm"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey && hasStagedChanges && !isCommitting) {
                     e.preventDefault();
                     void handleCommitAndPush();
                   }
@@ -811,7 +806,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 className="h-8 px-2 text-xs"
                 title="Commit staged changes without pushing"
                 onClick={() => void handleCommit('commit')}
-                disabled={isCommitting || !hasStagedChanges || !commitMessage.trim()}
+                disabled={isCommitting || !hasStagedChanges}
               >
                 {commitAction === 'commit' ? <Spinner size="sm" /> : 'Commit'}
               </Button>
@@ -821,7 +816,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 className="h-8 px-2 text-xs"
                 title="Commit all staged changes and push"
                 onClick={() => void handleCommitAndPush()}
-                disabled={isCommitting || !hasStagedChanges || !commitMessage.trim()}
+                disabled={isCommitting || !hasStagedChanges}
               >
                 {commitAction === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
               </Button>

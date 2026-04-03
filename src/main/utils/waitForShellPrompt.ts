@@ -1,4 +1,4 @@
-import { stripAnsi } from '@shared/text/stripAnsi';
+import { stripAnsi } from '../../shared/text/stripAnsi';
 
 /**
  * Matches common shell prompt endings: $, #, %, >, ❯ preceded by a non-digit, non-space character.

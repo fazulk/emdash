@@ -163,11 +163,7 @@ const cleanupPtyResources = async (task: Task): Promise<void> => {
     }
     if (sessionIds.length > 0) {
       try {
-        await window.electronAPI.ptyCleanupSessions({
-          ids: sessionIds,
-          clearSnapshots: true,
-          waitForSnapshots: false,
-        });
+        await window.electronAPI.ptyCleanupSessions({ ids: sessionIds });
       } catch {}
     }
 
@@ -668,11 +664,7 @@ export function useTaskManagement() {
       }
       if (sessionIds.length > 0) {
         try {
-          await window.electronAPI.ptyCleanupSessions({
-            ids: sessionIds,
-            clearSnapshots: true,
-            waitForSnapshots: false,
-          });
+          await window.electronAPI.ptyCleanupSessions({ ids: sessionIds });
         } catch {}
       }
 

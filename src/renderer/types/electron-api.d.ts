@@ -81,9 +81,13 @@ declare global {
         rows?: number;
         autoApprove?: boolean;
         initialPrompt?: string;
-        skipResume?: boolean;
-        rendererSessionId?: string;
-      }) => Promise<{ ok: boolean; tmux?: boolean; error?: string }>;
+      }) => Promise<{
+        ok: boolean;
+        reused?: boolean;
+        attachToken?: string;
+        replay?: { data: string; cols: number; rows: number };
+        error?: string;
+      }>;
       ptyStartDirect: (opts: {
         id: string;
         providerId: string;
@@ -94,9 +98,13 @@ declare global {
         autoApprove?: boolean;
         initialPrompt?: string;
         env?: Record<string, string>;
-        resume?: boolean;
-        rendererSessionId?: string;
-      }) => Promise<{ ok: boolean; reused?: boolean; tmux?: boolean; error?: string }>;
+      }) => Promise<{
+        ok: boolean;
+        reused?: boolean;
+        attachToken?: string;
+        replay?: { data: string; cols: number; rows: number };
+        error?: string;
+      }>;
       ptyScpToRemote: (args: { connectionId: string; localPaths: string[] }) => Promise<{
         success: boolean;
         remotePaths?: string[];
@@ -106,27 +114,12 @@ declare global {
       ptyResize: (args: { id: string; cols: number; rows?: number }) => void;
       ptyKill: (id: string) => void;
       ptyDisconnect: (id: string) => void;
-      ptyKillTmux: (id: string) => Promise<{ ok: boolean; error?: string }>;
+      ptyConfirmAttach: (args: { id: string; attachToken: string }) => Promise<{ ok: boolean }>;
       onPtyData: (id: string, listener: (data: string) => void) => () => void;
-      ptyGetSnapshot: (args: { id: string }) => Promise<{
-        ok: boolean;
-        snapshot?: any;
-        error?: string;
-      }>;
-      ptySaveSnapshot: (args: { id: string; payload: TerminalSnapshotPayload }) => Promise<{
-        ok: boolean;
-        error?: string;
-      }>;
-      ptyClearSnapshot: (args: { id: string }) => Promise<{ ok: boolean }>;
-      ptyCleanupSessions: (args: {
-        ids: string[];
-        clearSnapshots?: boolean;
-        waitForSnapshots?: boolean;
-      }) => Promise<{
+      ptyCleanupSessions: (args: { ids: string[] }) => Promise<{
         ok: boolean;
         cleaned: number;
         failedIds: string[];
-        snapshotClearQueued: boolean;
       }>;
       onPtyExit: (
         id: string,
@@ -1513,9 +1506,13 @@ export interface ElectronAPI {
     rows?: number;
     autoApprove?: boolean;
     initialPrompt?: string;
-    skipResume?: boolean;
-    rendererSessionId?: string;
-  }) => Promise<{ ok: boolean; tmux?: boolean; error?: string }>;
+  }) => Promise<{
+    ok: boolean;
+    reused?: boolean;
+    attachToken?: string;
+    replay?: { data: string; cols: number; rows: number };
+    error?: string;
+  }>;
   ptyStartDirect: (opts: {
     id: string;
     providerId: string;
@@ -1525,9 +1522,13 @@ export interface ElectronAPI {
     autoApprove?: boolean;
     initialPrompt?: string;
     env?: Record<string, string>;
-    resume?: boolean;
-    rendererSessionId?: string;
-  }) => Promise<{ ok: boolean; reused?: boolean; tmux?: boolean; error?: string }>;
+  }) => Promise<{
+    ok: boolean;
+    reused?: boolean;
+    attachToken?: string;
+    replay?: { data: string; cols: number; rows: number };
+    error?: string;
+  }>;
   ptyScpToRemote: (args: { connectionId: string; localPaths: string[] }) => Promise<{
     success: boolean;
     remotePaths?: string[];
@@ -1537,27 +1538,12 @@ export interface ElectronAPI {
   ptyResize: (args: { id: string; cols: number; rows?: number }) => void;
   ptyKill: (id: string) => void;
   ptyDisconnect: (id: string) => void;
-  ptyKillTmux: (id: string) => Promise<{ ok: boolean; error?: string }>;
+  ptyConfirmAttach: (args: { id: string; attachToken: string }) => Promise<{ ok: boolean }>;
   onPtyData: (id: string, listener: (data: string) => void) => () => void;
-  ptyGetSnapshot: (args: { id: string }) => Promise<{
-    ok: boolean;
-    snapshot?: any;
-    error?: string;
-  }>;
-  ptySaveSnapshot: (args: { id: string; payload: TerminalSnapshotPayload }) => Promise<{
-    ok: boolean;
-    error?: string;
-  }>;
-  ptyClearSnapshot: (args: { id: string }) => Promise<{ ok: boolean }>;
-  ptyCleanupSessions: (args: {
-    ids: string[];
-    clearSnapshots?: boolean;
-    waitForSnapshots?: boolean;
-  }) => Promise<{
+  ptyCleanupSessions: (args: { ids: string[] }) => Promise<{
     ok: boolean;
     cleaned: number;
     failedIds: string[];
-    snapshotClearQueued: boolean;
   }>;
   onPtyExit: (
     id: string,
@@ -2271,5 +2257,4 @@ export interface ElectronAPI {
   }>;
   onPerfSnapshot: (listener: (snapshot: ResourceMetricsSnapshot) => void) => () => void;
 }
-import type { TerminalSnapshotPayload } from '#types/terminalSnapshot';
 import type { OpenInAppId } from '#shared/openInApps';

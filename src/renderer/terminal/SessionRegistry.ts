@@ -21,7 +21,6 @@ interface AttachOptions {
   autoApprove?: boolean;
   initialPrompt?: string;
   mapShiftEnterToCtrlJ?: boolean;
-  disableSnapshots?: boolean;
   onLinkClick?: (url: string) => void;
   onFirstMessage?: (message: string) => void;
 }
@@ -76,6 +75,13 @@ class SessionRegistry {
     }
   }
 
+  detachAll() {
+    for (const id of Array.from(this.sessions.keys())) {
+      this.sessions.get(id)?.dispose();
+      this.sessions.delete(id);
+    }
+  }
+
   private getOrCreate(options: AttachOptions): TerminalSessionManager {
     const existing = this.sessions.get(options.taskId);
     if (existing) {
@@ -99,7 +105,6 @@ class SessionRegistry {
       autoApprove: options.autoApprove,
       initialPrompt: options.initialPrompt,
       mapShiftEnterToCtrlJ: options.mapShiftEnterToCtrlJ,
-      disableSnapshots: options.disableSnapshots,
       onLinkClick: options.onLinkClick,
       onFirstMessage: options.onFirstMessage,
     };
@@ -122,7 +127,7 @@ export function registerRendererUnloadPtyCleanup(): void {
 
   const handler = () => {
     try {
-      terminalSessionRegistry.disposeAll();
+      terminalSessionRegistry.detachAll();
     } catch {}
   };
 

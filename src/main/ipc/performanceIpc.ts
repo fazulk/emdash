@@ -12,7 +12,7 @@ import type {
 } from '../../shared/performanceTypes';
 import { parsePtyId } from '../../shared/ptyId';
 import { getProvider } from '../../shared/providers/registry';
-import { getActivePtyInfo } from '../services/ptyManager';
+import { ptyHostService } from '../services/ptyHostService';
 import { databaseService } from '../services/DatabaseService';
 import { getDrizzleClient } from '../db/drizzleClient';
 import { conversations as conversationsTable } from '../db/schema';
@@ -99,7 +99,7 @@ async function collectNow(): Promise<ResourceMetricsSnapshot> {
   const appMetrics = collectAppMetrics();
 
   // ── Per-PTY resource usage via process tree ────────────────────────
-  const ptyInfos = getActivePtyInfo();
+  const ptyInfos = await ptyHostService.getActivePtyInfo();
   const pidsToQuery = ptyInfos
     .map((p) => p.pid)
     .filter((pid): pid is number => pid !== null && pid > 0);

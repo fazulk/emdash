@@ -128,6 +128,7 @@ import { workspaceProviderService } from './services/WorkspaceProviderService';
 import { sshService } from './services/ssh/SshService';
 import { taskLifecycleService } from './services/TaskLifecycleService';
 import { agentEventService } from './services/AgentEventService';
+import { persistPtyHostStateForQuit, revivePersistedPtys } from './services/ptyIpc';
 import * as telemetry from './telemetry';
 import { errorTracking } from './errorTracking';
 import { join } from 'path';
@@ -316,6 +317,12 @@ app.whenReady().then(async () => {
   registerAllIpc();
 
   try {
+    await revivePersistedPtys();
+  } catch (error) {
+    console.warn('Failed to revive persisted PTYs:', error);
+  }
+
+  try {
     await emdashAccountService.loadSessionToken();
   } catch (error) {
     console.warn('Failed to load account session:', error);
@@ -358,7 +365,25 @@ app.whenReady().then(async () => {
 registerAppLifecycle();
 
 // Graceful shutdown telemetry event
-app.on('before-quit', () => {
+let ptyHostStatePreparedToQuit = false;
+let ptyHostStatePersistPromise: Promise<void> | null = null;
+
+app.on('before-quit', (event) => {
+  if (!ptyHostStatePreparedToQuit) {
+    event.preventDefault();
+    if (!ptyHostStatePersistPromise) {
+      ptyHostStatePersistPromise = persistPtyHostStateForQuit().catch((error) => {
+        console.warn('Failed to persist PTY host state before quit:', error);
+      });
+      void ptyHostStatePersistPromise.finally(() => {
+        ptyHostStatePreparedToQuit = true;
+        ptyHostStatePersistPromise = null;
+        app.quit();
+      });
+    }
+    return;
+  }
+
   // Session summary with duration (no identifiers)
   telemetry.capture('app_session');
   telemetry.capture('app_closed');

@@ -28,7 +28,6 @@ type ConfigShape = Record<string, unknown> & {
   scripts?: Partial<LifecycleScripts>;
   customScripts?: Record<string, string>;
   shellSetup?: string;
-  tmux?: boolean;
   workspaceProvider?: WorkspaceProviderConfig;
 };
 
@@ -47,7 +46,6 @@ const EMPTY_SCRIPTS: LifecycleScripts = {
   teardown: '',
 };
 const PROJECT_CONFIG_DOCS_URL = 'https://docs.emdash.sh/project-config';
-const TMUX_ALWAYS_ENABLED = true;
 
 function ensureConfigObject(raw: unknown): ConfigShape {
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as ConfigShape) : {};
@@ -137,12 +135,6 @@ function applyShellSetup(config: ConfigShape, shellSetup: string): ConfigShape {
   return { ...rest, shellSetup: trimmed };
 }
 
-function applyTmux(config: ConfigShape, tmux: boolean): ConfigShape {
-  const { tmux: _tmux, ...rest } = config;
-  if (!tmux) return rest;
-  return { ...rest, tmux: true };
-}
-
 function applyWorkspaceProvider(
   config: ConfigShape,
   provisionCommand: string,
@@ -177,8 +169,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
   const [originalPreservePatternsInput, setOriginalPreservePatternsInput] = useState('');
   const [shellSetup, setShellSetup] = useState('');
   const [originalShellSetup, setOriginalShellSetup] = useState('');
-  const tmux = TMUX_ALWAYS_ENABLED;
-  const [originalTmux, setOriginalTmux] = useState(false);
   const [wpProvisionCommand, setWpProvisionCommand] = useState('');
   const [originalWpProvisionCommand, setOriginalWpProvisionCommand] = useState('');
   const [wpTerminateCommand, setWpTerminateCommand] = useState('');
@@ -203,12 +193,11 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
   const normalizedConfigContent = useMemo(() => {
     const withPatterns = applyPreservePatterns(config, preservePatterns);
     const withShellSetup = applyShellSetup(withPatterns, shellSetup);
-    const withTmux = applyTmux(withShellSetup, tmux);
-    const withWp = applyWorkspaceProvider(withTmux, wpProvisionCommand, wpTerminateCommand);
+    const withWp = applyWorkspaceProvider(withShellSetup, wpProvisionCommand, wpTerminateCommand);
     const withCustomScripts = applyCustomScripts(withWp, customScriptsList);
     const withScripts = applyScripts(withCustomScripts, scripts);
     return `${JSON.stringify(withScripts, null, 2)}\n`;
-  }, [config, preservePatterns, shellSetup, tmux, wpProvisionCommand, wpTerminateCommand, customScriptsList, scripts]);
+  }, [config, preservePatterns, shellSetup, wpProvisionCommand, wpTerminateCommand, customScriptsList, scripts]);
 
   const scriptsDirty = useMemo(
     () =>
@@ -218,7 +207,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       scripts.teardown !== originalScripts.teardown ||
       preservePatternsInput !== originalPreservePatternsInput ||
       shellSetup !== originalShellSetup ||
-      tmux !== originalTmux ||
       wpProvisionCommand !== originalWpProvisionCommand ||
       wpTerminateCommand !== originalWpTerminateCommand ||
       JSON.stringify(customScriptsList) !== JSON.stringify(originalCustomScriptsList),
@@ -229,7 +217,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       originalScripts.setup,
       originalScripts.stop,
       originalScripts.teardown,
-      originalTmux,
       originalWpProvisionCommand,
       originalWpTerminateCommand,
       customScriptsList,
@@ -240,7 +227,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       scripts.setup,
       scripts.stop,
       scripts.teardown,
-      tmux,
       wpProvisionCommand,
       wpTerminateCommand,
     ]
@@ -275,7 +261,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       const nextScripts = scriptsFromConfig(parsed);
       const nextPreservePatterns = preservePatternsFromConfig(parsed);
       const nextShellSetup = typeof parsed.shellSetup === 'string' ? parsed.shellSetup : '';
-      const nextTmux = parsed.tmux === true;
       const wp = parsed.workspaceProvider;
       const nextWpProvision =
         wp && typeof wp === 'object' && typeof wp.provisionCommand === 'string'
@@ -293,7 +278,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalPreservePatternsInput(nextPreservePatterns.join('\n'));
       setShellSetup(nextShellSetup);
       setOriginalShellSetup(nextShellSetup);
-      setOriginalTmux(nextTmux);
       setWpProvisionCommand(nextWpProvision);
       setOriginalWpProvisionCommand(nextWpProvision);
       setWpTerminateCommand(nextWpTerminate);
@@ -308,7 +292,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalPreservePatternsInput('');
       setShellSetup('');
       setOriginalShellSetup('');
-      setOriginalTmux(false);
       setWpProvisionCommand('');
       setOriginalWpProvisionCommand('');
       setWpTerminateCommand('');
@@ -369,10 +352,7 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       const nextConfig = applyScripts(
         applyCustomScripts(
           applyWorkspaceProvider(
-            applyTmux(
-              applyShellSetup(applyPreservePatterns(config, preservePatterns), shellSetup),
-              tmux
-            ),
+            applyShellSetup(applyPreservePatterns(config, preservePatterns), shellSetup),
             wpProvisionCommand,
             wpTerminateCommand
           ),
@@ -384,7 +364,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalScripts(scripts);
       setOriginalPreservePatternsInput(preservePatternsInput);
       setOriginalShellSetup(shellSetup);
-      setOriginalTmux(tmux);
       setOriginalWpProvisionCommand(wpProvisionCommand);
       setOriginalWpTerminateCommand(wpTerminateCommand);
       setOriginalCustomScriptsList(customScriptsList);
@@ -415,7 +394,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
     preservePatterns,
     projectPath,
     scripts,
-    tmux,
     wpProvisionCommand,
     wpTerminateCommand,
     customScriptsList,

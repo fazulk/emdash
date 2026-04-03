@@ -1,4 +1,3 @@
-import type { TerminalSnapshotPayload } from '#types/terminalSnapshot';
 import type { DiffPayload } from '../../shared/diff/types';
 import type { GitIndexUpdateArgs } from '../../shared/git/types';
 
@@ -29,9 +28,13 @@ declare global {
         rows?: number;
         autoApprove?: boolean;
         initialPrompt?: string;
-        skipResume?: boolean;
-        rendererSessionId?: string;
-      }) => Promise<{ ok: boolean; error?: string }>;
+      }) => Promise<{
+        ok: boolean;
+        reused?: boolean;
+        attachToken?: string;
+        replay?: { data: string; cols: number; rows: number };
+        error?: string;
+      }>;
       ptyStartDirect: (opts: {
         id: string;
         providerId: string;
@@ -42,33 +45,23 @@ declare global {
         autoApprove?: boolean;
         initialPrompt?: string;
         env?: Record<string, string>;
-        resume?: boolean;
-        rendererSessionId?: string;
-      }) => Promise<{ ok: boolean; reused?: boolean; error?: string }>;
+      }) => Promise<{
+        ok: boolean;
+        reused?: boolean;
+        attachToken?: string;
+        replay?: { data: string; cols: number; rows: number };
+        error?: string;
+      }>;
       ptyInput: (args: { id: string; data: string }) => void;
       ptyResize: (args: { id: string; cols: number; rows: number }) => void;
       ptyKill: (id: string) => void;
       ptyDisconnect: (id: string) => void;
+      ptyConfirmAttach: (args: { id: string; attachToken: string }) => Promise<{ ok: boolean }>;
       onPtyData: (id: string, listener: (data: string) => void) => () => void;
-      ptyGetSnapshot: (args: { id: string }) => Promise<{
-        ok: boolean;
-        snapshot?: any;
-        error?: string;
-      }>;
-      ptySaveSnapshot: (args: { id: string; payload: TerminalSnapshotPayload }) => Promise<{
-        ok: boolean;
-        error?: string;
-      }>;
-      ptyClearSnapshot: (args: { id: string }) => Promise<{ ok: boolean }>;
-      ptyCleanupSessions: (args: {
-        ids: string[];
-        clearSnapshots?: boolean;
-        waitForSnapshots?: boolean;
-      }) => Promise<{
+      ptyCleanupSessions: (args: { ids: string[] }) => Promise<{
         ok: boolean;
         cleaned: number;
         failedIds: string[];
-        snapshotClearQueued: boolean;
       }>;
       onPtyExit: (
         id: string,

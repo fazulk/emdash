@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { List } from 'react-window';
 import type { RowComponentProps } from 'react-window';
 import { Checkbox } from '../ui/checkbox';
+import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import type { FileChange } from '../../hooks/useFileChanges';
 import { formatDiffCount, getTotalDiffLines } from '../../lib/gitChangePresentation';
 import { FileDiffView } from './FileDiffView';
@@ -54,6 +55,7 @@ const FileSection: React.FC<FileSectionProps> = ({
   onRefreshChanges,
   baseRef,
 }) => {
+  const { isLocked } = useGitWorkspaceBusyForTask(taskPath);
   const totalDiffLines = getTotalDiffLines(file.additions, file.deletions);
   const isLarge = totalDiffLines !== null && totalDiffLines > LARGE_DIFF_LINE_THRESHOLD;
 
@@ -66,7 +68,7 @@ const FileSection: React.FC<FileSectionProps> = ({
 
   const handleStage = useCallback(
     async (checked: boolean) => {
-      if (!taskPath) return;
+      if (!taskPath || isLocked) return;
       try {
         await window.electronAPI.updateIndex({
           taskPath,
@@ -79,7 +81,7 @@ const FileSection: React.FC<FileSectionProps> = ({
       }
       await onRefreshChanges?.();
     },
-    [taskPath, file.path, onRefreshChanges]
+    [taskPath, file.path, onRefreshChanges, isLocked]
   );
 
   const editorHeight =
@@ -107,6 +109,7 @@ const FileSection: React.FC<FileSectionProps> = ({
         {!baseRef && (
           <Checkbox
             checked={file.isStaged}
+            disabled={isLocked}
             onCheckedChange={(checked) => {
               void handleStage(checked === true);
             }}

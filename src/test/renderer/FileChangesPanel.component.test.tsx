@@ -351,6 +351,27 @@ describe('FileChangesPanel', () => {
     expect(toastUi.getByText('Update src/file.ts')).toBeInTheDocument();
   });
 
+  it('shows View PR in the top action row when a PR already exists', async () => {
+    usePrStatusMock.mockReturnValue({
+      pr: {
+        number: 42,
+        title: 'Existing draft PR',
+        url: 'https://github.com/example/repo/pull/42',
+        isDraft: true,
+        state: 'OPEN',
+      },
+      isLoading: false,
+      refresh: refreshPrMock,
+    });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+
+    expect(screen.getByRole('button', { name: 'View PR' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Draft PR' })).not.toBeInTheDocument();
+  });
+
   it('queries check runs with the resolved PR number', async () => {
     usePrStatusMock.mockReturnValue({
       pr: {

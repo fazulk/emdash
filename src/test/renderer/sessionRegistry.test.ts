@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const managerInstances: Array<{
@@ -24,11 +26,20 @@ vi.mock('../../renderer/terminal/TerminalSessionManager', () => ({
   }),
 }));
 
-import { terminalSessionRegistry } from '../../renderer/terminal/SessionRegistry';
+import {
+  registerRendererUnloadPtyCleanup,
+  terminalSessionRegistry,
+} from '../../renderer/terminal/SessionRegistry';
 
 describe('terminalSessionRegistry', () => {
   beforeEach(() => {
     terminalSessionRegistry.disposeAll();
+    const existingHandler = window.__EMDASH_PTY_UNLOAD_CLEANUP_HANDLER__;
+    if (existingHandler) {
+      window.removeEventListener('beforeunload', existingHandler);
+    }
+    delete window.__EMDASH_PTY_UNLOAD_CLEANUP_HANDLER__;
+    delete window.__EMDASH_PTY_UNLOAD_CLEANUP_ATTACHED__;
     managerInstances.length = 0;
     vi.clearAllMocks();
   });
@@ -83,5 +94,30 @@ describe('terminalSessionRegistry', () => {
     });
 
     expect(managerInstances[0].restart).not.toHaveBeenCalled();
+  });
+
+  it('disposes all terminal sessions before renderer unload', () => {
+    const theme = { base: 'dark' as const };
+    const container = {} as HTMLElement;
+
+    terminalSessionRegistry.attach({
+      taskId: 'task-3',
+      container,
+      initialSize: { cols: 120, rows: 32 },
+      theme,
+    });
+
+    terminalSessionRegistry.attach({
+      taskId: 'task-4',
+      container,
+      initialSize: { cols: 120, rows: 32 },
+      theme,
+    });
+
+    registerRendererUnloadPtyCleanup();
+    window.dispatchEvent(new Event('beforeunload'));
+
+    expect(managerInstances[0].dispose).toHaveBeenCalledTimes(1);
+    expect(managerInstances[1].dispose).toHaveBeenCalledTimes(1);
   });
 });

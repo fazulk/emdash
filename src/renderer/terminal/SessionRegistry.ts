@@ -26,6 +26,13 @@ interface AttachOptions {
   onFirstMessage?: (message: string) => void;
 }
 
+declare global {
+  interface Window {
+    __EMDASH_PTY_UNLOAD_CLEANUP_ATTACHED__?: boolean;
+    __EMDASH_PTY_UNLOAD_CLEANUP_HANDLER__?: () => void;
+  }
+}
+
 class SessionRegistry {
   private readonly sessions = new Map<string, TerminalSessionManager>();
 
@@ -104,3 +111,26 @@ class SessionRegistry {
 }
 
 export const terminalSessionRegistry = new SessionRegistry();
+
+export function registerRendererUnloadPtyCleanup(): void {
+  if (typeof window === 'undefined') return;
+
+  const existingHandler = window.__EMDASH_PTY_UNLOAD_CLEANUP_HANDLER__;
+  if (window.__EMDASH_PTY_UNLOAD_CLEANUP_ATTACHED__ && existingHandler) {
+    return;
+  }
+
+  const handler = () => {
+    try {
+      terminalSessionRegistry.disposeAll();
+    } catch {}
+  };
+
+  if (existingHandler) {
+    window.removeEventListener('beforeunload', existingHandler);
+  }
+
+  window.__EMDASH_PTY_UNLOAD_CLEANUP_HANDLER__ = handler;
+  window.__EMDASH_PTY_UNLOAD_CLEANUP_ATTACHED__ = true;
+  window.addEventListener('beforeunload', handler);
+}

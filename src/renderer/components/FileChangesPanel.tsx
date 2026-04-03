@@ -292,6 +292,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const hasChanges = fileChanges.length > 0;
   const stagedCount = fileChanges.filter((change) => change.isStaged).length;
   const hasStagedChanges = stagedCount > 0;
+  const hasOnlyUnstagedChanges = hasChanges && !hasStagedChanges;
   const { pr, isLoading: isPrLoading, refresh: refreshPr } = usePrStatus(safeTaskPath);
   const [activeTab, setActiveTab] = useState<ActiveTab>('changes');
   const { status: checkRunsStatus, isLoading: checkRunsLoading } = useCheckRuns(
@@ -484,10 +485,10 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     const trimmedMessage = commitMessage.trim();
 
-    if (!hasStagedChanges) {
+    if (!hasStagedChanges && !hasOnlyUnstagedChanges) {
       toast({
-        title: 'No Staged Changes',
-        description: 'Please stage some files before committing.',
+        title: 'No Changes to Commit',
+        description: 'Please make or stage some changes before committing.',
         variant: 'destructive',
       });
       return;
@@ -495,6 +496,15 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
     setCommitAction(action);
     try {
+      if (hasOnlyUnstagedChanges) {
+        await window.electronAPI.updateIndex({
+          taskPath: safeTaskPath,
+          taskId: resolvedTaskId,
+          action: 'stage',
+          scope: 'all',
+        });
+      }
+
       const result =
         action === 'commitAndPush'
           ? await window.electronAPI.gitCommitAndPush({
@@ -567,9 +577,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const handlePush = async () => {
     setIsPushing(true);
     try {
+      const taskPathAtPush = safeTaskPath;
       const result = await window.electronAPI.gitPush({ taskPath: safeTaskPath });
       if (result?.success) {
-        const taskPathAtPush = safeTaskPath;
         setShowPushAfterCommit(false);
         toast({ title: 'Pushed successfully' });
         try {
@@ -860,7 +870,12 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 onChange={(e) => setCommitMessage(e.target.value)}
                 className="h-8 flex-1 text-sm"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && hasStagedChanges && !isCommitting) {
+                  if (
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    (hasStagedChanges || hasOnlyUnstagedChanges) &&
+                    !isCommitting
+                  ) {
                     e.preventDefault();
                     void handleCommitAndPush();
                   }
@@ -870,9 +885,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 variant="outline"
                 size="sm"
                 className="h-8 px-2 text-xs"
-                title="Commit staged changes without pushing"
+                title={
+                  hasOnlyUnstagedChanges
+                    ? 'Stage all changes and commit'
+                    : 'Commit staged changes without pushing'
+                }
                 onClick={() => void handleCommit('commit')}
-                disabled={isCommitting || !hasStagedChanges}
+                disabled={isCommitting || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
                 {commitAction === 'commit' ? <Spinner size="sm" /> : 'Commit'}
               </Button>
@@ -880,9 +899,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 variant="outline"
                 size="sm"
                 className="h-8 px-2 text-xs"
-                title="Commit all staged changes and push"
+                title={
+                  hasOnlyUnstagedChanges
+                    ? 'Stage all changes, commit, and push'
+                    : 'Commit all staged changes and push'
+                }
                 onClick={() => void handleCommitAndPush()}
-                disabled={isCommitting || !hasStagedChanges}
+                disabled={isCommitting || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
                 {commitAction === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
               </Button>

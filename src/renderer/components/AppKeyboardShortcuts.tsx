@@ -24,6 +24,7 @@ export interface AppKeyboardShortcutsProps {
   handleToggleKanban: () => void;
   handleToggleEditor: () => void;
   handleOpenInEditor: () => void;
+  handleOpenGitPage: () => void;
 }
 
 const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
@@ -44,6 +45,7 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
   handleToggleKanban,
   handleToggleEditor,
   handleOpenInEditor,
+  handleOpenGitPage,
 }) => {
   const { toggle: toggleLeftSidebar } = useSidebar();
   const { toggle: toggleRightSidebar } = useRightSidebar();
@@ -86,6 +88,7 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
     onSelectAgentTab: (tabIndex) =>
       window.dispatchEvent(new CustomEvent('emdash:select-agent-tab', { detail: { tabIndex } })),
     onOpenInEditor: handleOpenInEditor,
+    onOpenGitPage: handleOpenGitPage,
     onCloseModal: (
       [
         [showCommandPalette, handleCloseCommandPalette],

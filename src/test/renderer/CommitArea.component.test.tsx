@@ -121,7 +121,7 @@ describe('CommitArea', () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Enter commit message'), {
+    fireEvent.change(screen.getByPlaceholderText('Leave blank to auto generate...'), {
       target: { value: 'ship it' },
     });
     fireEvent.change(screen.getByPlaceholderText('Description'), {

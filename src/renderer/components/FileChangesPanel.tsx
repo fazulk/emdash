@@ -842,7 +842,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Enter commit message..."
+                placeholder="Leave blank to auto generate..."
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 className="h-8 flex-1 text-sm"
@@ -1005,7 +1005,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Enter commit message..."
+                placeholder="Leave blank to auto generate..."
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 className="h-8 flex-1 text-sm"

@@ -161,7 +161,7 @@ describe('FileChangesPanel', () => {
 
     await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
 
-    expect(screen.getByPlaceholderText('Enter commit message...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Leave blank to auto generate...')).toBeInTheDocument();
     // Unstaged-only changes: commit actions stage everything first, so they stay enabled.
     expect(screen.getByRole('button', { name: 'Commit' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeEnabled();
@@ -179,7 +179,7 @@ describe('FileChangesPanel', () => {
 
     await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
 
-    expect(screen.getByPlaceholderText('Enter commit message...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Leave blank to auto generate...')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Commit' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled();

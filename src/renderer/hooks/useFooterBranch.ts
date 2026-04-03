@@ -11,6 +11,8 @@ const normalizeBranch = (branch?: string | null): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const footerBranchCache = new Map<string, string | null>();
+
 export function useFooterBranch({
   taskPath,
   taskId,
@@ -18,7 +20,9 @@ export function useFooterBranch({
 }: UseFooterBranchArgs): string | null {
   const normalizedPath = taskPath?.trim() || null;
   const normalizedFallbackBranch = useMemo(() => normalizeBranch(fallbackBranch), [fallbackBranch]);
-  const [liveBranch, setLiveBranch] = useState<string | null>(null);
+  const [liveBranch, setLiveBranch] = useState<string | null>(() =>
+    normalizedPath ? footerBranchCache.get(normalizedPath) ?? null : null
+  );
   const requestIdRef = useRef(0);
 
   const refreshBranch = useCallback(async () => {
@@ -37,7 +41,9 @@ export function useFooterBranch({
 
       if (requestIdRef.current !== requestId) return;
 
-      setLiveBranch(result?.success ? normalizeBranch(result.branch) : null);
+      const nextBranch = result?.success ? normalizeBranch(result.branch) : null;
+      footerBranchCache.set(normalizedPath, nextBranch);
+      setLiveBranch(nextBranch);
     } catch {
       if (requestIdRef.current !== requestId) return;
       setLiveBranch(null);
@@ -46,9 +52,9 @@ export function useFooterBranch({
 
   useEffect(() => {
     requestIdRef.current += 1;
-    setLiveBranch(null);
+    setLiveBranch(normalizedPath ? footerBranchCache.get(normalizedPath) ?? null : null);
     void refreshBranch();
-  }, [refreshBranch]);
+  }, [normalizedPath, refreshBranch]);
 
   useEffect(() => {
     if (!normalizedPath) return;

@@ -9,99 +9,71 @@ import {
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { SlugInput } from './ui/slug-input';
-import { AgentDropdown } from './AgentDropdown';
 import { Spinner } from './ui/spinner';
 import type { BaseModalProps } from '@/contexts/ModalProvider';
-import type { Project, Task } from '@/types/app';
 import type { Agent } from '@/types';
-import { useTaskManagementContext } from '@/contexts/TaskManagementContext';
-import { useAppSettings } from '@/contexts/AppSettingsProvider';
-import { useCliAgentDetection } from '@/hooks/useCliAgentDetection';
-import { filterDisabledProviders, getDisabledProviderIds } from '@/lib/agentAvailability';
+import type { Project, Task } from '@/types/app';
 import { generateFriendlyTaskName, MAX_TASK_NAME_LENGTH, normalizeTaskName } from '@/lib/taskNames';
-import { PROVIDER_IDS, isValidProviderId } from '@shared/providers/registry';
-
-const DEFAULT_AGENT: Agent = 'claude';
 
 interface MoveChangesToTaskModalProps {
   onClose: () => void;
   initialProject: Project;
   sourceTask: Task;
+  existingTaskNames: string[];
+  defaultAgent: Agent;
+  onCreateTask: (taskName: string) => Promise<void>;
 }
 
-export type MoveChangesToTaskModalOverlayProps = BaseModalProps<void> & {
-  initialProject: Project;
-  sourceTask: Task;
-};
+export type MoveChangesToTaskModalOverlayProps = BaseModalProps<void> &
+  Omit<MoveChangesToTaskModalProps, 'onClose'>;
 
 export function MoveChangesToTaskModalOverlay({
   onClose,
   initialProject,
   sourceTask,
+  existingTaskNames,
+  defaultAgent,
+  onCreateTask,
 }: MoveChangesToTaskModalOverlayProps) {
-  return <MoveChangesToTaskModal onClose={onClose} initialProject={initialProject} sourceTask={sourceTask} />;
+  return (
+    <MoveChangesToTaskModal
+      onClose={onClose}
+      initialProject={initialProject}
+      sourceTask={sourceTask}
+      existingTaskNames={existingTaskNames}
+      defaultAgent={defaultAgent}
+      onCreateTask={onCreateTask}
+    />
+  );
 }
 
 function MoveChangesToTaskModal({
   onClose,
   initialProject,
   sourceTask,
+  existingTaskNames,
+  defaultAgent,
+  onCreateTask,
 }: MoveChangesToTaskModalProps): JSX.Element {
-  const { tasksByProjectId, handleCreateTaskFromCurrentBranch } = useTaskManagementContext();
-  const { settings } = useAppSettings();
-  const { cliAgents } = useCliAgentDetection();
-  const disabledAgents = useMemo(() => getDisabledProviderIds(settings), [settings]);
-  const enabledAgents = useMemo(
-    () => filterDisabledProviders(PROVIDER_IDS, settings) as Agent[],
-    [settings]
-  );
-  const detectedAgents = useMemo(
-    () =>
-      cliAgents
-        .filter(
-          (candidate) => candidate.status === 'connected' && !disabledAgents.includes(candidate.id)
-        )
-        .map((candidate) => candidate.id as Agent),
-    [cliAgents, disabledAgents]
-  );
-  const availableAgents = detectedAgents.length > 0 ? detectedAgents : enabledAgents;
-  const projectTasks = useMemo(() => tasksByProjectId[initialProject.id] ?? [], [
-    initialProject.id,
-    tasksByProjectId,
-  ]);
+  // debug: modal used for moving current branch changes into a fresh task/worktree
   const normalizedExisting = useMemo(
     () =>
-      projectTasks
-        .map((task) => normalizeTaskName(task.name))
+      existingTaskNames
+        .map((name) => normalizeTaskName(name))
         .filter((value): value is string => Boolean(value)),
-    [projectTasks]
+    [existingTaskNames]
   );
-  const defaultTaskName = useMemo(
-    () => generateFriendlyTaskName(normalizedExisting),
-    [normalizedExisting]
-  );
-  const preferredAgent = useMemo(() => {
-    const settingsAgent = settings?.defaultProvider;
-    return isValidProviderId(settingsAgent) && availableAgents.includes(settingsAgent as Agent)
-      ? (settingsAgent as Agent)
-      : (availableAgents[0] ?? DEFAULT_AGENT);
-  }, [availableAgents, settings?.defaultProvider]);
-
-  const [taskName, setTaskName] = useState(defaultTaskName);
-  const [agent, setAgent] = useState<Agent>(preferredAgent);
+  const [taskName, setTaskName] = useState(() => generateFriendlyTaskName(normalizedExisting));
   const [branch, setBranch] = useState(sourceTask.branch || initialProject.gitInfo.branch || '');
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const selectedAgent = availableAgents.includes(agent) ? agent : preferredAgent;
 
   useEffect(() => {
     void window.electronAPI
       .getBranchStatus({ taskPath: sourceTask.path, taskId: sourceTask.id })
       .then((result) => {
-        if (result?.success && result.branch) {
-          setBranch(result.branch);
-        }
+        if (result?.success && result.branch) setBranch(result.branch);
       })
       .catch(() => {});
   }, [sourceTask.id, sourceTask.path]);
@@ -127,12 +99,7 @@ function MoveChangesToTaskModal({
     setIsCreating(true);
     setError(null);
     try {
-      await handleCreateTaskFromCurrentBranch(
-        sourceTask,
-        normalizeTaskName(taskName) || taskName,
-        selectedAgent,
-        initialProject
-      );
+      await onCreateTask(normalizeTaskName(taskName) || taskName);
       onClose();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Failed to create task');
@@ -157,7 +124,9 @@ function MoveChangesToTaskModal({
       <DialogHeader>
         <DialogTitle>New Task from Current Branch</DialogTitle>
         <DialogDescription className="text-xs">
-          Creates a new task on a new branch/worktree from <span className="font-medium text-foreground">{branch || 'the current branch'}</span> and moves any uncommitted changes into it.
+          Creates a new task on a new branch/worktree from{' '}
+          <span className="font-medium text-foreground">{branch || 'the current branch'}</span>{' '}
+          and moves any uncommitted changes into it. Agent: {defaultAgent}
         </DialogDescription>
       </DialogHeader>
 
@@ -177,23 +146,18 @@ function MoveChangesToTaskModal({
             maxLength={MAX_TASK_NAME_LENGTH}
             placeholder="split-follow-up-work"
             aria-invalid={!!error}
-            className={error ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive' : ''}
-          />
-        </div>
-
-        <div className="flex items-center gap-4">
-          <Label className="shrink-0">Agent</Label>
-          <AgentDropdown
-            value={selectedAgent}
-            onChange={setAgent}
-            installedAgents={availableAgents}
+            className={
+              error
+                ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive'
+                : ''
+            }
           />
         </div>
 
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
         <DialogFooter>
-          <Button type="submit" disabled={isCreating || availableAgents.length === 0} aria-busy={isCreating}>
+          <Button type="submit" disabled={isCreating} aria-busy={isCreating}>
             {isCreating ? (
               <>
                 <Spinner size="sm" className="mr-2" />

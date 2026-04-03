@@ -589,12 +589,20 @@ export function useTaskManagement() {
 
   const handleOpenCreateTaskFromCurrentBranchModal = useCallback(
     (project: Project, task: Task) => {
+      const existingTaskNames = (tasksByProjectId[project.id] ?? []).map((existing) => existing.name);
+      const defaultAgent = (task.agentId as Agent | undefined) || activeTaskAgent || 'claude';
       showModal('moveChangesToTaskModal', {
         initialProject: project,
         sourceTask: task,
+        existingTaskNames,
+        defaultAgent,
+        onCreateTask: (taskName: string) =>
+          handleCreateTaskFromCurrentBranch(task, taskName, defaultAgent, project).then(() => {
+            return undefined;
+          }),
       });
     },
-    [showModal]
+    [activeTaskAgent, handleCreateTaskFromCurrentBranch, showModal, tasksByProjectId]
   );
 
   // ---------------------------------------------------------------------------

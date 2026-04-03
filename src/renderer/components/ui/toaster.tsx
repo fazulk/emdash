@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Toast,
   ToastClose,
@@ -10,7 +10,85 @@ import {
   ToastViewport,
 } from './toast';
 import { useToast } from '../../hooks/use-toast';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Copy, Check } from 'lucide-react';
+
+function getToastTextContent(node: React.ReactNode): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(getToastTextContent).join('');
+  if (typeof node === 'object' && 'props' in node) {
+    const { children } = (node as React.ReactElement).props ?? {};
+    return getToastTextContent(children);
+  }
+  return '';
+}
+
+function ToastWithCopy({
+  id,
+  title,
+  description,
+  descriptionClassName,
+  action,
+  variant,
+  ...props
+}: {
+  id: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  descriptionClassName?: string;
+  action?: React.ReactElement;
+  variant?: 'default' | 'destructive';
+  [key: string]: unknown;
+}) {
+  const [copied, setCopied] = useState(false);
+  const isDestructive = variant === 'destructive';
+
+  const handleCopy = useCallback(() => {
+    const titleText = getToastTextContent(title);
+    const descText = getToastTextContent(description);
+    const text = [titleText, descText].filter(Boolean).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [title, description]);
+
+  return (
+    <Toast key={id} variant={variant} {...props}>
+      <div className="flex gap-3 pr-6">
+        {isDestructive && (
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-none self-start text-amber-600 dark:text-amber-400" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="grid gap-1">
+            {title && <ToastTitle>{title}</ToastTitle>}
+            {description && (
+              <ToastDescription
+                className={isDestructive ? `break-words text-sm opacity-90 ${descriptionClassName ?? ''}` : descriptionClassName}
+              >
+                {description}
+              </ToastDescription>
+            )}
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              {copied ? (
+                <><Check className="h-3.5 w-3.5" /> Copied</>
+              ) : (
+                <><Copy className="h-3.5 w-3.5" /> Copy</>
+              )}
+            </button>
+            {action}
+          </div>
+        </div>
+      </div>
+      <ToastClose />
+    </Toast>
+  );
+}
 
 export function Toaster() {
   const { toasts } = useToast();
@@ -79,23 +157,16 @@ export function Toaster() {
         ...props
       }) {
         return (
-          <Toast key={id} variant={variant} {...props}>
-            <div className="flex gap-3 pr-6">
-              {variant === 'destructive' && (
-                <AlertCircle className="mt-0.5 h-5 w-5 flex-none self-start text-amber-600 dark:text-amber-400" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="grid gap-1">
-                  {title && <ToastTitle>{title}</ToastTitle>}
-                  {description && (
-                    <ToastDescription className={descriptionClassName}>{description}</ToastDescription>
-                  )}
-                </div>
-                {action && <div className="mt-3 flex justify-start">{action}</div>}
-              </div>
-            </div>
-            <ToastClose />
-          </Toast>
+          <ToastWithCopy
+            key={id}
+            id={id}
+            title={title}
+            description={description}
+            descriptionClassName={descriptionClassName}
+            action={action}
+            variant={variant}
+            {...props}
+          />
         );
       })}
       <ToastViewport />

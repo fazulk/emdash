@@ -64,6 +64,7 @@ export interface KeyboardSettings {
   nextAgent?: KeyboardShortcutBinding;
   prevAgent?: KeyboardShortcutBinding;
   openInEditor?: KeyboardShortcutBinding;
+  openGitPage?: KeyboardShortcutBinding;
 }
 
 export interface InterfaceSettings {
@@ -191,8 +192,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   keyboard: {
     commandPalette: { key: 'k', modifier: 'cmd' },
     settings: { key: ',', modifier: 'cmd' },
-    toggleLeftSidebar: { key: 'b', modifier: 'cmd' },
-    toggleRightSidebar: { key: '.', modifier: 'cmd' },
+    toggleLeftSidebar: { key: 'm', modifier: 'ctrl' },
+    toggleRightSidebar: { key: 'b', modifier: 'cmd' },
     toggleTheme: { key: 't', modifier: 'cmd+shift' },
     toggleKanban: { key: 'p', modifier: 'cmd' },
     toggleEditor: { key: 'e', modifier: 'cmd' },
@@ -203,6 +204,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     nextAgent: { key: ']', modifier: 'cmd+shift' },
     prevAgent: { key: '[', modifier: 'cmd+shift' },
     openInEditor: { key: 'o', modifier: 'cmd' },
+    openGitPage: { key: 'g', modifier: 'cmd' },
   },
   interface: {
     autoRightSidebarBehavior: false,
@@ -533,6 +535,7 @@ export function normalizeSettings(input: AppSettings): AppSettings {
     nextAgent: normalizeBinding(keyboard.nextAgent, DEFAULT_SETTINGS.keyboard!.nextAgent!),
     prevAgent: normalizeBinding(keyboard.prevAgent, DEFAULT_SETTINGS.keyboard!.prevAgent!),
     openInEditor: normalizeBinding(keyboard.openInEditor, DEFAULT_SETTINGS.keyboard!.openInEditor!),
+    openGitPage: normalizeBinding(keyboard.openGitPage, DEFAULT_SETTINGS.keyboard!.openGitPage!),
   };
   const hasLegacyThemeShortcut = isBinding(out.keyboard.toggleTheme!, 'cmd', 't');
   const hasLegacyNewTaskShortcut = isBinding(out.keyboard.newTask!, 'cmd', 'n');
@@ -544,6 +547,15 @@ export function normalizeSettings(input: AppSettings): AppSettings {
       out.keyboard.newAgent = DEFAULT_SETTINGS.keyboard!.newAgent!;
     }
   }
+
+  const hasLegacySidebarDefaults =
+    isBinding(out.keyboard.toggleLeftSidebar!, 'cmd', 'b') &&
+    isBinding(out.keyboard.toggleRightSidebar!, 'cmd', '.');
+  if (hasLegacySidebarDefaults) {
+    out.keyboard.toggleLeftSidebar = DEFAULT_SETTINGS.keyboard!.toggleLeftSidebar!;
+    out.keyboard.toggleRightSidebar = DEFAULT_SETTINGS.keyboard!.toggleRightSidebar!;
+  }
+
   const platformTaskDefaults = getPlatformTaskSwitchDefaults();
   const isLegacyArrowPair =
     isBinding(out.keyboard.nextProject!, 'cmd', 'ArrowRight') &&

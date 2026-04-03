@@ -156,6 +156,23 @@ describe('FileChangesPanel', () => {
     expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled();
   });
 
+  it('still shows commit and push actions when there are no file changes', async () => {
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+
+    expect(screen.getByPlaceholderText('Enter commit message...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Commit' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled();
+  });
+
   it('allows commit and push with a blank subject so the backend can generate one', async () => {
     useFileChangesMock.mockReturnValue({
       fileChanges: [

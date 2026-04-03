@@ -2320,6 +2320,7 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
         }
 
         const { stdout: out } = await execAsync('git status -sb', { cwd: taskPath });
+        broadcastGitStatusChange(taskPath);
         return {
           success: true,
           branch: activeBranch,
@@ -2907,6 +2908,7 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
       const pathErr = validateTaskPath(args.taskPath);
       if (pathErr) return { success: false, error: pathErr };
       const result = await gitPull(args.taskPath);
+      broadcastGitStatusChange(args.taskPath);
       return { success: true, output: result.output };
     } catch (error) {
       const errObj = error as { stderr?: string; message?: string };

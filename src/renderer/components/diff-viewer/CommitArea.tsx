@@ -126,6 +126,16 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
     });
   }, [taskPath, fetchBranch, fetchLatestCommit]);
 
+  useEffect(() => {
+    if (!taskPath || !window.electronAPI.onGitStatusChanged) return;
+    return window.electronAPI.onGitStatusChanged((event) => {
+      if (event?.taskPath !== taskPath) return;
+      void fetchBranch();
+      void fetchLatestCommit();
+      void onRefreshChanges?.();
+    });
+  }, [taskPath, fetchBranch, fetchLatestCommit, onRefreshChanges]);
+
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     if (!taskPath || (!hasStagedFiles && !hasOnlyUnstagedChanges) || isLocked) return;
     beginOperation(action);

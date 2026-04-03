@@ -12,6 +12,7 @@ const useFileChangesMock = vi.fn();
 const usePrStatusMock = vi.fn();
 const useCheckRunsMock = vi.fn();
 const useAutoCheckRunsRefreshMock = vi.fn();
+const onGitStatusChangedMock = vi.fn();
 
 vi.mock('framer-motion', () => ({
   motion: {
@@ -93,6 +94,8 @@ describe('FileChangesPanel', () => {
     usePrStatusMock.mockReset();
     useCheckRunsMock.mockReset();
     useAutoCheckRunsRefreshMock.mockReset();
+    onGitStatusChangedMock.mockReset();
+    onGitStatusChangedMock.mockImplementation(() => () => {});
     getBranchStatusMock.mockResolvedValue({
       success: true,
       branch: 'main',
@@ -133,6 +136,7 @@ describe('FileChangesPanel', () => {
       value: {
         getBranchStatus: getBranchStatusMock,
         gitCommitAndPush: gitCommitAndPushMock,
+        onGitStatusChanged: onGitStatusChangedMock,
       },
     });
 
@@ -171,6 +175,33 @@ describe('FileChangesPanel', () => {
     expect(screen.getByRole('button', { name: 'Commit' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Commit & Push' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled();
+  });
+
+  it('refreshes the push count when git status changes elsewhere', async () => {
+    let statusListener: ((data: { taskPath: string; error?: string }) => void) | undefined;
+    onGitStatusChangedMock.mockImplementation(
+      (listener: (data: { taskPath: string; error?: string }) => void) => {
+      statusListener = listener;
+        return () => {
+          if (statusListener === listener) statusListener = undefined;
+        };
+      }
+    );
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Push (2)' })).toBeEnabled());
+
+    getBranchStatusMock.mockResolvedValue({
+      success: true,
+      branch: 'main',
+      ahead: 0,
+      behind: 0,
+    });
+
+    statusListener?.({ taskPath: '/tmp/repo' });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Push (0)' })).toBeDisabled());
   });
 
   it('allows commit and push with a blank subject so the backend can generate one', async () => {

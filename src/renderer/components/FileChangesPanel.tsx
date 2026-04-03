@@ -444,6 +444,16 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     [resolvedTaskId]
   );
 
+  useEffect(() => {
+    if (!safeTaskPath || !window.electronAPI.onGitStatusChanged) return;
+    return window.electronAPI.onGitStatusChanged((event) => {
+      if (event?.taskPath !== safeTaskPath) return;
+      void refreshChanges();
+      void refreshBranchStatus(safeTaskPath);
+      void Promise.resolve(refreshPr()).catch(() => {});
+    });
+  }, [safeTaskPath, refreshChanges, refreshBranchStatus, refreshPr]);
+
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     const trimmedMessage = commitMessage.trim();
 

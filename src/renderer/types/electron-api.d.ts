@@ -589,7 +589,7 @@ declare global {
         output?: string;
         error?: string;
       }>;
-      getCheckRuns: (args: { taskPath: string }) => Promise<{
+      getCheckRuns: (args: { taskPath: string; prNumber?: number }) => Promise<{
         success: boolean;
         checks?: Array<{
           name: string;

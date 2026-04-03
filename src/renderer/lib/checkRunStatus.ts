@@ -28,6 +28,14 @@ export interface CheckRunsStatus {
   hasFailures: boolean;
 }
 
+const CHECK_BUCKET_SORT_ORDER: Record<CheckRunBucket, number> = {
+  fail: 0,
+  pending: 1,
+  pass: 2,
+  skipping: 3,
+  cancel: 4,
+};
+
 export function computeCheckRunsSummary(checks: CheckRun[]): CheckRunsSummary {
   const summary: CheckRunsSummary = {
     total: checks.length,
@@ -61,8 +69,16 @@ export function computeCheckRunsSummary(checks: CheckRun[]): CheckRunsSummary {
 
 export function buildCheckRunsStatus(checks: CheckRun[]): CheckRunsStatus {
   const summary = computeCheckRunsSummary(checks);
+  const sortedChecks = checks
+    .map((check, index) => ({ check, index }))
+    .sort((a, b) => {
+      const orderDiff = CHECK_BUCKET_SORT_ORDER[a.check.bucket] - CHECK_BUCKET_SORT_ORDER[b.check.bucket];
+      return orderDiff !== 0 ? orderDiff : a.index - b.index;
+    })
+    .map(({ check }) => check);
+
   return {
-    checks,
+    checks: sortedChecks,
     summary,
     allComplete: summary.pending === 0,
     hasFailures: summary.failed > 0,

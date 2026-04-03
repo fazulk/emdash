@@ -1,5 +1,4 @@
 import { CheckCircle2, XCircle, Loader2, MinusCircle, ExternalLink } from 'lucide-react';
-import githubIcon from '../../assets/images/github.png';
 import type { CheckRunsStatus, CheckRun, CheckRunBucket } from '../lib/checkRunStatus';
 import { formatCheckDuration } from '../lib/checkRunStatus';
 import { Badge } from './ui/badge';
@@ -22,16 +21,12 @@ function CheckRunItem({ check }: { check: CheckRun }) {
   const duration = formatCheckDuration(check.startedAt, check.completedAt);
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2.5">
+    <div className="flex items-center gap-2 px-4 py-1">
       <span className="shrink-0">
         <BucketIcon bucket={check.bucket} />
       </span>
-      <img src={githubIcon} alt="" className="h-3.5 w-3.5 shrink-0 dark:invert" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-foreground">{check.name}</div>
-        {check.workflow && (
-          <div className="truncate text-xs text-muted-foreground">{check.workflow}</div>
-        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {duration && <span className="text-xs text-muted-foreground">{duration}</span>}
@@ -89,7 +84,7 @@ export function ChecksPanel({ status, isLoading, hasPr, hideSummary }: ChecksPan
   return (
     <div className="flex flex-col">
       {!hideSummary && (
-        <div className="flex items-center gap-1.5 border-b border-border px-4 py-2">
+        <div className="flex items-center gap-1.5 border-b border-border px-4 py-1.5">
           {summary.passed > 0 && (
             <Badge variant="outline">
               <CheckCircle2 className="h-3 w-3 text-emerald-500" />

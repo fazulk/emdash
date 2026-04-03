@@ -4,7 +4,7 @@ import type { CheckRunsStatus } from '../lib/checkRunStatus';
 
 const noopRefresh = async () => {};
 
-export function useCheckRuns(taskPath?: string, enabled = true) {
+export function useCheckRuns(taskPath?: string, prNumber?: number, enabled = true) {
   const [status, setStatus] = useState<CheckRunsStatus | null>(null);
   const [isLoading, setIsLoading] = useState(!!taskPath && enabled);
 
@@ -12,7 +12,7 @@ export function useCheckRuns(taskPath?: string, enabled = true) {
     if (!taskPath || !enabled) return;
     setIsLoading(true);
     try {
-      const result = await refreshCheckRuns(taskPath);
+      const result = await refreshCheckRuns({ taskPath, prNumber });
       setStatus(result);
     } finally {
       setIsLoading(false);
@@ -28,11 +28,11 @@ export function useCheckRuns(taskPath?: string, enabled = true) {
 
     setStatus(null);
     setIsLoading(true);
-    return subscribeToCheckRuns(taskPath, (newStatus) => {
+    return subscribeToCheckRuns({ taskPath, prNumber }, (newStatus) => {
       setStatus(newStatus);
       setIsLoading(false);
     });
-  }, [taskPath, enabled]);
+  }, [taskPath, prNumber, enabled]);
 
   if (!enabled) {
     return { status: null, refresh: noopRefresh, isLoading: false };

@@ -295,12 +295,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const { pr, isLoading: isPrLoading, refresh: refreshPr } = usePrStatus(safeTaskPath);
   const [activeTab, setActiveTab] = useState<ActiveTab>('changes');
   const { status: checkRunsStatus, isLoading: checkRunsLoading } = useCheckRuns(
-    pr ? safeTaskPath : undefined
+    pr ? safeTaskPath : undefined,
+    pr?.number
   );
   // Only poll for check runs when the Checks tab is active; the initial fetch
   // from useCheckRuns is enough for the tab badge indicators.
   const checksTabActive = activeTab === 'checks' && !!pr;
-  useAutoCheckRunsRefresh(checksTabActive ? safeTaskPath : undefined, checkRunsStatus);
+  useAutoCheckRunsRefresh(checksTabActive ? safeTaskPath : undefined, pr?.number, checkRunsStatus);
   const prevChecksAllComplete = useRef<boolean | null>(null);
   useEffect(() => {
     if (!checksTabActive || !pr || !checkRunsStatus) return;

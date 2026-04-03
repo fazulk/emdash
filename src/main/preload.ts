@@ -465,7 +465,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('git:enable-auto-merge', args),
   disableAutoMerge: (args: { taskPath: string; prNumber?: number }) =>
     ipcRenderer.invoke('git:disable-auto-merge', args),
-  getCheckRuns: (args: { taskPath: string }) => ipcRenderer.invoke('git:get-check-runs', args),
+  getCheckRuns: (args: { taskPath: string; prNumber?: number }) =>
+    ipcRenderer.invoke('git:get-check-runs', args),
   getPrComments: (args: { taskPath: string; prNumber?: number }) =>
     ipcRenderer.invoke('git:get-pr-comments', args),
   getBranchStatus: (args: { taskPath: string; taskId?: string }) =>

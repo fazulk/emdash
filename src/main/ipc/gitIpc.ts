@@ -1676,21 +1676,108 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
     }
   );
 
+  const getCheckRunBucket = (status?: string, conclusion?: string | null) => {
+    if ((status || '').toLowerCase() !== 'completed') return 'pending' as const;
+
+    switch ((conclusion || '').toLowerCase()) {
+      case 'success':
+      case 'neutral':
+        return 'pass' as const;
+      case 'skipped':
+        return 'skipping' as const;
+      case 'cancelled':
+        return 'cancel' as const;
+      case 'failure':
+      case 'action_required':
+      case 'timed_out':
+      case 'startup_failure':
+      case 'stale':
+        return 'fail' as const;
+      default:
+        return 'pending' as const;
+    }
+  };
+
+  const getStatusContextBucket = (state?: string) => {
+    switch ((state || '').toLowerCase()) {
+      case 'success':
+        return 'pass' as const;
+      case 'failure':
+      case 'error':
+        return 'fail' as const;
+      default:
+        return 'pending' as const;
+    }
+  };
+
+  const parseRepoSlugFromPrUrl = (url?: string): string | null => {
+    if (!url) return null;
+    const match = url.match(/^https?:\/\/[^/]+\/([^/]+\/[^/]+)\/pull\/\d+(?:\/.*)?$/i);
+    return match?.[1] ?? null;
+  };
+
+  const normalizeApiChecks = (checkRunsPayload: any, statusPayload: any) => {
+    const checks = Array.isArray(checkRunsPayload?.check_runs)
+      ? checkRunsPayload.check_runs.map((check: any) => ({
+          name: typeof check?.name === 'string' ? check.name : 'Unnamed check',
+          state:
+            typeof check?.conclusion === 'string'
+              ? check.conclusion
+              : typeof check?.status === 'string'
+                ? check.status
+                : 'unknown',
+          bucket: getCheckRunBucket(check?.status, check?.conclusion),
+          description:
+            typeof check?.output?.title === 'string'
+              ? check.output.title
+              : typeof check?.conclusion === 'string'
+                ? check.conclusion
+                : undefined,
+          link:
+            typeof check?.html_url === 'string'
+              ? check.html_url
+              : typeof check?.details_url === 'string'
+                ? check.details_url
+                : undefined,
+          workflow:
+            typeof check?.app?.name === 'string' && check.app.name.trim()
+              ? check.app.name.trim()
+              : undefined,
+          startedAt: typeof check?.started_at === 'string' ? check.started_at : undefined,
+          completedAt: typeof check?.completed_at === 'string' ? check.completed_at : undefined,
+        }))
+      : [];
+
+    const statuses = Array.isArray(statusPayload?.statuses)
+      ? statusPayload.statuses.map((status: any) => ({
+          name: typeof status?.context === 'string' ? status.context : 'Status',
+          state: typeof status?.state === 'string' ? status.state : 'unknown',
+          bucket: getStatusContextBucket(status?.state),
+          description: typeof status?.description === 'string' ? status.description : undefined,
+          link: typeof status?.target_url === 'string' ? status.target_url : undefined,
+          startedAt: typeof status?.created_at === 'string' ? status.created_at : undefined,
+          completedAt: typeof status?.updated_at === 'string' ? status.updated_at : undefined,
+        }))
+      : [];
+
+    return [...checks, ...statuses];
+  };
+
   // Git: Get CI/CD check runs for current branch via GitHub CLI
-  ipcMain.handle('git:get-check-runs', async (_, args: { taskPath: string }) => {
-    const { taskPath } = args || ({} as { taskPath: string });
+  ipcMain.handle('git:get-check-runs', async (_, args: { taskPath: string; prNumber?: number }) => {
+    const { taskPath, prNumber } = args || ({} as { taskPath: string; prNumber?: number });
+    const prSelector = prNumber ? `${quoteGhArg(String(prNumber))} ` : '';
     try {
       const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
       if (remoteProject) {
         const connId = remoteProject.sshConnectionId;
-        const fields = 'bucket,completedAt,description,event,link,name,startedAt,state,workflow';
-        const checksResult = await remoteGitService.execGh(
+        const prResult = await remoteGitService.execGh(
           connId,
           taskPath,
-          `pr checks --json ${fields}`
+          `pr view ${prSelector}--json headRefOid,url`
         );
-        if (checksResult.exitCode !== 0) {
-          const msg = checksResult.stderr || '';
+        if (prResult.exitCode !== 0) {
+          const msg = prResult.stderr || '';
           if (/no pull requests? found/i.test(msg) || /not found/i.test(msg)) {
             return { success: true, checks: null };
           }
@@ -1699,90 +1786,63 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
           }
           return { success: false, error: msg || 'Failed to query check runs' };
         }
-        const checks = checksResult.stdout.trim() ? JSON.parse(checksResult.stdout.trim()) : [];
 
-        // Fetch html_url from API
-        try {
-          const shaResult = await remoteGitService.execGh(
-            connId,
-            taskPath,
-            "pr view --json headRefOid --jq '.headRefOid'"
-          );
-          const sha = shaResult.stdout.trim();
-          if (sha) {
-            const apiResult = await remoteGitService.execGh(
-              connId,
-              taskPath,
-              `api repos/{owner}/{repo}/commits/${sha}/check-runs --jq '.check_runs | map({name: .name, html_url: .html_url}) | .[]'`
-            );
-            const urlMap = new Map<string, string>();
-            for (const line of apiResult.stdout.trim().split('\n')) {
-              if (!line) continue;
-              try {
-                const entry = JSON.parse(line);
-                if (entry.name && entry.html_url) urlMap.set(entry.name, entry.html_url);
-              } catch {}
-            }
-            for (const check of checks) {
-              const htmlUrl = urlMap.get(check.name);
-              if (htmlUrl) check.link = htmlUrl;
-            }
-          }
-        } catch {
-          // Fall back to original link values
+        const prData = prResult.stdout.trim() ? JSON.parse(prResult.stdout.trim()) : null;
+        const sha = typeof prData?.headRefOid === 'string' ? prData.headRefOid.trim() : '';
+        const repoSlug = parseRepoSlugFromPrUrl(prData?.url);
+        if (!sha || !repoSlug) {
+          return { success: true, checks: [] };
         }
 
-        return { success: true, checks };
+        const checkRunsResult = await remoteGitService.execGh(
+          connId,
+          taskPath,
+          `api repos/${repoSlug}/commits/${sha}/check-runs?per_page=100`
+        );
+        const statusResult = await remoteGitService.execGh(
+          connId,
+          taskPath,
+          `api repos/${repoSlug}/commits/${sha}/status`
+        );
+
+        const checkRunsPayload = checkRunsResult.stdout.trim()
+          ? JSON.parse(checkRunsResult.stdout.trim())
+          : null;
+        const statusPayload = statusResult.stdout.trim()
+          ? JSON.parse(statusResult.stdout.trim())
+          : null;
+
+        return { success: true, checks: normalizeApiChecks(checkRunsPayload, statusPayload) };
       }
 
       await execFileAsync(GIT, ['rev-parse', '--is-inside-work-tree'], { cwd: taskPath });
 
-      const fields = 'bucket,completedAt,description,event,link,name,startedAt,state,workflow';
       try {
-        const { stdout } = await execFileAsync('gh', ['pr', 'checks', '--json', fields], {
-          cwd: taskPath,
-        });
-        const json = (stdout || '').trim();
-        const checks = json ? JSON.parse(json) : [];
-
-        // Fetch html_url from the GitHub API instead, which always points to the
-        // actual check run page on GitHub.
-        try {
-          const { stdout: shaOut } = await execFileAsync(
-            'gh',
-            ['pr', 'view', '--json', 'headRefOid', '--jq', '.headRefOid'],
-            { cwd: taskPath }
-          );
-          const sha = shaOut.trim();
-          if (sha) {
-            const { stdout: apiOut } = await execFileAsync(
-              'gh',
-              [
-                'api',
-                `repos/{owner}/{repo}/commits/${sha}/check-runs`,
-                '--jq',
-                '.check_runs | map({name: .name, html_url: .html_url}) | .[]',
-              ],
-              { cwd: taskPath }
-            );
-            const urlMap = new Map<string, string>();
-            for (const line of apiOut.trim().split('\n')) {
-              if (!line) continue;
-              try {
-                const entry = JSON.parse(line);
-                if (entry.name && entry.html_url) urlMap.set(entry.name, entry.html_url);
-              } catch {}
-            }
-            for (const check of checks) {
-              const htmlUrl = urlMap.get(check.name);
-              if (htmlUrl) check.link = htmlUrl;
-            }
-          }
-        } catch {
-          // Fall back to original link values if API call fails
+        const { stdout: prOut } = await execFileAsync(
+          'gh',
+          ['pr', 'view', ...(prNumber ? [String(prNumber)] : []), '--json', 'headRefOid,url'],
+          { cwd: taskPath }
+        );
+        const prData = prOut.trim() ? JSON.parse(prOut.trim()) : null;
+        const sha = typeof prData?.headRefOid === 'string' ? prData.headRefOid.trim() : '';
+        const repoSlug = parseRepoSlugFromPrUrl(prData?.url);
+        if (!sha || !repoSlug) {
+          return { success: true, checks: [] };
         }
 
-        return { success: true, checks };
+        const [{ stdout: checkRunsOut }, { stdout: statusOut }] = await Promise.all([
+          execFileAsync('gh', ['api', `repos/${repoSlug}/commits/${sha}/check-runs?per_page=100`], {
+            cwd: taskPath,
+          }),
+          execFileAsync('gh', ['api', `repos/${repoSlug}/commits/${sha}/status`], {
+            cwd: taskPath,
+          }),
+        ]);
+
+        const checkRunsPayload = checkRunsOut.trim() ? JSON.parse(checkRunsOut.trim()) : null;
+        const statusPayload = statusOut.trim() ? JSON.parse(statusOut.trim()) : null;
+
+        return { success: true, checks: normalizeApiChecks(checkRunsPayload, statusPayload) };
       } catch (err) {
         const msg = String(err as string);
         if (/no pull requests? found/i.test(msg) || /not found/i.test(msg)) {

@@ -8,6 +8,7 @@ const COOLDOWN_MS = 3000;
 
 export function useAutoCheckRunsRefresh(
   activeTaskPath: string | undefined,
+  prNumber: number | undefined,
   checkRunsStatus: CheckRunsStatus | null
 ): void {
   const lastFocusRefresh = useRef(0);
@@ -39,7 +40,7 @@ export function useAutoCheckRunsRefresh(
     const startPolling = () => {
       if (intervalId) clearInterval(intervalId);
       intervalId = setInterval(() => {
-        refreshCheckRuns(activeTaskPath).catch(() => {});
+        refreshCheckRuns({ taskPath: activeTaskPath, prNumber }).catch(() => {});
       }, interval);
     };
 
@@ -57,7 +58,7 @@ export function useAutoCheckRunsRefresh(
         const now = Date.now();
         if (now - lastVisibilityRefresh.current >= COOLDOWN_MS) {
           lastVisibilityRefresh.current = now;
-          refreshCheckRuns(activeTaskPath).catch(() => {});
+          refreshCheckRuns({ taskPath: activeTaskPath, prNumber }).catch(() => {});
         }
         startPolling();
       }
@@ -73,5 +74,5 @@ export function useAutoCheckRunsRefresh(
       stopPolling();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [activeTaskPath, allComplete]);
+  }, [activeTaskPath, prNumber, allComplete]);
 }

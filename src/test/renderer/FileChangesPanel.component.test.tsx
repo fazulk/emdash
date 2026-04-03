@@ -9,6 +9,9 @@ const toastMock = vi.fn();
 const refreshChangesMock = vi.fn();
 const refreshPrMock = vi.fn();
 const useFileChangesMock = vi.fn();
+const usePrStatusMock = vi.fn();
+const useCheckRunsMock = vi.fn();
+const useAutoCheckRunsRefreshMock = vi.fn();
 
 vi.mock('framer-motion', () => ({
   motion: {
@@ -37,22 +40,15 @@ vi.mock('../../renderer/hooks/useFileChanges', () => ({
 }));
 
 vi.mock('../../renderer/hooks/usePrStatus', () => ({
-  usePrStatus: () => ({
-    pr: null,
-    isLoading: false,
-    refresh: refreshPrMock,
-  }),
+  usePrStatus: (...args: unknown[]) => usePrStatusMock(...args),
 }));
 
 vi.mock('../../renderer/hooks/useCheckRuns', () => ({
-  useCheckRuns: () => ({
-    status: null,
-    isLoading: false,
-  }),
+  useCheckRuns: (...args: unknown[]) => useCheckRunsMock(...args),
 }));
 
 vi.mock('../../renderer/hooks/useAutoCheckRunsRefresh', () => ({
-  useAutoCheckRunsRefresh: () => undefined,
+  useAutoCheckRunsRefresh: (...args: unknown[]) => useAutoCheckRunsRefreshMock(...args),
 }));
 
 vi.mock('../../renderer/hooks/usePrComments', () => ({
@@ -94,6 +90,9 @@ describe('FileChangesPanel', () => {
     getBranchStatusMock.mockReset();
     gitCommitAndPushMock.mockReset();
     useFileChangesMock.mockReset();
+    usePrStatusMock.mockReset();
+    useCheckRunsMock.mockReset();
+    useAutoCheckRunsRefreshMock.mockReset();
     getBranchStatusMock.mockResolvedValue({
       success: true,
       branch: 'main',
@@ -118,6 +117,16 @@ describe('FileChangesPanel', () => {
       isLoading: false,
       refreshChanges: refreshChangesMock,
     });
+    usePrStatusMock.mockReturnValue({
+      pr: null,
+      isLoading: false,
+      refresh: refreshPrMock,
+    });
+    useCheckRunsMock.mockReturnValue({
+      status: null,
+      isLoading: false,
+    });
+    useAutoCheckRunsRefreshMock.mockReturnValue(undefined);
 
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
@@ -232,5 +241,22 @@ describe('FileChangesPanel', () => {
         'Committed and Pushed\nChanges committed with message:\nUpdate src/file.ts'
       )
     );
+  });
+
+  it('queries check runs with the resolved PR number', async () => {
+    usePrStatusMock.mockReturnValue({
+      pr: {
+        number: 173,
+      },
+      isLoading: false,
+      refresh: refreshPrMock,
+    });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+
+    expect(useCheckRunsMock).toHaveBeenCalledWith('/tmp/repo', 173);
+    expect(useAutoCheckRunsRefreshMock).toHaveBeenCalledWith(undefined, 173, null);
   });
 });

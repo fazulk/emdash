@@ -249,6 +249,23 @@ describe('normalizeSettings - keyboard shortcuts', () => {
   });
 });
 
+describe('normalizeSettings - disabled providers', () => {
+  it('keeps only valid provider ids and deduplicates them', () => {
+    const result = normalizeSettings(
+      makeSettings({
+        disabledProviders: ['claude', 'codex', 'claude', 'nope' as any],
+      })
+    );
+
+    expect(result.disabledProviders).toEqual(['claude', 'codex']);
+  });
+
+  it('defaults to an empty list when missing', () => {
+    const result = normalizeSettings(makeSettings());
+    expect(result.disabledProviders).toEqual([]);
+  });
+});
+
 describe('normalizeSettings - review preset', () => {
   it('defaults to the shared review preset when missing', () => {
     const result = normalizeSettings(makeSettings());

@@ -3,6 +3,7 @@ import { Settings2, Sparkles } from 'lucide-react';
 import IntegrationRow from './IntegrationRow';
 import CustomCommandModal from './CustomCommandModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Switch } from './ui/switch';
 import { CliAgentStatus } from '../types/connections';
 import { PROVIDERS } from '@shared/providers/registry';
 import { agentAssets } from '@/providers/assets';
@@ -11,6 +12,8 @@ interface CliAgentsListProps {
   agents: CliAgentStatus[];
   isLoading: boolean;
   error?: string | null;
+  disabledAgentIds?: string[];
+  onToggleAgentDisabled?: (agentId: string, disabled: boolean) => void;
 }
 
 export const BASE_CLI_AGENTS: CliAgentStatus[] = PROVIDERS.filter(
@@ -26,7 +29,12 @@ export const BASE_CLI_AGENTS: CliAgentStatus[] = PROVIDERS.filter(
 const ICON_BUTTON =
   'rounded-md p-1.5 text-muted-foreground transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
-const renderAgentRow = (agent: CliAgentStatus, onSettingsClick: (id: string) => void) => {
+const renderAgentRow = (
+  agent: CliAgentStatus,
+  onSettingsClick: (id: string) => void,
+  disabledAgentIds: string[],
+  onToggleAgentDisabled?: (agentId: string, disabled: boolean) => void
+) => {
   const asset = agentAssets[agent.id as keyof typeof agentAssets];
   const logo = asset?.logo;
 
@@ -44,6 +52,7 @@ const renderAgentRow = (agent: CliAgentStatus, onSettingsClick: (id: string) => 
   const isDetected = agent.status === 'connected';
   const indicatorClass = isDetected ? 'bg-emerald-500' : 'bg-muted-foreground/50';
   const statusLabel = isDetected ? 'Detected' : 'Not detected';
+  const isDisabled = disabledAgentIds.includes(agent.id);
 
   return (
     <IntegrationRow
@@ -68,25 +77,41 @@ const renderAgentRow = (agent: CliAgentStatus, onSettingsClick: (id: string) => 
         </span>
       }
       rightExtra={
-        isDetected ? (
+        <div className="flex items-center gap-1">
           <TooltipProvider delayDuration={150}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => onSettingsClick(agent.id)}
-                  className={ICON_BUTTON}
-                  aria-label={`${agent.name} execution settings`}
-                >
-                  <Settings2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <Switch
+                  checked={!isDisabled}
+                  onCheckedChange={(checked) => onToggleAgentDisabled?.(agent.id, !checked)}
+                  aria-label={`${isDisabled ? 'Enable' : 'Disable'} ${agent.name}`}
+                />
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                Execution settings
+                {isDisabled ? 'Show in New Task and New Agent' : 'Hide from New Task and New Agent'}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        ) : null
+          {isDetected ? (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => onSettingsClick(agent.id)}
+                    className={ICON_BUTTON}
+                    aria-label={`${agent.name} execution settings`}
+                  >
+                    <Settings2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Execution settings
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+        </div>
       }
     />
   );
@@ -113,7 +138,14 @@ export const CliAgentsList: React.FC<CliAgentsListProps> = (props) => {
       ) : null}
 
       <div className="space-y-2">
-        {sortedAgents.map((agent) => renderAgentRow(agent, setCustomModalAgentId))}
+        {sortedAgents.map((agent) =>
+          renderAgentRow(
+            agent,
+            setCustomModalAgentId,
+            props.disabledAgentIds ?? [],
+            props.onToggleAgentDisabled
+          )
+        )}
       </div>
 
       <CustomCommandModal

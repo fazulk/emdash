@@ -21,6 +21,7 @@ import { useTaskTerminals } from '@/lib/taskTerminalsStore';
 import { activityStore } from '@/lib/activityStore';
 import { rpc } from '@/lib/rpc';
 import { getInstallCommandForProvider } from '@shared/providers/registry';
+import type { ProviderId } from '@shared/providers/registry';
 import { useAutoScrollOnTaskSwitch } from '@/hooks/useAutoScrollOnTaskSwitch';
 import { useTerminalViewportWheelForwarding } from '@/hooks/useTerminalViewportWheelForwarding';
 import { TaskScopeProvider } from './TaskScopeContext';
@@ -373,12 +374,17 @@ const ChatInterface: React.FC<Props> = ({
     [footerBranch, projectPath, task.path, task.useWorktree]
   );
 
+  const { settings: appSettings } = useAppSettings();
   const installedAgents = useMemo(
     () =>
       Object.entries(agentStatuses)
-        .filter(([, status]) => status.installed === true)
+        .filter(
+          ([id, status]) =>
+            status.installed === true &&
+            !(appSettings?.disabledProviders ?? []).includes(id as ProviderId)
+        )
         .map(([id]) => id),
-    [agentStatuses]
+    [agentStatuses, appSettings?.disabledProviders]
   );
   const sortedConversations = useMemo(
     () =>
@@ -1242,7 +1248,6 @@ const ChatInterface: React.FC<Props> = ({
 
   // Auto-rename task from first terminal message (only if name was auto-generated
   // and the auto-infer setting is enabled)
-  const { settings: appSettings } = useAppSettings();
   const autoInferTaskNames = appSettings?.tasks?.autoInferTaskNames ?? false;
 
   const handleFirstMessage = useCallback(

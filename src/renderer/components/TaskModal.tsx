@@ -36,6 +36,9 @@ import { useProjectManagementContext } from '../contexts/ProjectManagementProvid
 import { useTaskManagementContext } from '../contexts/TaskManagementContext';
 import { rpc } from '@/lib/rpc';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useAppSettings } from '@/contexts/AppSettingsProvider';
+import { filterDisabledProviders, getDisabledProviderIds } from '@/lib/agentAvailability';
+import { PROVIDER_IDS } from '@shared/providers/registry';
 
 const DEFAULT_AGENT: Agent = 'claude';
 
@@ -146,6 +149,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
   const { linkedGithubIssueMap } = useTaskManagementContext();
 
   const workspaceProviderEnabled = useFeatureFlag('workspace-provider');
+  const { settings: appSettings } = useAppSettings();
   const project = initialProject ?? selectedProject;
   const projectName = project?.name || '';
   const existingNames = (project?.tasks || []).map((w) => w.name);
@@ -231,6 +235,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
   // Integration connections — always active since component only mounts when open
   const integrations = useIntegrationStatus(true);
 
+  const disabledAgents = useMemo(() => getDisabledProviderIds(appSettings), [appSettings]);
+  const enabledAgents = useMemo(() => filterDisabledProviders(PROVIDER_IDS, appSettings), [appSettings]);
+
   // Computed values
   const activeAgents = useMemo(() => agentRuns.map((ar) => ar.agent), [agentRuns]);
   const hasAutoApproveSupport = activeAgents.every((id) => !!agentMeta[id]?.autoApproveFlag);
@@ -312,9 +319,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
       if (cancel) return;
 
       const settingsAgent = settings?.defaultProvider;
-      const agent: Agent = isValidProviderId(settingsAgent)
-        ? (settingsAgent as Agent)
-        : DEFAULT_AGENT;
+      const firstEnabledAgent = (enabledAgents[0] as Agent | undefined) ?? DEFAULT_AGENT;
+      const agent: Agent =
+        isValidProviderId(settingsAgent) && !disabledAgents.includes(settingsAgent)
+          ? (settingsAgent as Agent)
+          : firstEnabledAgent;
       setAgentRuns([{ agent, runs: 1 }]);
 
       const autoApproveByDefault = settings?.tasks?.autoApproveByDefault ?? false;
@@ -339,7 +348,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [disabledAgents, enabledAgents]);
 
   // Auto-generate name from context (prompt / linked issue) with debounce.
   // Only active when both auto-generate and auto-infer settings are enabled.
@@ -532,7 +541,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
 
           <div className="flex items-center gap-4">
             <Label className="shrink-0">Agent</Label>
-            <MultiAgentDropdown agentRuns={agentRuns} onChange={setAgentRuns} />
+            <MultiAgentDropdown
+              agentRuns={agentRuns}
+              onChange={setAgentRuns}
+              disabledAgents={disabledAgents}
+            />
           </div>
 
           <TaskAdvancedSettings

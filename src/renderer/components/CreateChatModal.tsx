@@ -64,7 +64,6 @@ export function CreateChatModal({
     if (isOpen) {
       setError(null);
       setReviewEnabled(false);
-      setReviewAgent(reviewSettings.agent as Agent);
       setReviewPrompt(reviewSettings.prompt);
 
       let cancel = false;
@@ -75,21 +74,23 @@ export function CreateChatModal({
         const defaultFromSettings: Agent = isValidProviderId(settingsAgent)
           ? (settingsAgent as Agent)
           : DEFAULT_AGENT;
+        const firstInstalled = Object.keys(agentConfig).find((key) => installedSet.has(key)) as
+          | Agent
+          | undefined;
+        const resolvedReviewAgent = installedSet.has(reviewSettings.agent)
+          ? (reviewSettings.agent as Agent)
+          : (firstInstalled ?? DEFAULT_AGENT);
+        setReviewAgent(resolvedReviewAgent);
 
         // Priority: settings default (if installed) > first installed in agentConfig order
         if (installedSet.has(defaultFromSettings)) {
           setSelectedAgent(defaultFromSettings);
           setError(null);
+        } else if (firstInstalled) {
+          setSelectedAgent(firstInstalled);
+          setError(null);
         } else {
-          const firstInstalled = Object.keys(agentConfig).find((key) => installedSet.has(key)) as
-            | Agent
-            | undefined;
-          if (firstInstalled) {
-            setSelectedAgent(firstInstalled);
-            setError(null);
-          } else {
-            setError('No agents installed');
-          }
+          setError('No agents installed');
         }
       });
 

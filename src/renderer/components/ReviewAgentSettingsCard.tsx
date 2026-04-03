@@ -12,6 +12,8 @@ import {
   type ReviewSettings,
 } from '@shared/reviewPreset';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
+import { filterDisabledProviders, getFirstEnabledProvider } from '@/lib/agentAvailability';
+import { PROVIDER_IDS } from '@shared/providers/registry';
 
 const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
   enabled: false,
@@ -24,17 +26,22 @@ const ReviewAgentSettingsCard: React.FC = () => {
 
   const reviewSettings = useMemo<ReviewSettings>(() => {
     const configured = settings?.review;
+    const enabledAgents = filterDisabledProviders(PROVIDER_IDS, settings);
+    const fallbackAgent =
+      getFirstEnabledProvider(enabledAgents, settings) ?? DEFAULT_REVIEW_SETTINGS.agent;
+    const configuredAgent = isValidProviderId(configured?.agent) ? configured.agent : undefined;
     return {
       enabled: configured?.enabled ?? DEFAULT_REVIEW_SETTINGS.enabled,
-      agent: isValidProviderId(configured?.agent)
-        ? configured.agent
-        : DEFAULT_REVIEW_SETTINGS.agent,
+      agent:
+        configuredAgent && !settings?.disabledProviders?.includes(configuredAgent)
+          ? configuredAgent
+          : fallbackAgent,
       prompt:
         typeof configured?.prompt === 'string' && configured.prompt.trim()
           ? configured.prompt
           : DEFAULT_REVIEW_SETTINGS.prompt,
     };
-  }, [settings?.review]);
+  }, [settings]);
 
   const [promptDraft, setPromptDraft] = useState(reviewSettings.prompt);
 
@@ -84,6 +91,7 @@ const ReviewAgentSettingsCard: React.FC = () => {
             value={reviewSettings.agent as Agent}
             onChange={(agent) => updateSettings({ review: { agent } })}
             disabled={loading || saving}
+            disabledAgents={settings?.disabledProviders ?? []}
             className="w-full"
           />
         </div>

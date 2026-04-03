@@ -111,13 +111,14 @@ export const MultiAgentDropdown: React.FC<MultiAgentDropdownProps> = ({
           className="z-[1000] max-h-80 w-[var(--radix-select-trigger-width)] overflow-y-auto p-1"
         >
           <TooltipProvider delayDuration={150}>
-            {sortedAgents.map(([key, config]) => {
+            {sortedAgents
+              .filter(([key]) => !disabledAgents.includes(key))
+              .map(([key, config]) => {
               const agent = key as Agent;
               const isSelected = selectedAgents.has(agent);
               const isLastSelected = isSelected && agentRuns.length === 1;
-              const isDisabled = disabledAgents.includes(agent);
 
-              return !isDisabled ? (
+              return (
                 <AgentTooltipRow
                   key={key}
                   id={agent as UiAgent}
@@ -209,37 +210,6 @@ export const MultiAgentDropdown: React.FC<MultiAgentDropdownProps> = ({
                     )}
                   </div>
                 </AgentTooltipRow>
-              ) : (
-                /* Disabled agents with tooltip */
-                <Tooltip key={key}>
-                  <TooltipTrigger asChild>
-                    <div className="flex h-8 cursor-not-allowed items-center justify-between rounded-sm px-2 opacity-50">
-                      <div className="flex flex-1 items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          disabled={true}
-                          className="h-4 w-4 cursor-not-allowed"
-                        />
-                        <AgentLogo
-                          logo={config.logo}
-                          alt={config.alt}
-                          isSvg={config.isSvg}
-                          invertInDark={config.invertInDark}
-                          className="h-4 w-4 flex-shrink-0 rounded-sm"
-                          grayscale
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {config.name}
-                          <span className="ml-1 text-xs">(in use)</span>
-                        </span>
-                      </div>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="z-[10000]" style={{ zIndex: 10000 }}>
-                    <p className="text-xs">This agent already has an active chat in this task</p>
-                  </TooltipContent>
-                </Tooltip>
               );
             })}
           </TooltipProvider>

@@ -32,6 +32,8 @@ import { AccountTab } from './settings/AccountTab';
 import { WorkspaceProviderInfoCard } from './WorkspaceProviderInfoCard';
 import { useTaskSettings } from '../hooks/useTaskSettings';
 import type { SettingsPageTab } from '../types/settings';
+import { useAppSettings } from '@/contexts/AppSettingsProvider';
+import type { ProviderId } from '@shared/providers/registry';
 export type { SettingsPageTab } from '../types/settings';
 
 // Helper functions from SettingsModal
@@ -98,6 +100,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ initialTab, onClose 
   const [activeTab, setActiveTab] = useState<SettingsPageTab>(initialTab || 'general');
   const [cliAgents, setCliAgents] = useState<CliAgentStatus[]>(() => createDefaultCliAgents());
   const taskSettings = useTaskSettings();
+  const { settings, updateSettings } = useAppSettings();
 
   useEffect(() => {
     setActiveTab(initialTab || 'general');
@@ -182,6 +185,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ initialTab, onClose 
       return a.name.localeCompare(b.name);
     });
   }, [cliAgents]);
+  const disabledAgentIds = settings?.disabledProviders ?? [];
+
+  const handleToggleAgentDisabled = useCallback(
+    (agentId: string, disabled: boolean) => {
+      const next = disabled
+        ? Array.from(new Set([...disabledAgentIds, agentId]))
+        : disabledAgentIds.filter((id) => id !== agentId);
+      updateSettings({ disabledProviders: next as ProviderId[] });
+    },
+    [disabledAgentIds, updateSettings]
+  );
 
   const tabContent: Record<
     string,
@@ -227,7 +241,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ initialTab, onClose 
           title: 'CLI agents',
           component: (
             <div className="rounded-xl border border-border/60 bg-muted/10 p-2">
-              <CliAgentsList agents={sortedAgents} isLoading={false} />
+              <CliAgentsList
+                agents={sortedAgents}
+                isLoading={false}
+                disabledAgentIds={disabledAgentIds}
+                onToggleAgentDisabled={handleToggleAgentDisabled}
+              />
             </div>
           ),
         },

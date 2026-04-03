@@ -14,6 +14,7 @@ interface AgentSelectorProps {
   value: Agent;
   onChange: (agent: Agent) => void;
   disabled?: boolean;
+  disabledAgents?: string[];
   className?: string;
 }
 
@@ -21,6 +22,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   value,
   onChange,
   disabled = false,
+  disabledAgents = [],
   className = '',
 }) => {
   return (
@@ -57,7 +59,9 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
         )}
         <SelectContent side="top" className="z-[120]">
           <TooltipProvider delayDuration={150}>
-            {Object.entries(agentConfig).map(([key, config]) => (
+            {Object.entries(agentConfig)
+              .filter(([key]) => !disabledAgents.includes(key))
+              .map(([key, config]) => (
               <AgentTooltipRow key={key} id={key as UiAgent}>
                 <SelectItem value={key}>
                   <div className="flex items-center gap-2">

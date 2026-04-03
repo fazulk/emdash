@@ -107,6 +107,7 @@ export interface AppSettings {
     soundProfile: NotificationSoundProfile;
   };
   defaultProvider?: ProviderId;
+  disabledProviders?: ProviderId[];
   review?: ReviewSettings;
   tasks?: {
     autoGenerateName: boolean;
@@ -171,6 +172,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     soundProfile: 'default',
   },
   defaultProvider: DEFAULT_PROVIDER_ID,
+  disabledProviders: [],
   review: {
     enabled: false,
     agent: DEFAULT_REVIEW_AGENT,
@@ -441,6 +443,11 @@ export function normalizeSettings(input: AppSettings): AppSettings {
   out.defaultProvider = isValidProviderId(defaultProvider)
     ? defaultProvider
     : DEFAULT_SETTINGS.defaultProvider!;
+
+  const rawDisabledProviders = (input as any)?.disabledProviders;
+  out.disabledProviders = Array.isArray(rawDisabledProviders)
+    ? [...new Set(rawDisabledProviders.filter(isValidProviderId))]
+    : [];
 
   const review = (input as any)?.review || {};
   const reviewAgent = isValidProviderId(review?.agent)

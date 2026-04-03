@@ -29,6 +29,7 @@ import { buildPromptInjectionPayload } from '@/lib/terminalInjection';
 import { TaskScopeProvider } from './TaskScopeContext';
 import TaskContextBadges from './TaskContextBadges';
 import { getTerminalFooterSummary } from '@/lib/terminalFooter';
+import { useFooterBranch } from '@/hooks/useFooterBranch';
 import TerminalContextFooter from './TerminalContextFooter';
 
 interface Props {
@@ -72,6 +73,11 @@ const MultiAgentTask: React.FC<Props> = ({
   const activeVariantPath = variants[activeTabIndex]?.path ?? task.path;
   useCommentInjection(task.id, activeVariantPath);
   const activeVariant = variants[activeTabIndex] ?? null;
+  const activeVariantFooterBranch = useFooterBranch({
+    taskPath: activeVariant?.path ?? task.path,
+    taskId: task.id,
+    fallbackBranch: activeVariant?.branch ?? task.branch,
+  });
 
   const variantEnvs = useMemo(() => {
     if (!projectPath) return new Map<string, Record<string, string>>();
@@ -99,14 +105,14 @@ const MultiAgentTask: React.FC<Props> = ({
         ? getTerminalFooterSummary({
             mode: 'task',
             task: {
-              branch: activeVariant.branch,
+              branch: activeVariantFooterBranch,
               path: activeVariant.path,
               useWorktree: true,
             },
             projectPath,
           })
         : { branch: null, worktreeName: null },
-    [activeVariant, projectPath]
+    [activeVariant, activeVariantFooterBranch, projectPath]
   );
 
   // Auto-scroll to bottom when this task becomes active

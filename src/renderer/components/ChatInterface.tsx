@@ -42,6 +42,7 @@ import {
   planConversationTitleUpdates,
 } from '../lib/conversationTabTitles';
 import { getTerminalFooterSummary } from '../lib/terminalFooter';
+import { useFooterBranch } from '../hooks/useFooterBranch';
 import TerminalContextFooter from './TerminalContextFooter';
 
 declare const window: Window & {
@@ -348,14 +349,24 @@ const ChatInterface: React.FC<Props> = ({
     });
   }, [task.id, task.name, task.path, projectPath, defaultBranch]);
 
+  const footerBranch = useFooterBranch({
+    taskPath: task.path,
+    taskId: task.id,
+    fallbackBranch: task.branch,
+  });
+
   const terminalFooter = useMemo(
     () =>
       getTerminalFooterSummary({
         mode: 'task',
-        task,
+        task: {
+          branch: footerBranch,
+          path: task.path,
+          useWorktree: task.useWorktree,
+        },
         projectPath,
       }),
-    [projectPath, task]
+    [footerBranch, projectPath, task.path, task.useWorktree]
   );
 
   const installedAgents = useMemo(

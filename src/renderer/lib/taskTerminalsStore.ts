@@ -310,11 +310,6 @@ export function disposeTaskTerminals(taskKey: string): void {
       } catch {
         // ignore dispose errors
       }
-      try {
-        (window as any).electronAPI?.ptyClearSnapshot?.({ id: terminal.id });
-      } catch {
-        // ignore snapshot errors
-      }
     }
   }
 

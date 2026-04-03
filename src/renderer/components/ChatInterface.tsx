@@ -1452,7 +1452,6 @@ const ChatInterface: React.FC<Props> = ({
                     env={taskEnv}
                     keepAlive={true}
                     mapShiftEnterToCtrlJ
-                    disableSnapshots={false}
                     onActivity={handleTerminalActivity}
                     onStartError={(message) => {
                       setCliStartError(message);

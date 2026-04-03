@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { TerminalSnapshotPayload } from './types/terminalSnapshot';
 import type { OpenInAppId } from '../shared/openInApps';
 import type { AgentEvent } from '../shared/agentEvents';
 import type { McpServer } from '../shared/mcp/types';
@@ -115,15 +114,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     rows?: number;
     autoApprove?: boolean;
     initialPrompt?: string;
-    rendererSessionId?: string;
   }) => ipcRenderer.invoke('pty:start', opts),
   ptyInput: (args: { id: string; data: string }) => ipcRenderer.send('pty:input', args),
   ptyResize: (args: { id: string; cols: number; rows: number }) =>
     ipcRenderer.send('pty:resize', args),
   ptyKill: (id: string) => ipcRenderer.send('pty:kill', { id }),
   ptyDisconnect: (id: string) => ipcRenderer.send('pty:disconnect', { id }),
-  ptyKillTmux: (id: string) =>
-    ipcRenderer.invoke('pty:killTmux', { id }) as Promise<{ ok: boolean; error?: string }>,
+  ptyConfirmAttach: (args: { id: string; attachToken: string }) =>
+    ipcRenderer.invoke('pty:confirmAttach', args),
 
   // Direct PTY spawn (no shell wrapper, bypasses shell config loading)
   ptyStartDirect: (opts: {
@@ -137,8 +135,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     initialPrompt?: string;
     clickTime?: number;
     env?: Record<string, string>;
-    resume?: boolean;
-    rendererSessionId?: string;
   }) => ipcRenderer.invoke('pty:startDirect', opts),
 
   ptyScpToRemote: (args: { connectionId: string; localPaths: string[] }) =>
@@ -150,15 +146,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on(channel, wrapped);
     return () => ipcRenderer.removeListener(channel, wrapped);
   },
-  ptyGetSnapshot: (args: { id: string }) => ipcRenderer.invoke('pty:snapshot:get', args),
-  ptySaveSnapshot: (args: { id: string; payload: TerminalSnapshotPayload }) =>
-    ipcRenderer.invoke('pty:snapshot:save', args),
-  ptyClearSnapshot: (args: { id: string }) => ipcRenderer.invoke('pty:snapshot:clear', args),
-  ptyCleanupSessions: (args: {
-    ids: string[];
-    clearSnapshots?: boolean;
-    waitForSnapshots?: boolean;
-  }) => ipcRenderer.invoke('pty:cleanupSessions', args),
+  ptyCleanupSessions: (args: { ids: string[] }) => ipcRenderer.invoke('pty:cleanupSessions', args),
   onPtyExit: (id: string, listener: (info: { exitCode: number; signal?: number }) => void) => {
     const channel = `pty:exit:${id}`;
     const wrapped = (_: Electron.IpcRendererEvent, info: { exitCode: number; signal?: number }) =>
@@ -1015,30 +1003,40 @@ export interface ElectronAPI {
     rows?: number;
     autoApprove?: boolean;
     initialPrompt?: string;
-  }) => Promise<{ ok: boolean; error?: string }>;
+  }) => Promise<{
+    ok: boolean;
+    reused?: boolean;
+    attachToken?: string;
+    replay?: { data: string; cols: number; rows: number };
+    error?: string;
+  }>;
   ptyInput: (args: { id: string; data: string }) => void;
   ptyResize: (args: { id: string; cols: number; rows: number }) => void;
   ptyKill: (id: string) => void;
+  ptyDisconnect: (id: string) => void;
+  ptyConfirmAttach: (args: { id: string; attachToken: string }) => Promise<{ ok: boolean }>;
   onPtyData: (id: string, listener: (data: string) => void) => () => void;
-  ptyGetSnapshot: (args: { id: string }) => Promise<{
+  ptyStartDirect: (opts: {
+    id: string;
+    providerId: string;
+    cwd: string;
+    remote?: { connectionId: string };
+    cols?: number;
+    rows?: number;
+    autoApprove?: boolean;
+    initialPrompt?: string;
+    env?: Record<string, string>;
+  }) => Promise<{
     ok: boolean;
-    snapshot?: any;
+    reused?: boolean;
+    attachToken?: string;
+    replay?: { data: string; cols: number; rows: number };
     error?: string;
   }>;
-  ptySaveSnapshot: (args: {
-    id: string;
-    payload: TerminalSnapshotPayload;
-  }) => Promise<{ ok: boolean; error?: string }>;
-  ptyClearSnapshot: (args: { id: string }) => Promise<{ ok: boolean }>;
-  ptyCleanupSessions: (args: {
-    ids: string[];
-    clearSnapshots?: boolean;
-    waitForSnapshots?: boolean;
-  }) => Promise<{
+  ptyCleanupSessions: (args: { ids: string[] }) => Promise<{
     ok: boolean;
     cleaned: number;
     failedIds: string[];
-    snapshotClearQueued: boolean;
   }>;
   onPtyExit: (
     id: string,

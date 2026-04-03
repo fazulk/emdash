@@ -1,15 +1,12 @@
 import { Terminal, type ITerminalOptions } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { TerminalInputBuffer } from './TerminalInputBuffer';
 import { classifyActivity } from '../lib/activityClassifier';
 import { agentStatusStore } from '../lib/agentStatusStore';
 import { TerminalMetrics } from './TerminalMetrics';
 import { log } from '../lib/logger';
-import { TERMINAL_SNAPSHOT_VERSION, type TerminalSnapshotPayload } from '#types/terminalSnapshot';
 import { pendingInjectionManager } from '../lib/PendingInjectionManager';
-import { getProvider, type ProviderId } from '@shared/providers/registry';
 import { consumeSubmittedInputChunk } from './submitCapture';
 import { isSlashCommandInput } from '../lib/slashCommand';
 import { buildCommentInjectionPayload } from '../lib/terminalInjection';
@@ -30,10 +27,7 @@ import {
 import { scheduleTerminalWriteDrain } from './writeDrainScheduler';
 import { rpc } from '@/lib/rpc';
 import { APP_SHORTCUTS, normalizeShortcutKey } from '@/hooks/useKeyboardShortcuts';
-import { rendererBootSessionId } from '@/lib/rendererBootSession';
 
-const SNAPSHOT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-const ENABLE_TERMINAL_SNAPSHOTS = false;
 const MAX_DATA_WINDOW_BYTES = 128 * 1024 * 1024; // 128 MB soft guardrail
 const FALLBACK_FONTS = 'Menlo, Monaco, Courier New, monospace';
 const DEFAULT_FONT_SIZE = 13;
@@ -89,7 +83,6 @@ export interface TerminalSessionOptions {
   autoApprove?: boolean;
   initialPrompt?: string;
   mapShiftEnterToCtrlJ?: boolean;
-  disableSnapshots?: boolean;
   onLinkClick?: (url: string) => void;
   onFirstMessage?: (message: string) => void;
 }
@@ -100,15 +93,12 @@ export class TerminalSessionManager {
   readonly id: string;
   private readonly terminal: Terminal;
   private readonly fitAddon: FitAddon;
-  private readonly serializeAddon: SerializeAddon;
   private readonly webLinksAddon: WebLinksAddon;
   private readonly metrics: TerminalMetrics;
   private readonly container: HTMLDivElement;
   private attachedContainer: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private disposables: CleanupFn[] = [];
-  private snapshotTimer: ReturnType<typeof setInterval> | null = null;
-  private pendingSnapshot: Promise<void> | null = null;
   private disposed = false;
   private opened = false;
   private readonly activityListeners = new Set<() => void>();
@@ -121,14 +111,13 @@ export class TerminalSessionManager {
   private ptyConnectPromise: Promise<{
     ok: boolean;
     reused?: boolean;
-    tmux?: boolean;
+    attachToken?: string;
+    replay?: { data: string; cols: number; rows: number };
     error?: string;
   }> | null = null;
   private restartPromise: Promise<boolean> | null = null;
   private firstFrameRendered = false;
   private ptyStarted = false;
-  private lastSnapshotAt: number | null = null;
-  private lastSnapshotReason: 'interval' | 'detach' | 'dispose' | null = null;
   private customFontFamily = '';
   private customFontSize = 0;
   private themeFontFamily = '';
@@ -155,11 +144,9 @@ export class TerminalSessionManager {
   private activeSearchQuery = '';
   private activeSearchMatch: TerminalSearchMatch | null = null;
   private needsRepaintAfterAttach = false;
-  private reusedPtyUsesTmux = false;
 
   // Timing for startup performance measurement
   private initStartTime: number = 0;
-  private snapshotRestoreTime: number = 0;
   private ptyConnectStartTime: number = 0;
 
   constructor(private readonly options: TerminalSessionOptions) {
@@ -297,7 +284,6 @@ export class TerminalSessionManager {
     );
 
     this.fitAddon = new FitAddon();
-    this.serializeAddon = new SerializeAddon();
 
     // Initialize WebLinks addon with custom handler
     this.webLinksAddon = new WebLinksAddon((event, uri) => {
@@ -306,7 +292,6 @@ export class TerminalSessionManager {
     });
 
     this.terminal.loadAddon(this.fitAddon);
-    this.terminal.loadAddon(this.serializeAddon);
     this.terminal.loadAddon(this.webLinksAddon);
 
     // Work around xterm.js 6.0.0 bug: the built-in DECRQM (Request Mode)
@@ -348,7 +333,7 @@ export class TerminalSessionManager {
     }
 
     // Keep xterm on its default renderer for stability. Re-attaching terminals,
-    // resizing hidden containers, and rendering TUI apps (e.g. tmux) has been
+    // resizing hidden containers, and rendering full-screen TUI apps has been
     // visually unreliable with the WebGL addon in Electron.
     this.applyTheme(options.theme);
 
@@ -535,10 +520,6 @@ export class TerminalSessionManager {
       });
     });
 
-    // Only start snapshot timer if snapshots are enabled (main chats only)
-    if (!this.options.disableSnapshots) {
-      this.startSnapshotTimer();
-    }
   }
 
   detach() {
@@ -556,11 +537,6 @@ export class TerminalSessionManager {
         this.container.remove();
       } catch {}
       this.attachedContainer = null;
-      this.stopSnapshotTimer();
-      // Only capture snapshot on detach if snapshots are enabled
-      if (!this.options.disableSnapshots) {
-        void this.captureSnapshot('detach');
-      }
     }
   }
 
@@ -580,13 +556,8 @@ export class TerminalSessionManager {
     this.writeInFlight = false;
     this.shouldScrollToBottomAfterWrites = false;
     this.detach();
-    this.stopSnapshotTimer();
     this.cancelScheduledFit();
     this.clearQueuedResize();
-    // Only capture final snapshot if snapshots are enabled
-    if (!this.options.disableSnapshots) {
-      void this.captureSnapshot('dispose');
-    }
     // Clean up stored viewport position when session is disposed
     viewportPositions.delete(this.id);
     try {
@@ -801,7 +772,7 @@ export class TerminalSessionManager {
       this.clearQueuedResize();
       this.cleanupPtyListeners();
 
-      const result = await this.connectPty(true);
+      const result = await this.connectPty();
       return Boolean(result?.ok);
     })();
 
@@ -1241,7 +1212,7 @@ export class TerminalSessionManager {
     this.sendSizeIfStarted();
 
     // Follow with Ctrl+L as a lightweight redraw nudge. This is less invasive
-    // than injecting a shell command and helps shells/TUIs/tmux repaint after
+    // than injecting a shell command and helps shells/TUIs repaint after
     // the new renderer attaches.
     requestAnimationFrame(() => {
       if (this.disposed || !this.ptyStarted) return;
@@ -1249,7 +1220,6 @@ export class TerminalSessionManager {
         window.electronAPI.ptyInput({ id: this.id, data: '\f' });
         log.info('terminalSession:requestedRepaintAfterAttach', {
           id: this.id,
-          tmux: this.reusedPtyUsesTmux,
         });
       } catch (error) {
         log.warn('Failed to request terminal repaint after attach', {
@@ -1337,110 +1307,32 @@ export class TerminalSessionManager {
     }
   }
 
-  private startSnapshotTimer() {
-    this.stopSnapshotTimer();
-    this.snapshotTimer = setInterval(() => {
-      void this.captureSnapshot('interval');
-    }, SNAPSHOT_INTERVAL_MS);
-  }
-
-  private stopSnapshotTimer() {
-    if (this.snapshotTimer) {
-      clearInterval(this.snapshotTimer);
-      this.snapshotTimer = null;
-    }
-  }
-
   /**
-   * Initialize terminal: connect to PTY and conditionally restore snapshot.
-   *
-   * For CLIs with resume capability (claude, codex):
-   * - Hot reload (PTY reused): restore snapshot for visual continuity
-   * - Full restart: skip snapshot, let CLI show history via resume flag
-   *
-   * For CLIs without resume:
-   * - Always restore snapshot for visual context
+   * Initialize terminal by attaching to the PTY host and replaying buffered
+   * terminal state when available.
    */
   private async initializeTerminal(): Promise<void> {
-    // Check if snapshot exists (indicates previous session)
-    const snapshot = await this.fetchSnapshot();
-    const hasSnapshot = !!snapshot;
-
-    // Connect to PTY - pass resume flag if we have a previous session
-    const result = await this.connectPty(hasSnapshot);
-
-    // When tmux is active, disable snapshots — tmux preserves terminal state natively.
-    if (result?.tmux) {
-      this.options.disableSnapshots = true;
-      this.stopSnapshotTimer();
-    }
-
-    // On renderer reload we may reconnect to an already-running PTY with a brand
-    // new xterm instance. Mark that path so the first visible attach can force a
-    // redraw/repaint nudge after fit.
-    this.needsRepaintAfterAttach = Boolean(result?.reused);
-    this.reusedPtyUsesTmux = Boolean(result?.tmux);
-
-    // Decide whether to restore snapshot based on PTY result
-    try {
-      if (result?.tmux) {
-        // Tmux session: skip snapshot — tmux restores its own scrollback on reattach
-      } else if (result?.reused) {
-        // Hot reload - PTY still running, restore snapshot for visual continuity
-        if (snapshot) {
-          this.applySnapshot(snapshot);
-        }
-      } else if (!this.providerHasResume()) {
-        // Full restart with non-resume CLI - show snapshot for context
-        if (snapshot) {
-          this.applySnapshot(snapshot);
-        }
-      }
-      // For full restart with resume CLI - skip snapshot, CLI handles history
-    } catch (err) {
-      log.warn('terminalSession:applySnapshotError', { id: this.id, error: err });
-    }
+    const result = await this.connectPty();
+    this.needsRepaintAfterAttach = false;
   }
 
-  private providerHasResume(): boolean {
-    const { providerId } = this.options;
-    if (!providerId) return false;
-    const provider = getProvider(providerId as ProviderId);
-    return !!provider?.resumeFlag;
-  }
-
-  private async fetchSnapshot(): Promise<any | null> {
-    // Snapshots are temporarily disabled because replaying serialized terminal
-    // state on reload/reattach is producing visual corruption and stale UI.
-    if (!ENABLE_TERMINAL_SNAPSHOTS) return null;
-    if (this.options.disableSnapshots) return null;
-    if (!window.electronAPI.ptyGetSnapshot) return null;
-
-    try {
-      const response = await window.electronAPI.ptyGetSnapshot({ id: this.id });
-      if (!response?.ok || !response.snapshot?.data) return null;
-      if (response.snapshot.version && response.snapshot.version !== TERMINAL_SNAPSHOT_VERSION) {
-        return null;
-      }
-      return response.snapshot;
-    } catch {
-      return null;
-    }
-  }
-
-  private applySnapshot(snapshot: any): void {
-    if (typeof snapshot.data === 'string' && snapshot.data.length > 0) {
+  private applyReplay(replay: { data: string; cols: number; rows: number }): void {
+    if (typeof replay.data === 'string' && replay.data.length > 0) {
       this.terminal.reset();
-      this.terminal.write(snapshot.data);
+      this.terminal.write(replay.data);
     }
-    if (snapshot.cols && snapshot.rows) {
-      this.terminal.resize(snapshot.cols, snapshot.rows);
+    if (replay.cols && replay.rows) {
+      this.terminal.resize(replay.cols, replay.rows);
     }
   }
 
-  private async connectPty(
-    hasExistingSession: boolean = false
-  ): Promise<{ ok: boolean; reused?: boolean; tmux?: boolean; error?: string }> {
+  private async connectPty(): Promise<{
+    ok: boolean;
+    reused?: boolean;
+    attachToken?: string;
+    replay?: { data: string; cols: number; rows: number };
+    error?: string;
+  }> {
     if (this.ptyConnectPromise) {
       return this.ptyConnectPromise;
     }
@@ -1450,9 +1342,8 @@ export class TerminalSessionManager {
       const { taskId, cwd, providerId, shell, env, initialSize, autoApprove, initialPrompt } =
         this.options;
       const id = taskId;
+      this.setupPtyDataListener(id);
 
-      // Provider CLIs use direct spawn (bypasses shell config loading)
-      // Regular shell terminals use shell-based spawn
       const ptyPromise =
         providerId && cwd
           ? window.electronAPI.ptyStartDirect({
@@ -1465,8 +1356,6 @@ export class TerminalSessionManager {
               autoApprove,
               initialPrompt,
               env,
-              resume: hasExistingSession,
-              rendererSessionId: rendererBootSessionId,
             })
           : window.electronAPI.ptyStart({
               id,
@@ -1478,10 +1367,15 @@ export class TerminalSessionManager {
               rows: initialSize.rows,
               autoApprove,
               initialPrompt,
-              rendererSessionId: rendererBootSessionId,
             });
 
-      const result = await ptyPromise.catch((error: any) => {
+      const result: {
+        ok: boolean;
+        reused?: boolean;
+        attachToken?: string;
+        replay?: { data: string; cols: number; rows: number };
+        error?: string;
+      } = await ptyPromise.catch((error: any) => {
         const message = error?.message || String(error);
         log.error('terminalSession:ptyStartError', { id, error });
         this.emitError(message);
@@ -1489,6 +1383,19 @@ export class TerminalSessionManager {
       });
 
       if (result?.ok) {
+        if (result.replay) {
+          this.applyReplay(result.replay);
+        }
+        if (result.attachToken) {
+          try {
+            await window.electronAPI.ptyConfirmAttach({
+              id,
+              attachToken: result.attachToken,
+            });
+          } catch (error) {
+            log.warn('terminalSession:attachConfirmFailed', { id, error });
+          }
+        }
         this.ptyStarted = true;
         this.lastSentResize = null;
         this.sendSizeIfStarted();
@@ -1519,9 +1426,6 @@ export class TerminalSessionManager {
         log.warn('terminalSession:ptyStartFailed', { id, error: message });
         this.emitError(message);
       }
-
-      // Set up data listener (runs regardless of success for potential reuse)
-      this.setupPtyDataListener(id);
 
       return result || { ok: false, error: 'Unknown error' };
     })();
@@ -1660,63 +1564,6 @@ export class TerminalSessionManager {
     try {
       this.terminal.refresh(0, this.terminal.rows - 1);
     } catch {}
-  }
-
-  private captureSnapshot(reason: 'interval' | 'detach' | 'dispose'): Promise<void> {
-    if (!ENABLE_TERMINAL_SNAPSHOTS) return Promise.resolve();
-    if (!window.electronAPI.ptySaveSnapshot) return Promise.resolve();
-    if (this.disposed) return Promise.resolve();
-    // Skip snapshots for non-main chats
-    if (this.options.disableSnapshots) return Promise.resolve();
-    if (reason === 'detach' && this.lastSnapshotReason === 'detach' && this.lastSnapshotAt) {
-      const elapsed = Date.now() - this.lastSnapshotAt;
-      if (elapsed < 1500) return Promise.resolve();
-    }
-
-    const now = new Date().toISOString();
-    const task = (async () => {
-      try {
-        const data = this.serializeAddon.serialize();
-        if (!data && reason === 'detach') return;
-
-        const payload: TerminalSnapshotPayload = {
-          version: TERMINAL_SNAPSHOT_VERSION,
-          createdAt: now,
-          cols: this.terminal.cols,
-          rows: this.terminal.rows,
-          data,
-          stats: { ...this.metrics.snapshot(), reason },
-        };
-
-        const result = await window.electronAPI.ptySaveSnapshot({
-          id: this.id,
-          payload,
-        });
-        if (!result?.ok) {
-          log.warn('Terminal snapshot save failed', {
-            id: this.id,
-            error: result?.error,
-          });
-        } else {
-          this.metrics.markSnapshot();
-        }
-      } catch (error) {
-        log.warn('terminalSession:snapshotCaptureFailed', {
-          id: this.id,
-          error: (error as Error)?.message ?? String(error),
-          reason,
-        });
-      }
-    })();
-
-    this.pendingSnapshot = task;
-    return task.finally(() => {
-      if (this.pendingSnapshot === task) {
-        this.pendingSnapshot = null;
-      }
-      this.lastSnapshotAt = Date.now();
-      this.lastSnapshotReason = reason;
-    });
   }
 
   private emitActivity() {

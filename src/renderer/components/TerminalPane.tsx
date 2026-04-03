@@ -37,7 +37,6 @@ type Props = {
   autoApprove?: boolean;
   initialPrompt?: string;
   mapShiftEnterToCtrlJ?: boolean;
-  disableSnapshots?: boolean; // If true, don't save/restore terminal snapshots (for non-main chats)
   onActivity?: () => void;
   onStartError?: (message: string) => void;
   onStartSuccess?: () => void;
@@ -64,7 +63,6 @@ const TerminalPaneComponent = forwardRef<TerminalPaneHandle, Props>(
       autoApprove,
       initialPrompt,
       mapShiftEnterToCtrlJ,
-      disableSnapshots = false,
       onActivity,
       onStartError,
       onStartSuccess,
@@ -100,8 +98,8 @@ const TerminalPaneComponent = forwardRef<TerminalPaneHandle, Props>(
     initialPromptRef.current = initialPrompt;
     const mapShiftEnterToCtrlJRef = useRef(mapShiftEnterToCtrlJ);
     mapShiftEnterToCtrlJRef.current = mapShiftEnterToCtrlJ;
-    const disableSnapshotsRef = useRef(disableSnapshots);
-    disableSnapshotsRef.current = disableSnapshots;
+    const keepAliveRef = useRef(keepAlive);
+    keepAliveRef.current = keepAlive;
     const onActivityRef = useRef(onActivity);
     onActivityRef.current = onActivity;
     const onStartErrorRef = useRef(onStartError);
@@ -158,7 +156,6 @@ const TerminalPaneComponent = forwardRef<TerminalPaneHandle, Props>(
         autoApprove: autoApproveRef.current,
         initialPrompt: initialPromptRef.current,
         mapShiftEnterToCtrlJ: mapShiftEnterToCtrlJRef.current,
-        disableSnapshots: disableSnapshotsRef.current,
         onLinkClick: handleLinkClick,
         onFirstMessage: onFirstMessageRef.current,
       });
@@ -195,7 +192,12 @@ const TerminalPaneComponent = forwardRef<TerminalPaneHandle, Props>(
         errorCleanupRef.current = null;
         exitCleanupRef.current?.();
         exitCleanupRef.current = null;
-        terminalSessionRegistry.detach(id);
+        sessionRef.current = null;
+        if (keepAliveRef.current) {
+          terminalSessionRegistry.detach(id);
+        } else {
+          terminalSessionRegistry.dispose(id);
+        }
       };
     }, [id]);
 
@@ -226,20 +228,6 @@ const TerminalPaneComponent = forwardRef<TerminalPaneHandle, Props>(
         );
       };
     }, [remote?.connectionId]);
-
-    useEffect(() => {
-      return () => {
-        activityCleanupRef.current?.();
-        activityCleanupRef.current = null;
-        readyCleanupRef.current?.();
-        readyCleanupRef.current = null;
-        errorCleanupRef.current?.();
-        errorCleanupRef.current = null;
-        exitCleanupRef.current?.();
-        exitCleanupRef.current = null;
-        terminalSessionRegistry.dispose(id);
-      };
-    }, [id]);
 
     const handleFocus = () => {
       void (async () => {

@@ -9,6 +9,19 @@ import { stripAnsi } from '@shared/text/stripAnsi';
 const execFileAsync = promisify(execFile);
 const CODEX_MODEL = 'gpt-5.4-mini';
 const MAX_PATCH_CHARS = 12000;
+const FALLBACK_CONVENTIONAL_TYPE = 'chore';
+
+type ConventionalCommitType =
+  | 'build'
+  | 'chore'
+  | 'ci'
+  | 'docs'
+  | 'feat'
+  | 'fix'
+  | 'perf'
+  | 'refactor'
+  | 'style'
+  | 'test';
 
 type CommitStatus = 'added' | 'modified' | 'deleted' | 'renamed';
 
@@ -30,6 +43,9 @@ const STATUS_VERBS: Record<CommitStatus, string> = {
   deleted: 'Remove',
   renamed: 'Rename',
 };
+
+const CONVENTIONAL_SUBJECT_RE =
+  /^(build|chore|ci|docs|feat|fix|perf|refactor|style|test)(\([^)]+\))?(!)?:\s+(.+)$/i;
 
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return count === 1 ? singular : plural;
@@ -126,6 +142,95 @@ function sanitizeCommitMessage(raw: string): string | null {
   return (lastSpace >= 48 ? truncated.slice(0, lastSpace) : truncated).trimEnd();
 }
 
+function truncateSubjectLine(line: string): string {
+  if (line.length <= 72) return line;
+
+  const truncated = line.slice(0, 72);
+  const lastSpace = truncated.lastIndexOf(' ');
+  return (lastSpace >= 48 ? truncated.slice(0, lastSpace) : truncated).trimEnd();
+}
+
+function normalizeDescriptionText(raw: string): string {
+  const collapsed = raw.replace(/\s+/g, ' ').replace(/[.]+$/, '').trim();
+  if (!collapsed) return 'update files';
+  if (/^[A-Z][a-z]/.test(collapsed)) {
+    return collapsed[0].toLowerCase() + collapsed.slice(1);
+  }
+  return collapsed;
+}
+
+function looksLikeDocPath(filePath: string): boolean {
+  return /(^|\/)(readme|changelog|contributing|license)(\.[^/]+)?$/i.test(filePath) || /\.(md|mdx|rst|txt)$/i.test(filePath);
+}
+
+function looksLikeTestPath(filePath: string): boolean {
+  return /(^|\/)(test|tests|__tests__|spec|specs)(\/|$)/i.test(filePath) || /\.(test|spec)\.[^.]+$/i.test(filePath);
+}
+
+function looksLikeCiPath(filePath: string): boolean {
+  return filePath.startsWith('.github/workflows/') || filePath.startsWith('.circleci/') || filePath.startsWith('.buildkite/');
+}
+
+function looksLikeBuildPath(filePath: string): boolean {
+  return /(^|\/)(package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|Cargo\.toml|Cargo\.lock|Makefile|Dockerfile)$/i.test(filePath);
+}
+
+function inferTypeFromMessage(message: string): ConventionalCommitType | null {
+  const lower = message.toLowerCase();
+  if (/^(fix|resolve|correct|prevent|handle)\b/.test(lower)) return 'fix';
+  if (/^(add|create|implement|introduce|enable|allow|support)\b/.test(lower)) return 'feat';
+  if (/^(refactor|rename|restructure|extract|simplify|cleanup|clean up|move)\b/.test(lower))
+    return 'refactor';
+  if (/^(optimi[sz]e|improve performance|speed up|reduce latency)\b/.test(lower)) return 'perf';
+  if (/^(docs?|document)\b/.test(lower) || /\b(readme|changelog|documentation)\b/.test(lower))
+    return 'docs';
+  if (/^(test|tests|spec)\b/.test(lower) || /\b(test|spec|coverage)\b/.test(lower)) return 'test';
+  if (/^(format|lint|style)\b/.test(lower)) return 'style';
+  if (/^(build|release|bump|deps?|dependency)\b/.test(lower)) return 'build';
+  if (/^(ci|workflow)\b/.test(lower)) return 'ci';
+  return null;
+}
+
+function inferTypeFromContext(context?: CommitMessageContext): ConventionalCommitType | null {
+  if (!context?.nameStatus) return null;
+
+  const changes = parseNameStatus(context.nameStatus);
+  if (changes.length === 0) return null;
+  const paths = changes.map((change) => change.path);
+
+  if (paths.every(looksLikeDocPath)) return 'docs';
+  if (paths.every(looksLikeTestPath)) return 'test';
+  if (paths.every(looksLikeCiPath)) return 'ci';
+  if (paths.every(looksLikeBuildPath)) return 'build';
+  if (changes.every((change) => change.status === 'renamed')) return 'refactor';
+  if (changes.every((change) => change.status === 'added')) return 'feat';
+  return null;
+}
+
+export function normalizeCommitSubject(
+  raw: string,
+  context?: CommitMessageContext
+): string {
+  const candidate = sanitizeCommitMessage(raw) ?? '';
+
+  if (!candidate) {
+    return `${FALLBACK_CONVENTIONAL_TYPE}: update files`;
+  }
+
+  const conventionalMatch = candidate.match(CONVENTIONAL_SUBJECT_RE);
+  if (conventionalMatch) {
+    const [, type, scope = '', breaking = '', description] = conventionalMatch;
+    return truncateSubjectLine(
+      `${type.toLowerCase()}${scope}${breaking}: ${normalizeDescriptionText(description)}`
+    );
+  }
+
+  const type =
+    inferTypeFromMessage(candidate) ?? inferTypeFromContext(context) ?? FALLBACK_CONVENTIONAL_TYPE;
+
+  return truncateSubjectLine(`${type}: ${normalizeDescriptionText(candidate)}`);
+}
+
 export class CommitMessageGenerationService {
   async generateForLocalTask(taskPath: string): Promise<string> {
     const context = await this.getLocalContext(taskPath);
@@ -141,13 +246,17 @@ export class CommitMessageGenerationService {
 
     try {
       const generated = await this.runCodex(this.buildPrompt(context));
-      return sanitizeCommitMessage(generated) || fallback;
+      return normalizeCommitSubject(generated, context);
     } catch (error) {
       log.warn('Failed to generate commit message with Codex', {
         error: error instanceof Error ? error.message : String(error),
       });
       return fallback;
     }
+  }
+
+  normalizeSubject(raw: string, context?: CommitMessageContext): string {
+    return normalizeCommitSubject(raw, context);
   }
 
   private async getLocalContext(taskPath: string): Promise<CommitMessageContext> {
@@ -238,7 +347,7 @@ Requirements:
 - Maximum 72 characters.
 - Use imperative mood.
 - Be specific to the staged changes shown below.
-- Prefer a conventional commit prefix only when it is clearly warranted.
+- Always use conventional commit format: <type>: <subject>.
 
 Staged diff stat:
 ${statBlock}
@@ -254,18 +363,18 @@ ${patchBlock}`;
     const changes = parseNameStatus(context.nameStatus);
     if (changes.length === 1) {
       const [change] = changes;
-      return `${STATUS_VERBS[change.status]} ${change.path}`;
+      return normalizeCommitSubject(`${STATUS_VERBS[change.status]} ${change.path}`, context);
     }
 
     if (changes.length > 1) {
-      return summarizeCounts(changes) ?? 'Update files';
+      return normalizeCommitSubject(summarizeCounts(changes) ?? 'Update files', context);
     }
 
     if (context.taskLabel) {
-      return `Update ${context.taskLabel}`;
+      return normalizeCommitSubject(`Update ${context.taskLabel}`, context);
     }
 
-    return 'Update files';
+    return normalizeCommitSubject('Update files', context);
   }
 }
 

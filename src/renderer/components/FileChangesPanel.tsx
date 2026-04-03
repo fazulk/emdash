@@ -31,6 +31,8 @@ import {
   CheckCircle2,
   XCircle,
   GitMerge,
+  Check,
+  Copy,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -45,6 +47,7 @@ import {
 import { useTaskScope } from './TaskScopeContext';
 import { fetchPrBaseDiff, parseDiffToFileChanges } from '../lib/parsePrDiff';
 import { formatDiffCount } from '../lib/gitChangePresentation';
+import { ToastAction } from './ui/toast';
 
 type ActiveTab = 'changes' | 'checks';
 type PrMode = 'create' | 'draft' | 'merge';
@@ -133,6 +136,62 @@ interface FileChangesPanelProps {
   taskPath?: string;
   className?: string;
   onOpenChanges?: (filePath?: string, taskPath?: string) => void;
+}
+
+function CommitMessageToastDescription({ message }: { message: string }) {
+  return (
+    <div className="space-y-2">
+      <p>Changes committed with message:</p>
+      <code className="block whitespace-pre-wrap break-words rounded-md border border-border/70 bg-muted/60 px-2 py-1.5 font-mono text-xs text-foreground">
+        {message}
+      </code>
+    </div>
+  );
+}
+
+function CopyCommitMessageToastAction({ message }: { message: string }) {
+  const [copied, setCopied] = useState(false);
+  const copyResetRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetRef.current !== null) {
+        window.clearTimeout(copyResetRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      if (copyResetRef.current !== null) {
+        window.clearTimeout(copyResetRef.current);
+      }
+      copyResetRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyResetRef.current = null;
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy commit message', error);
+      setCopied(false);
+    }
+  };
+
+  const CopyIcon = copied ? Check : Copy;
+
+  return (
+    <ToastAction altText="Copy commit message" onClick={() => void handleCopy()}>
+      <span className="inline-flex items-center gap-1">
+        {copied ? 'Copied' : 'Copy message'}
+        <CopyIcon className="h-3 w-3" />
+      </span>
+    </ToastAction>
+  );
 }
 
 const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
@@ -455,8 +514,10 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
         toast({
           title: action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed',
           description: committedMessage
-            ? `Changes committed with message: "${committedMessage}"`
+            ? <CommitMessageToastDescription message={committedMessage} />
             : 'Changes committed successfully.',
+          descriptionClassName: committedMessage ? 'line-clamp-none opacity-100' : undefined,
+          action: committedMessage ? <CopyCommitMessageToastAction message={committedMessage} /> : undefined,
         });
         setCommitMessage('');
         await refreshChanges();

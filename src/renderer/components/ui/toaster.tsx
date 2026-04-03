@@ -12,17 +12,6 @@ import {
 import { useToast } from '../../hooks/use-toast';
 import { AlertCircle, Copy, Check } from 'lucide-react';
 
-function getToastTextContent(node: React.ReactNode): string {
-  if (node == null || typeof node === 'boolean') return '';
-  if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(getToastTextContent).join('');
-  if (typeof node === 'object' && 'props' in node) {
-    const { children } = (node as React.ReactElement).props ?? {};
-    return getToastTextContent(children);
-  }
-  return '';
-}
-
 function ToastWithCopy({
   id,
   title,
@@ -41,17 +30,16 @@ function ToastWithCopy({
   [key: string]: unknown;
 }) {
   const [copied, setCopied] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const isDestructive = variant === 'destructive';
 
   const handleCopy = useCallback(() => {
-    const titleText = getToastTextContent(title);
-    const descText = getToastTextContent(description);
-    const text = [titleText, descText].filter(Boolean).join('\n');
+    const text = contentRef.current?.innerText ?? '';
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, [title, description]);
+  }, []);
 
   return (
     <Toast key={id} variant={variant} {...props}>
@@ -60,7 +48,7 @@ function ToastWithCopy({
           <AlertCircle className="mt-0.5 h-5 w-5 flex-none self-start text-amber-600 dark:text-amber-400" />
         )}
         <div className="min-w-0 flex-1">
-          <div className="grid gap-1">
+          <div ref={contentRef} className="grid gap-1">
             {title && <ToastTitle>{title}</ToastTitle>}
             {description && (
               <ToastDescription

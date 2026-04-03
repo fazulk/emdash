@@ -137,6 +137,69 @@ function randomAttachToken(): string {
   return randomUUID();
 }
 
+function formatLaunchArgs(args: string[]): string {
+  return args
+    .map((arg) => {
+      if (/^[A-Za-z0-9_./:=+-]+$/.test(arg)) {
+        return arg;
+      }
+      return JSON.stringify(arg);
+    })
+    .join(' ');
+}
+
+function formatLaunchError(
+  launch: PreparedPtyLaunch,
+  error: unknown,
+  providerId?: ProviderId
+): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const lines = [message];
+
+  lines.push(`Mode: ${launch.kind}/${launch.persistentRequest.mode}`);
+  if (providerId) {
+    lines.push(`Provider: ${providerId}`);
+  }
+
+  lines.push(`Command: ${launch.spawn.command}`);
+  if (launch.spawn.args.length > 0) {
+    lines.push(`Args: ${formatLaunchArgs(launch.spawn.args)}`);
+  }
+  lines.push(`CWD: ${launch.spawn.cwd}`);
+
+  return lines.join('\n');
+}
+
+function formatStartRequestError(
+  options: {
+    mode: 'shell' | 'direct';
+    id: string;
+    cwd?: string;
+    shell?: string;
+    providerId?: string;
+    remoteConnectionId?: string;
+  },
+  error: unknown
+): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const lines = [message, `Mode: ${options.remoteConnectionId ? 'ssh' : 'local'}/${options.mode}`];
+
+  if (options.providerId) {
+    lines.push(`Provider: ${options.providerId}`);
+  }
+  if (options.shell) {
+    lines.push(`Shell: ${options.shell}`);
+  }
+  if (options.cwd) {
+    lines.push(`CWD: ${options.cwd}`);
+  }
+  if (options.remoteConnectionId) {
+    lines.push(`Remote: ${options.remoteConnectionId}`);
+  }
+
+  return lines.join('\n');
+}
+
 function ensureOwnerDestroyedListener(wc: WebContents): void {
   if (wcDestroyedListeners.has(wc.id)) return;
   wcDestroyedListeners.add(wc.id);
@@ -786,9 +849,20 @@ async function attachPreparedLaunch(
   } catch (error) {
     pendingAttaches.delete(launch.id);
     owners.delete(launch.id);
+    const formattedError = formatLaunchError(launch, error, providerId);
+    log.error('pty:attachPreparedLaunch failed', {
+      id: launch.id,
+      providerId,
+      kind: launch.kind,
+      mode: launch.persistentRequest.mode,
+      command: launch.spawn.command,
+      args: launch.spawn.args,
+      cwd: launch.spawn.cwd,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: formattedError,
     };
   }
 }
@@ -910,13 +984,23 @@ export function registerPtyIpc(): void {
         const launch = await buildPreparedShellLaunch(args);
         return await attachPreparedLaunch(event, launch);
       } catch (error) {
+        const formattedError = formatStartRequestError(
+          {
+            mode: 'shell',
+            id: args.id,
+            cwd: args.cwd,
+            shell: args.shell,
+            remoteConnectionId: args.remote?.connectionId,
+          },
+          error
+        );
         log.error('pty:start FAIL', {
           id: args.id,
           cwd: args.cwd,
           shell: args.shell,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+        return { ok: false, error: formattedError };
       }
     }
   );
@@ -951,11 +1035,24 @@ export function registerPtyIpc(): void {
         const launch = await buildPreparedDirectLaunch(args);
         return await attachPreparedLaunch(event, launch, args.providerId as ProviderId);
       } catch (error) {
+        const formattedError = formatStartRequestError(
+          {
+            mode: 'direct',
+            id: args.id,
+            cwd: args.cwd,
+            providerId: args.providerId,
+            remoteConnectionId: args.remote?.connectionId,
+          },
+          error
+        );
         log.error('pty:startDirect FAIL', {
           id: args.id,
+          providerId: args.providerId,
+          cwd: args.cwd,
+          remoteConnectionId: args.remote?.connectionId,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+        return { ok: false, error: formattedError };
       }
     }
   );

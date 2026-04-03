@@ -107,7 +107,7 @@ export const InstallBanner: React.FC<Props> = ({
         </div>
 
         {showDetails ? (
-          <div className="text-foreground">
+          <div className="whitespace-pre-wrap break-all text-foreground">
             <span className="font-medium">Error:</span> {details}
             {isPtyDisabledOrUnavailable ? (
               <div className="mt-1 text-muted-foreground">

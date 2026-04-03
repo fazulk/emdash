@@ -518,6 +518,18 @@ export function getProviderRuntimeCliArgs(options: ProviderRuntimeCliArgsOptions
 
 const resolvedCommandPathCache = new Map<string, string | null>();
 
+function isExecutableFile(candidate: string): boolean {
+  try {
+    const stat = fs.statSync(candidate);
+    if (!stat.isFile()) return false;
+    if (process.platform === 'win32') return true;
+    fs.accessSync(candidate, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveCommandPath(command: string): string | null {
   const trimmed = command.trim();
   if (!trimmed) return null;
@@ -527,18 +539,6 @@ export function resolveCommandPath(command: string): string | null {
     trimmed.includes('\\') ||
     trimmed.startsWith('.') ||
     /^[A-Za-z]:/.test(trimmed);
-
-  const isExecutableFile = (candidate: string): boolean => {
-    try {
-      const stat = fs.statSync(candidate);
-      if (!stat.isFile()) return false;
-      if (process.platform === 'win32') return true;
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return true;
-    } catch {
-      return false;
-    }
-  };
 
   const appendWindowsExecutableExts = (base: string): string[] => {
     if (process.platform !== 'win32') return [base];
@@ -878,41 +878,48 @@ export function prepareLocalDirectLaunch(options: {
   const resolvedConfig = resolveProviderCommandConfig(providerId);
   const provider = resolvedConfig?.provider;
   const status = providerStatusCache.get(providerId);
-  if (!status?.installed || !status?.path) {
-    log.warn('ptyLaunch: direct spawn unavailable, CLI path missing', { providerId });
+  if (!status?.installed) {
+    log.warn('ptyLaunch: direct spawn unavailable, CLI not marked installed', { providerId });
     return null;
   }
 
-  let cliPath = status.path;
-  if (provider && resolvedConfig && resolvedConfig.cli !== provider.cli) {
-    const cliParts = parseCustomCliForDirectSpawn(resolvedConfig.cli);
-    if (cliParts.length !== 1) {
-      log.info('ptyLaunch: custom CLI requires shell parsing', {
-        providerId,
-        cli: resolvedConfig.cli,
-      });
-      return null;
-    }
+  let cliPath = status.path && isExecutableFile(status.path) ? status.path : null;
+  if (!cliPath && status?.path) {
+    log.info('ptyLaunch: cached CLI path missing or not executable, resolving again', {
+      providerId,
+      path: status.path,
+    });
+  }
 
-    const customCommand = cliParts[0];
-    if (needsShellResolution(customCommand)) {
-      log.info('ptyLaunch: custom CLI requires shell resolution', {
-        providerId,
-        cli: resolvedConfig.cli,
-      });
-      return null;
-    }
+  const directCliValue = resolvedConfig?.cli ?? provider?.cli ?? providerId;
+  const cliParts = parseCustomCliForDirectSpawn(directCliValue);
+  if (cliParts.length !== 1) {
+    log.info('ptyLaunch: direct spawn requires shell parsing', {
+      providerId,
+      cli: directCliValue,
+    });
+    return null;
+  }
 
-    const resolvedCustomPath = resolveCommandPathCached(customCommand);
-    if (!resolvedCustomPath) {
-      log.info('ptyLaunch: custom CLI not directly executable', {
-        providerId,
-        cli: resolvedConfig.cli,
-      });
-      return null;
-    }
+  const directCommand = cliParts[0];
+  if (needsShellResolution(directCommand)) {
+    log.info('ptyLaunch: direct spawn requires shell resolution', {
+      providerId,
+      cli: directCliValue,
+    });
+    return null;
+  }
 
-    cliPath = resolvedCustomPath;
+  if (!cliPath) {
+    cliPath = resolveCommandPathCached(directCommand);
+  }
+
+  if (!cliPath) {
+    log.warn('ptyLaunch: direct spawn unavailable, CLI path missing', {
+      providerId,
+      cli: directCliValue,
+    });
+    return null;
   }
 
   const cliArgs: string[] = [];

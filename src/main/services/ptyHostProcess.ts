@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { Terminal as HeadlessTerminal } from '@xterm/headless';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import * as ptyModule from 'node-pty';
@@ -177,7 +179,55 @@ function writeAfterPrompt(record: HostRecord, data: string, label: string): void
   });
 }
 
+function isPathLikeCommand(command: string): boolean {
+  return (
+    command.includes('/') ||
+    command.includes('\\') ||
+    command.startsWith('.') ||
+    /^[A-Za-z]:/.test(command)
+  );
+}
+
+function validateSpawnPlan(plan: PtySpawnPlan): void {
+  try {
+    const cwdStat = fs.statSync(plan.cwd);
+    if (!cwdStat.isDirectory()) {
+      throw new Error(`PTY launch directory is not a directory: ${plan.cwd}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`PTY launch directory does not exist: ${plan.cwd} (${message})`);
+  }
+
+  if (!isPathLikeCommand(plan.command)) {
+    return;
+  }
+
+  const resolvedCommand = path.resolve(plan.command);
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(resolvedCommand);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`PTY launch command not found: ${resolvedCommand} (${message})`);
+  }
+
+  if (!stat.isFile()) {
+    throw new Error(`PTY launch command is not a file: ${resolvedCommand}`);
+  }
+
+  if (process.platform !== 'win32') {
+    try {
+      fs.accessSync(resolvedCommand, fs.constants.X_OK);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`PTY launch command is not executable: ${resolvedCommand} (${message})`);
+    }
+  }
+}
+
 function createPty(plan: PtySpawnPlan): IPty {
+  validateSpawnPlan(plan);
   return ptyModule.spawn(plan.command, plan.args, {
     name: 'xterm-256color',
     cols: plan.cols,

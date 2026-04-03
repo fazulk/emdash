@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type HostMessageListener = (message: unknown) => void;
@@ -111,7 +112,7 @@ function createLaunch(id: string) {
     spawn: {
       command: '/bin/zsh',
       args: ['-il'],
-      cwd: '/tmp/project',
+      cwd: os.tmpdir(),
       env: { TERM: 'xterm-256color' },
       cols: 120,
       rows: 32,
@@ -119,7 +120,7 @@ function createLaunch(id: string) {
     persistentRequest: {
       mode: 'shell' as const,
       id,
-      cwd: '/tmp/project',
+      cwd: os.tmpdir(),
       shell: '/bin/zsh',
       cols: 120,
       rows: 32,
@@ -230,5 +231,30 @@ describe('ptyHostProcess', () => {
         }),
       },
     });
+  });
+
+  it('returns a descriptive error when the launch directory does not exist', async () => {
+    await loadHostProcess();
+
+    const missingCwd = `/tmp/emdash-missing-${Date.now()}`;
+    const result = await sendRequest({
+      requestId: 'create-missing-cwd',
+      type: 'createOrAttach',
+      payload: {
+        launch: {
+          ...createLaunch('pty-missing-cwd'),
+          spawn: {
+            ...createLaunch('pty-missing-cwd').spawn,
+            cwd: missingCwd,
+          },
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(`PTY launch directory does not exist: ${missingCwd}`),
+    });
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 });

@@ -700,11 +700,13 @@ export function registerGitIpc() {
     const stashRef = (stashListOut || '')
       .split('\n')
       .map((line) => line.trim())
-      .find((line) => line.endsWith(`::${stashTag}`))
+      .find((line) => line.includes(stashTag))
       ?.split('::')[0];
 
     if (!stashRef) {
-      throw new Error('Failed to locate the temporary stash for moving changes.');
+      throw new Error(
+        `Failed to locate the temporary stash for moving changes. stash list: ${(stashListOut || '').trim()}`
+      );
     }
 
     try {
@@ -765,11 +767,13 @@ export function registerGitIpc() {
     const stashRef = (stashListResult.stdout || '')
       .split('\n')
       .map((line) => line.trim())
-      .find((line) => line.endsWith(`::${stashTag}`))
+      .find((line) => line.includes(stashTag))
       ?.split('::')[0];
 
     if (!stashRef) {
-      throw new Error('Failed to locate the temporary stash for moving changes.');
+      throw new Error(
+        `Failed to locate the temporary stash for moving changes. stash list: ${(stashListResult.stdout || '').trim()}`
+      );
     }
 
     const applyResult = await remoteGitService.execGit(

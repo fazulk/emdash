@@ -323,6 +323,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   }, [projects, tasksByProjectId]);
 
   useEffect(() => {
+    const activeProjectId = activeTask?.projectId || selectedProject?.id;
+    if (!activeProjectId) return;
+    setForceOpenIds((current) => {
+      if (current.has(activeProjectId)) return current;
+      const next = new Set(current);
+      next.add(activeProjectId);
+      return next;
+    });
+  }, [activeTask?.id, activeTask?.projectId, selectedProject?.id]);
+
+  useEffect(() => {
     onSidebarContextChange?.({ open, isMobile, setOpen });
   }, [open, isMobile, setOpen, onSidebarContextChange]);
 

@@ -542,6 +542,7 @@ export function useTaskManagement() {
           throw new Error(moveResult?.error || 'Failed to move changes to the new task.');
         }
 
+        activateProjectView(targetProject);
         dispatchFileChangeEvent(sourceTask.path);
         dispatchFileChangeEvent(task.path);
         navigate(
@@ -575,7 +576,15 @@ export function useTaskManagement() {
         setIsCreatingTask(false);
       }
     },
-    [cleanupFailedSplitTask, navigate, projects, queryClient, toast, updateTaskCache]
+    [
+      activateProjectView,
+      cleanupFailedSplitTask,
+      navigate,
+      projects,
+      queryClient,
+      toast,
+      updateTaskCache,
+    ]
   );
 
   const handleOpenCreateTaskFromCurrentBranchModal = useCallback(

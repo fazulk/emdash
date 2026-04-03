@@ -411,7 +411,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:update-index', args),
   revertFile: (args: { taskPath: string; taskId?: string; filePath: string }) =>
     ipcRenderer.invoke('git:revert-file', args),
-  gitCommit: (args: { taskPath: string; message: string }) =>
+  gitCommit: (args: { taskPath: string; message?: string; body?: string }) =>
     ipcRenderer.invoke('git:commit', args),
   gitPush: (args: { taskPath: string }) => ipcRenderer.invoke('git:push', args),
   gitPull: (args: { taskPath: string }) => ipcRenderer.invoke('git:pull', args),
@@ -432,6 +432,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     taskPath: string;
     taskId?: string;
     commitMessage?: string;
+    body?: string;
     createBranchIfOnDefault?: boolean;
     branchPrefix?: string;
   }) => ipcRenderer.invoke('git:commit-and-push', args),
@@ -1251,12 +1252,26 @@ export interface ElectronAPI {
     action?: 'reverted';
     error?: string;
   }>;
+  gitCommit: (args: { taskPath: string; message?: string; body?: string }) => Promise<{
+    success: boolean;
+    hash?: string;
+    message?: string;
+    error?: string;
+  }>;
   gitCommitAndPush: (args: {
     taskPath: string;
+    taskId?: string;
     commitMessage?: string;
+    body?: string;
     createBranchIfOnDefault?: boolean;
     branchPrefix?: string;
-  }) => Promise<{ success: boolean; branch?: string; output?: string; error?: string }>;
+  }) => Promise<{
+    success: boolean;
+    branch?: string;
+    output?: string;
+    message?: string;
+    error?: string;
+  }>;
   createPullRequest: (args: {
     taskPath: string;
     title?: string;

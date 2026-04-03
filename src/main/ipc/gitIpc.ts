@@ -33,6 +33,7 @@ import {
 } from '../utils/remoteProjectResolver';
 import { RemoteGitService } from '../services/RemoteGitService';
 import { sshService } from '../services/ssh/SshService';
+import { commitMessageGenerationService } from '../services/CommitMessageGenerationService';
 
 const remoteGitService = new RemoteGitService(sshService);
 
@@ -221,9 +222,14 @@ export function registerGitIpc() {
   async function commitAndPushRemote(
     connectionId: string,
     taskPath: string,
-    opts: { commitMessage: string; createBranchIfOnDefault: boolean; branchPrefix: string }
-  ): Promise<{ success: boolean; branch?: string; output?: string; error?: string }> {
-    const { commitMessage, createBranchIfOnDefault, branchPrefix } = opts;
+    opts: {
+      commitMessage?: string;
+      body?: string;
+      createBranchIfOnDefault: boolean;
+      branchPrefix: string;
+    }
+  ): Promise<{ success: boolean; branch?: string; output?: string; error?: string; message?: string }> {
+    const { commitMessage, body, createBranchIfOnDefault, branchPrefix } = opts;
 
     // Verify git repo
     const verifyResult = await remoteGitService.execGit(
@@ -287,10 +293,30 @@ export function registerGitIpc() {
     );
 
     stagedFiles = await readRemoteStagedFiles();
+    let finalCommitSubject = commitMessage?.trim() || '';
+    const finalCommitBody = body?.trim() || '';
 
     // Commit
     if (stagedFiles.length > 0) {
-      const commitResult = await remoteGitService.commit(connectionId, taskPath, commitMessage);
+      if (!finalCommitSubject) {
+        const [diffStatResult, nameStatusResult, patchResult] = await Promise.all([
+          remoteGitService.execGit(connectionId, taskPath, 'diff --cached --stat'),
+          remoteGitService.execGit(connectionId, taskPath, 'diff --cached --name-status'),
+          remoteGitService.execGit(connectionId, taskPath, 'diff --cached --no-color --unified=1'),
+        ]);
+
+        finalCommitSubject = await commitMessageGenerationService.generateFromContext({
+          diffStat: (diffStatResult.stdout || '').trim(),
+          nameStatus: (nameStatusResult.stdout || '').trim(),
+          patch: (patchResult.stdout || '').trim().slice(0, 12000),
+          taskLabel: path.basename(taskPath),
+        });
+      }
+
+      const fullCommitMessage = finalCommitBody
+        ? `${finalCommitSubject}\n\n${finalCommitBody}`
+        : finalCommitSubject;
+      const commitResult = await remoteGitService.commit(connectionId, taskPath, fullCommitMessage);
       if (commitResult.exitCode !== 0 && !/nothing to commit/i.test(commitResult.stderr || '')) {
         return { success: false, error: commitResult.stderr || 'Commit failed' };
       }
@@ -306,7 +332,12 @@ export function registerGitIpc() {
     }
 
     const finalStatus = await remoteGitService.execGit(connectionId, taskPath, 'status -sb');
-    return { success: true, branch: activeBranch, output: (finalStatus.stdout || '').trim() };
+    return {
+      success: true,
+      branch: activeBranch,
+      output: (finalStatus.stdout || '').trim(),
+      message: finalCommitSubject || undefined,
+    };
   }
 
   // Helper: get PR status for remote SSH projects
@@ -1944,6 +1975,7 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
         taskPath: string;
         taskId?: string;
         commitMessage?: string;
+        body?: string;
         createBranchIfOnDefault?: boolean;
         branchPrefix?: string;
       }
@@ -1951,7 +1983,8 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
       const {
         taskPath,
         taskId,
-        commitMessage = 'chore: apply task changes',
+        commitMessage,
+        body,
         createBranchIfOnDefault = true,
         branchPrefix = 'orch',
       } = (args ||
@@ -1959,12 +1992,14 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
           taskPath: string;
           taskId?: string;
           commitMessage?: string;
+          body?: string;
           createBranchIfOnDefault?: boolean;
           branchPrefix?: string;
         })) as {
         taskPath: string;
         taskId?: string;
         commitMessage?: string;
+        body?: string;
         createBranchIfOnDefault?: boolean;
         branchPrefix?: string;
       };
@@ -1975,6 +2010,7 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
         if (remote) {
           return await commitAndPushRemote(remote.connectionId, remote.remotePath, {
             commitMessage,
+            body,
             createBranchIfOnDefault,
             branchPrefix,
           });
@@ -2019,6 +2055,8 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
         }
 
         // Stage (only if needed) and commit
+        let finalCommitSubject = commitMessage?.trim() || '';
+        const finalCommitBody = body?.trim() || '';
         try {
           const { stdout: st } = await execAsync('git status --porcelain --untracked-files=all', {
             cwd: taskPath,
@@ -2060,8 +2098,14 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
           stagedFiles = await readStagedFiles();
 
           if (stagedFiles.length > 0) {
+            if (!finalCommitSubject) {
+              finalCommitSubject = await commitMessageGenerationService.generateForLocalTask(taskPath);
+            }
+            const fullCommitMessage = finalCommitBody
+              ? `${finalCommitSubject}\n\n${finalCommitBody}`
+              : finalCommitSubject;
             try {
-              await execAsync(`git commit -m ${JSON.stringify(commitMessage)}`, {
+              await execAsync(`git commit -m ${JSON.stringify(fullCommitMessage)}`, {
                 cwd: taskPath,
               });
             } catch (commitErr) {
@@ -2084,7 +2128,12 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
         }
 
         const { stdout: out } = await execAsync('git status -sb', { cwd: taskPath });
-        return { success: true, branch: activeBranch, output: (out || '').trim() };
+        return {
+          success: true,
+          branch: activeBranch,
+          output: (out || '').trim(),
+          message: finalCommitSubject || undefined,
+        };
       } catch (error) {
         log.error('Failed to commit and push:', error);
         const errObj = error as { stderr?: string; message?: string };
@@ -2572,17 +2621,25 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
     }
   );
 
-  ipcMain.handle('git:commit', async (_, args: { taskPath: string; message: string }) => {
-    try {
-      const pathErr = validateTaskPath(args.taskPath);
-      if (pathErr) return { success: false, error: pathErr };
-      const result = await gitCommit(args.taskPath, args.message);
-      broadcastGitStatusChange(args.taskPath);
-      return { success: true, hash: result.hash };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+  ipcMain.handle(
+    'git:commit',
+    async (_, args: { taskPath: string; message?: string; body?: string }) => {
+      try {
+        const pathErr = validateTaskPath(args.taskPath);
+        if (pathErr) return { success: false, error: pathErr };
+        const subject =
+          args.message?.trim() ||
+          (await commitMessageGenerationService.generateForLocalTask(args.taskPath));
+        const body = args.body?.trim() || '';
+        const fullMessage = body ? `${subject}\n\n${body}` : subject;
+        const result = await gitCommit(args.taskPath, fullMessage);
+        broadcastGitStatusChange(args.taskPath);
+        return { success: true, hash: result.hash, message: subject };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
     }
-  });
+  );
 
   ipcMain.handle('git:push', async (_, args: { taskPath: string }) => {
     try {

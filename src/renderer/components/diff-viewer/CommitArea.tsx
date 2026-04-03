@@ -54,7 +54,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
 
   const hasStagedFiles = fileChanges.some((f) => f.isStaged);
   const isCommitting = commitAction !== null;
-  const canCommit = hasStagedFiles && commitMessage.trim().length > 0 && !isCommitting;
+  const canCommit = hasStagedFiles && !isCommitting;
 
   const fetchBranch = useCallback(async () => {
     if (!taskPath) return;
@@ -94,17 +94,21 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
     if (!taskPath || !canCommit) return;
     setCommitAction(action);
     try {
-      const message = description.trim()
-        ? `${commitMessage.trim()}\n\n${description.trim()}`
-        : commitMessage.trim();
+      const subject = commitMessage.trim();
+      const body = description.trim();
       const result =
         action === 'commitAndPush'
           ? await window.electronAPI.gitCommitAndPush({
               taskPath,
-              commitMessage: message,
+              commitMessage: subject || undefined,
+              body: body || undefined,
               createBranchIfOnDefault: false,
             })
-          : await window.electronAPI.gitCommit({ taskPath, message });
+          : await window.electronAPI.gitCommit({
+              taskPath,
+              message: subject || undefined,
+              body: body || undefined,
+            });
       if (result.success) {
         setCommitMessage('');
         setDescription('');

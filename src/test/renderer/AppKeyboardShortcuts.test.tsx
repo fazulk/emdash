@@ -80,6 +80,7 @@ function renderShortcuts() {
       handleToggleKanban={vi.fn()}
       handleToggleEditor={vi.fn()}
       handleOpenInEditor={vi.fn()}
+      handleOpenGitPage={vi.fn()}
     />
   );
 
@@ -136,5 +137,37 @@ describe('AppKeyboardShortcuts', () => {
 
     expect(onNewAgentEvent).not.toHaveBeenCalled();
     window.removeEventListener('emdash:new-agent', onNewAgentEvent);
+  });
+
+  it('wires the git-page shortcut handler through to the keyboard hook', () => {
+    const handleOpenGitPage = vi.fn();
+
+    render(
+      <AppKeyboardShortcuts
+        showCommandPalette={false}
+        showSettings={false}
+        showBrowser={false}
+        showDiffViewer={false}
+        showEditor={false}
+        showKanban={false}
+        handleToggleCommandPalette={vi.fn()}
+        handleOpenSettings={vi.fn()}
+        handleCloseCommandPalette={vi.fn()}
+        handleCloseSettings={vi.fn()}
+        handleCloseBrowser={vi.fn()}
+        handleCloseDiffViewer={vi.fn()}
+        handleCloseEditor={vi.fn()}
+        handleCloseKanban={vi.fn()}
+        handleToggleKanban={vi.fn()}
+        handleToggleEditor={vi.fn()}
+        handleOpenInEditor={vi.fn()}
+        handleOpenGitPage={handleOpenGitPage}
+      />
+    );
+
+    const handlers = useKeyboardShortcutsMock.mock.calls[0][0];
+    handlers.onOpenGitPage();
+
+    expect(handleOpenGitPage).toHaveBeenCalledTimes(1);
   });
 });

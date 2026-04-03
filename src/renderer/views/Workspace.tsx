@@ -373,6 +373,22 @@ export function Workspace() {
     window.dispatchEvent(new CustomEvent('emdash:open-in-editor'));
   }, []);
 
+  const handleOpenGitPage = useCallback(() => {
+    const projectId = selectedProject?.id ?? activeTask?.projectId;
+    const taskId = activeTask?.id;
+    if (!projectId || !taskId) return;
+
+    setShowKanban(false);
+    setShowEditorMode(false);
+    navigate(
+      buildWorkspaceHref({
+        kind: 'diff',
+        projectId,
+        taskId,
+      })
+    );
+  }, [activeTask?.id, activeTask?.projectId, navigate, selectedProject?.id, setShowEditorMode, setShowKanban]);
+
   const handleToggleSettingsPage = useCallback(() => {
     if (showSettingsPage) {
       handleCloseSettingsPage();
@@ -406,6 +422,7 @@ export function Workspace() {
                 handleToggleKanban={handleToggleKanban}
                 handleToggleEditor={handleToggleEditor}
                 handleOpenInEditor={handleOpenInEditor}
+                handleOpenGitPage={handleOpenGitPage}
               />
               <RightSidebarBridge
                 onCollapsedChange={handleRightSidebarCollapsedChange}

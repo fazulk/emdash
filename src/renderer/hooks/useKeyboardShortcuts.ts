@@ -23,7 +23,8 @@ export type ShortcutSettingsKey =
   | 'newAgent'
   | 'nextAgent'
   | 'prevAgent'
-  | 'openInEditor';
+  | 'openInEditor'
+  | 'openGitPage';
 
 export interface AppShortcut {
   key: string;
@@ -118,8 +119,8 @@ export const APP_SHORTCUTS: Record<string, AppShortcut> = {
   },
 
   TOGGLE_LEFT_SIDEBAR: {
-    key: 'b',
-    modifier: 'cmd',
+    key: 'm',
+    modifier: 'ctrl',
     label: 'Toggle Left Sidebar',
     description: 'Show or hide the left sidebar',
     category: 'View',
@@ -127,7 +128,7 @@ export const APP_SHORTCUTS: Record<string, AppShortcut> = {
   },
 
   TOGGLE_RIGHT_SIDEBAR: {
-    key: '.',
+    key: 'b',
     modifier: 'cmd',
     label: 'Toggle Right Sidebar',
     description: 'Show or hide the right sidebar',
@@ -219,6 +220,15 @@ export const APP_SHORTCUTS: Record<string, AppShortcut> = {
     description: 'Open the project in the default editor',
     category: 'Navigation',
     settingsKey: 'openInEditor',
+  },
+
+  OPEN_GIT_PAGE: {
+    key: 'g',
+    modifier: 'cmd',
+    label: 'Open Git Page',
+    description: 'Open the Git changes view for the active task',
+    category: 'Navigation',
+    settingsKey: 'openGitPage',
   },
 };
 
@@ -401,6 +411,7 @@ export function useKeyboardShortcuts(handlers: GlobalShortcutHandlers) {
       nextAgent: getEffectiveConfig(APP_SHORTCUTS.NEXT_AGENT, custom),
       prevAgent: getEffectiveConfig(APP_SHORTCUTS.PREV_AGENT, custom),
       openInEditor: getEffectiveConfig(APP_SHORTCUTS.OPEN_IN_EDITOR, custom),
+      openGitPage: getEffectiveConfig(APP_SHORTCUTS.OPEN_GIT_PAGE, custom),
     };
   }, [handlers.customKeyboardSettings]);
 
@@ -497,6 +508,12 @@ export function useKeyboardShortcuts(handlers: GlobalShortcutHandlers) {
       effectiveShortcuts.openInEditor && {
         config: effectiveShortcuts.openInEditor,
         handler: () => handlers.onOpenInEditor?.(),
+        priority: 'global',
+        requiresClosed: true,
+      },
+      effectiveShortcuts.openGitPage && {
+        config: effectiveShortcuts.openGitPage,
+        handler: () => handlers.onOpenGitPage?.(),
         priority: 'global',
         requiresClosed: true,
       },

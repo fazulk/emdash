@@ -30,6 +30,7 @@ export interface KeyboardSettings {
   nextAgent?: KeyboardShortcutBinding;
   prevAgent?: KeyboardShortcutBinding;
   openInEditor?: KeyboardShortcutBinding;
+  openGitPage?: KeyboardShortcutBinding;
 }
 
 export interface ShortcutConfig {
@@ -98,6 +99,7 @@ export interface GlobalShortcutHandlers {
 
   // Open in editor
   onOpenInEditor?: () => void;
+  onOpenGitPage?: () => void;
 
   // State checks
   isCommandPaletteOpen?: boolean;

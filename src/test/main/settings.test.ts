@@ -216,7 +216,10 @@ describe('normalizeSettings - keyboard shortcuts', () => {
     );
 
     expect(result.keyboard?.commandPalette).toEqual({ key: 'k', modifier: 'cmd' });
+    expect(result.keyboard?.toggleLeftSidebar).toEqual({ key: 'm', modifier: 'ctrl' });
+    expect(result.keyboard?.toggleRightSidebar).toEqual({ key: 'b', modifier: 'cmd' });
     expect(result.keyboard?.openInEditor).toEqual({ key: 'i', modifier: 'cmd' });
+    expect(result.keyboard?.openGitPage).toEqual({ key: 'g', modifier: 'cmd' });
   });
 
   it('migrates the legacy Cmd+T theme shortcut when it conflicts with the new-task shortcut', () => {
@@ -230,6 +233,20 @@ describe('normalizeSettings - keyboard shortcuts', () => {
 
     expect(result.keyboard?.toggleTheme).toEqual({ key: 't', modifier: 'cmd+shift' });
     expect(result.keyboard?.newTask).toEqual({ key: 't', modifier: 'cmd' });
+  });
+
+  it('migrates the legacy sidebar shortcuts to Ctrl+M and Cmd+B', () => {
+    const result = normalizeSettings(
+      makeSettings({
+        keyboard: {
+          toggleLeftSidebar: { key: 'b', modifier: 'cmd' },
+          toggleRightSidebar: { key: '.', modifier: 'cmd' },
+        },
+      })
+    );
+
+    expect(result.keyboard?.toggleLeftSidebar).toEqual({ key: 'm', modifier: 'ctrl' });
+    expect(result.keyboard?.toggleRightSidebar).toEqual({ key: 'b', modifier: 'cmd' });
   });
 
   it('migrates the old Cmd+N new-task shortcut to Cmd+T and reserves Cmd+N for new agent', () => {

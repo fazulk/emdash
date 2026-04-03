@@ -53,6 +53,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   const [behindCount, setBehindCount] = useState(0);
 
   const hasStagedFiles = fileChanges.some((f) => f.isStaged);
+  const hasOnlyUnstagedChanges = fileChanges.length > 0 && !hasStagedFiles;
   const isCommitting = commitAction !== null;
   const canCommit = hasStagedFiles && !isCommitting;
 
@@ -91,11 +92,14 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   }, [taskPath, fetchBranch, fetchLatestCommit]);
 
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
-    if (!taskPath || !canCommit) return;
+    if (!taskPath || (!hasStagedFiles && !hasOnlyUnstagedChanges)) return;
     setCommitAction(action);
     try {
       const subject = commitMessage.trim();
       const body = description.trim();
+      if (hasOnlyUnstagedChanges) {
+        await window.electronAPI.updateIndex({ taskPath, action: 'stage', scope: 'all' });
+      }
       const result =
         action === 'commitAndPush'
           ? await window.electronAPI.gitCommitAndPush({
@@ -256,7 +260,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
       <div className="flex gap-2">
         <button
           onClick={() => void handleCommit('commit')}
-          disabled={!canCommit}
+          disabled={!hasStagedFiles && !hasOnlyUnstagedChanges}
           className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           {commitAction === 'commit' ? (
@@ -270,7 +274,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         </button>
         <button
           onClick={() => void handleCommit('commitAndPush')}
-          disabled={!canCommit}
+          disabled={!hasStagedFiles && !hasOnlyUnstagedChanges}
           className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           {commitAction === 'commitAndPush' ? (

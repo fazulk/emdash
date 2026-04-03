@@ -97,11 +97,20 @@ describe('getAgentTabSelectionIndex', () => {
 });
 
 describe('new task shortcut defaults', () => {
+  it('uses Ctrl+M for the left sidebar and Cmd+B for the right sidebar', () => {
+    expect(APP_SHORTCUTS.TOGGLE_LEFT_SIDEBAR.key).toBe('m');
+    expect(APP_SHORTCUTS.TOGGLE_LEFT_SIDEBAR.modifier).toBe('ctrl');
+    expect(APP_SHORTCUTS.TOGGLE_RIGHT_SIDEBAR.key).toBe('b');
+    expect(APP_SHORTCUTS.TOGGLE_RIGHT_SIDEBAR.modifier).toBe('cmd');
+  });
+
   it('uses Cmd/Ctrl+T for new task and Cmd/Ctrl+N for new agent', () => {
     expect(APP_SHORTCUTS.NEW_TASK.key).toBe('t');
     expect(APP_SHORTCUTS.NEW_TASK.modifier).toBe('cmd');
     expect(APP_SHORTCUTS.NEW_AGENT.key).toBe('n');
     expect(APP_SHORTCUTS.NEW_AGENT.modifier).toBe('cmd');
+    expect(APP_SHORTCUTS.OPEN_GIT_PAGE.key).toBe('g');
+    expect(APP_SHORTCUTS.OPEN_GIT_PAGE.modifier).toBe('cmd');
   });
 
   it('triggers the new-task handler on Ctrl+T and not on Ctrl+N', () => {
@@ -113,5 +122,17 @@ describe('new task shortcut defaults', () => {
     fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
 
     expect(onNewTask).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('git page shortcut', () => {
+  it('triggers the git-page handler on Cmd/Ctrl+G', () => {
+    const onOpenGitPage = vi.fn();
+
+    render(React.createElement(ShortcutHarness, { handlers: { onOpenGitPage } }));
+
+    fireEvent.keyDown(window, { key: 'g', ctrlKey: true });
+
+    expect(onOpenGitPage).toHaveBeenCalledTimes(1);
   });
 });

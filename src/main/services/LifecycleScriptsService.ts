@@ -63,11 +63,12 @@ class LifecycleScriptsService {
   }
 
   /**
-   * Check if tmux wrapping is enabled for this project in .emdash.json.
-   * When true, agent PTY sessions are wrapped in named tmux sessions
-   * for persistence and resumability.
+   * Check if tmux wrapping is enabled for this project.
+   * On supported local platforms we always enable tmux-backed session persistence;
+   * the config value is only kept for compatibility with older project files.
    */
   getTmuxEnabled(projectPath: string): boolean {
+    if (process.platform !== 'win32') return true;
     const config = this.readConfig(projectPath);
     return config?.tmux === true;
   }

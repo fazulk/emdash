@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Spinner } from './ui/spinner';
-import { Switch } from './ui/switch';
 import { Textarea } from './ui/textarea';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { Plus, Trash2 } from 'lucide-react';
@@ -48,6 +47,7 @@ const EMPTY_SCRIPTS: LifecycleScripts = {
   teardown: '',
 };
 const PROJECT_CONFIG_DOCS_URL = 'https://docs.emdash.sh/project-config';
+const TMUX_ALWAYS_ENABLED = true;
 
 function ensureConfigObject(raw: unknown): ConfigShape {
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as ConfigShape) : {};
@@ -177,7 +177,7 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
   const [originalPreservePatternsInput, setOriginalPreservePatternsInput] = useState('');
   const [shellSetup, setShellSetup] = useState('');
   const [originalShellSetup, setOriginalShellSetup] = useState('');
-  const [tmux, setTmux] = useState(false);
+  const tmux = TMUX_ALWAYS_ENABLED;
   const [originalTmux, setOriginalTmux] = useState(false);
   const [wpProvisionCommand, setWpProvisionCommand] = useState('');
   const [originalWpProvisionCommand, setOriginalWpProvisionCommand] = useState('');
@@ -293,7 +293,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalPreservePatternsInput(nextPreservePatterns.join('\n'));
       setShellSetup(nextShellSetup);
       setOriginalShellSetup(nextShellSetup);
-      setTmux(nextTmux);
       setOriginalTmux(nextTmux);
       setWpProvisionCommand(nextWpProvision);
       setOriginalWpProvisionCommand(nextWpProvision);
@@ -309,7 +308,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       setOriginalPreservePatternsInput('');
       setShellSetup('');
       setOriginalShellSetup('');
-      setTmux(false);
       setOriginalTmux(false);
       setWpProvisionCommand('');
       setOriginalWpProvisionCommand('');
@@ -481,24 +479,6 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
                 <p className="text-xs text-muted-foreground">
                   Runs in every terminal before the shell starts.
                 </p>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="config-tmux">tmux session persistence</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Wrap agent sessions in tmux so they survive disconnects and restarts.
-                  </p>
-                </div>
-                <Switch
-                  id="config-tmux"
-                  checked={tmux}
-                  onCheckedChange={(checked) => {
-                    setTmux(checked);
-                    setError(null);
-                  }}
-                  disabled={isSaving}
-                />
               </div>
 
               {workspaceProviderEnabled && (

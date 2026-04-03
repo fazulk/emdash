@@ -26,6 +26,7 @@ import {
 } from './git-core/statusShared';
 import { resolveWorkingTreeDiffResult } from './git-core/workingTreeDiffShared';
 import type { GitChange, GitIndexUpdateArgs } from '../../shared/git/types';
+import { commitMessageGenerationService } from './CommitMessageGenerationService';
 
 const execFileAsync = promisify(execFile);
 const FORCE_LOAD_DIFF_CONTENT_BYTES = 5 * 1024 * 1024;
@@ -429,13 +430,11 @@ export async function getFileDiff(
 }
 
 /** Commit staged files (no push). Returns the commit hash. */
-export async function commit(taskPath: string, message: string): Promise<{ hash: string }> {
-  if (!message || !message.trim()) {
-    throw new Error('Commit message cannot be empty');
-  }
-  await execFileAsync('git', ['commit', '-m', message], { cwd: taskPath });
+export async function commit(taskPath: string, message?: string): Promise<{ hash: string; message: string }> {
+  const finalMessage = message?.trim() || (await commitMessageGenerationService.generateForLocalTask(taskPath));
+  await execFileAsync('git', ['commit', '-m', finalMessage], { cwd: taskPath });
   const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: taskPath });
-  return { hash: stdout.trim() };
+  return { hash: stdout.trim(), message: finalMessage };
 }
 
 /** Push current branch to origin. Sets upstream if needed. */

@@ -431,9 +431,10 @@ declare global {
         action?: 'reverted';
         error?: string;
       }>;
-      gitCommit: (args: { taskPath: string; message: string }) => Promise<{
+      gitCommit: (args: { taskPath: string; message?: string; body?: string }) => Promise<{
         success: boolean;
         hash?: string;
+        message?: string;
         error?: string;
       }>;
       gitPush: (args: { taskPath: string }) => Promise<{
@@ -506,12 +507,14 @@ declare global {
         taskPath: string;
         taskId?: string;
         commitMessage?: string;
+        body?: string;
         createBranchIfOnDefault?: boolean;
         branchPrefix?: string;
       }) => Promise<{
         success: boolean;
         branch?: string;
         output?: string;
+        message?: string;
         error?: string;
       }>;
       generatePrContent: (args: { taskPath: string; base?: string }) => Promise<{

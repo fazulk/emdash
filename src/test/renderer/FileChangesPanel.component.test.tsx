@@ -172,4 +172,50 @@ describe('FileChangesPanel', () => {
       })
     );
   });
+
+  it('shows a readable, copyable commit message toast after commit and push', async () => {
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: true,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit & Push' }));
+
+    await waitFor(() =>
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Committed and Pushed',
+          descriptionClassName: 'line-clamp-none opacity-100',
+        })
+      )
+    );
+
+    const toastArg = toastMock.mock.calls.at(-1)?.[0];
+    expect(React.isValidElement(toastArg.description)).toBe(true);
+    expect(React.isValidElement(toastArg.action)).toBe(true);
+
+    const toastUi = render(
+      <>
+        {toastArg.description}
+        {toastArg.action}
+      </>
+    );
+
+    expect(toastUi.getByText('Changes committed with message:')).toBeInTheDocument();
+    expect(toastUi.getByText('Update src/file.ts')).toBeInTheDocument();
+    expect(toastUi.getByText('Copy message')).toBeInTheDocument();
+  });
 });

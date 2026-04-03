@@ -126,6 +126,13 @@ describe('FileChangesPanel', () => {
         gitCommitAndPush: gitCommitAndPushMock,
       },
     });
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
   it('always shows commit actions and push count in the top action row', async () => {
@@ -217,5 +224,13 @@ describe('FileChangesPanel', () => {
     expect(toastUi.getByText('Changes committed with message:')).toBeInTheDocument();
     expect(toastUi.getByText('Update src/file.ts')).toBeInTheDocument();
     expect(toastUi.getByText('Copy message')).toBeInTheDocument();
+
+    fireEvent.click(toastUi.getByText('Copy message'));
+
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        'Committed and Pushed\nChanges committed with message:\nUpdate src/file.ts'
+      )
+    );
   });
 });

@@ -149,7 +149,7 @@ function CommitMessageToastDescription({ message }: { message: string }) {
   );
 }
 
-function CopyCommitMessageToastAction({ message }: { message: string }) {
+function CopyCommitMessageToastAction({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const copyResetRef = useRef<number | null>(null);
 
@@ -167,7 +167,7 @@ function CopyCommitMessageToastAction({ message }: { message: string }) {
     }
 
     try {
-      await navigator.clipboard.writeText(message);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       if (copyResetRef.current !== null) {
         window.clearTimeout(copyResetRef.current);
@@ -517,7 +517,11 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             ? <CommitMessageToastDescription message={committedMessage} />
             : 'Changes committed successfully.',
           descriptionClassName: committedMessage ? 'line-clamp-none opacity-100' : undefined,
-          action: committedMessage ? <CopyCommitMessageToastAction message={committedMessage} /> : undefined,
+          action: committedMessage ? (
+            <CopyCommitMessageToastAction
+              text={`${action === 'commitAndPush' ? 'Committed and Pushed' : 'Committed'}\nChanges committed with message:\n${committedMessage}`}
+            />
+          ) : undefined,
         });
         setCommitMessage('');
         await refreshChanges();

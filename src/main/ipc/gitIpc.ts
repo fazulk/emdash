@@ -2889,11 +2889,12 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
     }
   );
 
-  ipcMain.handle('git:push', async (_, args: { taskPath: string }) => {
+  ipcMain.handle('git:push', async (_, args: { taskPath: string; force?: boolean }) => {
     try {
       const pathErr = validateTaskPath(args.taskPath);
       if (pathErr) return { success: false, error: pathErr };
-      const result = await gitPush(args.taskPath);
+      const result = await gitPush(args.taskPath, { force: args.force });
+      broadcastGitStatusChange(args.taskPath);
       return { success: true, output: result.output };
     } catch (error) {
       const errObj = error as { stderr?: string; message?: string };
@@ -2984,11 +2985,13 @@ current branch '${currentBranch}' ahead of base '${baseRef}'.`,
     }
   );
 
-  ipcMain.handle('git:soft-reset', async (_, args: { taskPath: string }) => {
+  ipcMain.handle('git:soft-reset', async (_, args: { taskPath: string; allowPushed?: boolean }) => {
     try {
       const pathErr = validateTaskPath(args.taskPath);
       if (pathErr) return { success: false, error: pathErr };
-      const result = await gitSoftResetLastCommit(args.taskPath);
+      const result = await gitSoftResetLastCommit(args.taskPath, {
+        allowPushed: args.allowPushed,
+      });
       broadcastGitStatusChange(args.taskPath);
       return { success: true, subject: result.subject, body: result.body };
     } catch (error) {

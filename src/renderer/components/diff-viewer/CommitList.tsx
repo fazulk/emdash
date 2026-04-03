@@ -7,6 +7,16 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '../ui/context-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 interface Commit {
   hash: string;
@@ -115,6 +125,7 @@ export const CommitList: React.FC<CommitListProps> = ({
   const [hasMore, setHasMore] = useState(false);
   const [aheadCount, setAheadCount] = useState<number | undefined>(undefined);
   const [undoingCommitHash, setUndoingCommitHash] = useState<string | null>(null);
+  const [confirmUndoPushedCommit, setConfirmUndoPushedCommit] = useState<Commit | null>(null);
 
   const onSelectCommitRef = useRef(onSelectCommit);
   onSelectCommitRef.current = onSelectCommit;
@@ -194,17 +205,23 @@ export const CommitList: React.FC<CommitListProps> = ({
   }, [taskPath, loadingMore, hasMore, commits.length, aheadCount]);
 
   const handleUndoCommit = useCallback(
-    async (commit: Commit, index: number) => {
+    async (commit: Commit, index: number, allowPushed = false) => {
       if (!taskPath || undoingCommitHash) return;
-      if (index !== 0 || commit.isPushed) return;
+      if (index !== 0) return;
 
       setUndoingCommitHash(commit.hash);
       try {
-        const result = await window.electronAPI.gitSoftReset({ taskPath });
+        const result = await window.electronAPI.gitSoftReset({
+          taskPath,
+          allowPushed: allowPushed || undefined,
+        });
         if (result?.success) {
+          const undoingPushedCommit = allowPushed || commit.isPushed;
           toast({
-            title: 'Commit undone',
-            description: result.subject || commit.subject || 'The last commit was undone.',
+            title: undoingPushedCommit ? 'Commit undone locally' : 'Commit undone',
+            description: undoingPushedCommit
+              ? `${result.subject || commit.subject || 'The last commit was undone.'} Force push to update origin.`
+              : result.subject || commit.subject || 'The last commit was undone.',
           });
           await loadInitialCommits();
         } else {
@@ -246,7 +263,7 @@ export const CommitList: React.FC<CommitListProps> = ({
   return (
     <div className="overflow-y-auto">
       {commits.map((commit, index) => {
-        const canUndo = index === 0 && !commit.isPushed;
+        const canUndo = index === 0;
         const isUndoingThisCommit = undoingCommitHash === commit.hash;
 
         return (
@@ -299,7 +316,13 @@ export const CommitList: React.FC<CommitListProps> = ({
             {canUndo && (
               <ContextMenuContent>
                 <ContextMenuItem
-                  onSelect={() => void handleUndoCommit(commit, index)}
+                  onSelect={() => {
+                    if (commit.isPushed) {
+                      setConfirmUndoPushedCommit(commit);
+                      return;
+                    }
+                    void handleUndoCommit(commit, index);
+                  }}
                   disabled={isUndoingThisCommit}
                 >
                   <span className="inline-flex items-center gap-2">
@@ -316,6 +339,34 @@ export const CommitList: React.FC<CommitListProps> = ({
           </ContextMenu>
         );
       })}
+      <AlertDialog
+        open={!!confirmUndoPushedCommit}
+        onOpenChange={(open) => !open && setConfirmUndoPushedCommit(null)}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Undo pushed commit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the latest commit from your local branch and restages its changes.
+              Because that commit is already on origin, you will need to force push afterward to
+              update the remote branch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const commit = confirmUndoPushedCommit;
+                setConfirmUndoPushedCommit(null);
+                if (commit) void handleUndoCommit(commit, 0, true);
+              }}
+            >
+              Undo locally
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {hasMore && (
         <button
           onClick={() => void loadMore()}

@@ -30,6 +30,23 @@ vi.mock('../../renderer/components/ui/context-menu', () => ({
   ),
 }));
 
+vi.mock('../../renderer/components/ui/alert-dialog', () => ({
+  AlertDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogCancel: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  AlertDialogAction: ({
+    children,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
+}));
+
 describe('CommitList', () => {
   const gitGetLog = vi.fn();
   const gitSoftReset = vi.fn();
@@ -109,6 +126,39 @@ describe('CommitList', () => {
     expect(toastMock).toHaveBeenCalledWith({
       title: 'Commit undone',
       description: 'Latest commit',
+    });
+  });
+
+  it('undoes the top pushed commit after confirmation', async () => {
+    gitGetLog.mockResolvedValueOnce({
+      success: true,
+      commits: [
+        {
+          hash: 'top1234',
+          subject: 'Latest commit',
+          body: '',
+          author: 'Jeff',
+          authorEmail: 'jeff@example.com',
+          date: '2026-04-03T00:00:00.000Z',
+          isPushed: true,
+          tags: [],
+        },
+      ],
+      aheadCount: 0,
+    });
+
+    render(<CommitList taskPath="/tmp/repo" selectedCommit="top1234" onSelectCommit={vi.fn()} />);
+
+    await screen.findByText('Latest commit');
+    fireEvent.click(screen.getByRole('button', { name: /undo commit/i }));
+    fireEvent.click(screen.getByRole('button', { name: /undo locally/i }));
+
+    await waitFor(() =>
+      expect(gitSoftReset).toHaveBeenCalledWith({ taskPath: '/tmp/repo', allowPushed: true })
+    );
+    expect(toastMock).toHaveBeenCalledWith({
+      title: 'Commit undone locally',
+      description: 'Latest commit Force push to update origin.',
     });
   });
 

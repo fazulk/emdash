@@ -450,7 +450,7 @@ declare global {
         message?: string;
         error?: string;
       }>;
-      gitPush: (args: { taskPath: string }) => Promise<{
+      gitPush: (args: { taskPath: string; force?: boolean }) => Promise<{
         success: boolean;
         output?: string;
         error?: string;
@@ -510,7 +510,7 @@ declare global {
         diff?: DiffPayload;
         error?: string;
       }>;
-      gitSoftReset: (args: { taskPath: string }) => Promise<{
+      gitSoftReset: (args: { taskPath: string; allowPushed?: boolean }) => Promise<{
         success: boolean;
         subject?: string;
         body?: string;

@@ -438,9 +438,14 @@ export async function commit(taskPath: string, message?: string): Promise<{ hash
 }
 
 /** Push current branch to origin. Sets upstream if needed. */
-export async function push(taskPath: string): Promise<{ output: string }> {
+export async function push(
+  taskPath: string,
+  options?: { force?: boolean }
+): Promise<{ output: string }> {
+  const pushArgs = ['push', ...(options?.force ? ['--force-with-lease'] : [])];
+
   try {
-    const { stdout } = await execFileAsync('git', ['push'], { cwd: taskPath });
+    const { stdout } = await execFileAsync('git', pushArgs, { cwd: taskPath });
     return { output: stdout.trim() };
   } catch (error: unknown) {
     const stderr = (error as { stderr?: string })?.stderr || '';
@@ -451,7 +456,13 @@ export async function push(taskPath: string): Promise<{ output: string }> {
       });
       const { stdout } = await execFileAsync(
         'git',
-        ['push', '--set-upstream', 'origin', branch.trim()],
+        [
+          'push',
+          ...(options?.force ? ['--force-with-lease'] : []),
+          '--set-upstream',
+          'origin',
+          branch.trim(),
+        ],
         { cwd: taskPath }
       );
       return { output: stdout.trim() };
@@ -828,7 +839,8 @@ export async function getCommitFileDiff(
 
 /** Soft-reset the latest commit. Returns the commit message that was reset. */
 export async function softResetLastCommit(
-  taskPath: string
+  taskPath: string,
+  options?: { allowPushed?: boolean }
 ): Promise<{ subject: string; body: string }> {
   // Check if HEAD~1 exists (i.e., this isn't the initial commit)
   try {
@@ -837,9 +849,9 @@ export async function softResetLastCommit(
     throw new Error('Cannot undo the initial commit');
   }
 
-  // Check if the commit has been pushed (safety guard — UI also hides the button)
+  // Check if the commit has been pushed (safety guard unless the caller explicitly allows it)
   const { commits: log } = await getLog(taskPath, 1);
-  if (log[0]?.isPushed) {
+  if (log[0]?.isPushed && !options?.allowPushed) {
     throw new Error('Cannot undo a commit that has already been pushed');
   }
 

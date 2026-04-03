@@ -11,6 +11,42 @@ vi.mock('../../renderer/hooks/use-toast', () => ({
   useToast: () => ({ toast: toastMock }),
 }));
 
+vi.mock('../../renderer/components/ui/popover', () => ({
+  Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('../../renderer/components/ui/alert-dialog', () => ({
+  AlertDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogCancel: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  AlertDialogAction: ({
+    children,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
+}));
+
+vi.mock('../../renderer/contexts/TaskManagementContext', () => ({
+  useTaskManagementContext: () => ({
+    activeTask: null,
+    handleOpenCreateTaskFromCurrentBranchModal: vi.fn(),
+  }),
+}));
+
+vi.mock('../../renderer/contexts/ProjectManagementProvider', () => ({
+  useProjectManagementContext: () => ({
+    selectedProject: null,
+  }),
+}));
+
 describe('CommitArea', () => {
   const getBranchStatus = vi.fn();
   const gitGetLatestCommit = vi.fn();
@@ -165,13 +201,50 @@ describe('CommitArea', () => {
   it('shows a success toast after undo', async () => {
     render(<CommitArea taskPath="/tmp/repo" fileChanges={[]} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /undo/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }));
 
     await waitFor(() => expect(gitSoftReset).toHaveBeenCalledWith({ taskPath: '/tmp/repo' }));
     expect(toastMock).toHaveBeenCalledWith({
       title: 'Commit undone',
       description: 'test commit',
     });
+  });
+
+  it('confirms before undoing a pushed commit', async () => {
+    gitGetLatestCommit.mockResolvedValue({
+      success: true,
+      commit: {
+        hash: 'abc123',
+        subject: 'test commit',
+        body: '',
+        isPushed: true,
+      },
+    });
+
+    render(<CommitArea taskPath="/tmp/repo" fileChanges={[]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /undo locally/i }));
+
+    await waitFor(() =>
+      expect(gitSoftReset).toHaveBeenCalledWith({ taskPath: '/tmp/repo', allowPushed: true })
+    );
+    expect(toastMock).toHaveBeenCalledWith({
+      title: 'Commit undone locally',
+      description: 'test commit Force push to update origin.',
+    });
+  });
+
+  it('can force push from the push actions menu', async () => {
+    render(<CommitArea taskPath="/tmp/repo" fileChanges={[]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /force push to origin/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^force push$/i }));
+
+    await waitFor(() =>
+      expect(gitPush).toHaveBeenCalledWith({ taskPath: '/tmp/repo', force: true })
+    );
+    expect(toastMock).toHaveBeenCalledWith({ title: 'Force pushed successfully' });
   });
 
   it('shows the push button disabled when there is nothing to push', async () => {

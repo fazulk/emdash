@@ -424,7 +424,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('git:move-working-changes', args),
   gitCommit: (args: { taskPath: string; message?: string; body?: string }) =>
     ipcRenderer.invoke('git:commit', args),
-  gitPush: (args: { taskPath: string }) => ipcRenderer.invoke('git:push', args),
+  gitPush: (args: { taskPath: string; force?: boolean }) => ipcRenderer.invoke('git:push', args),
   gitPull: (args: { taskPath: string }) => ipcRenderer.invoke('git:pull', args),
   gitGetLog: (args: { taskPath: string; maxCount?: number; skip?: number }) =>
     ipcRenderer.invoke('git:get-log', args),
@@ -438,7 +438,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     filePath: string;
     forceLarge?: boolean;
   }) => ipcRenderer.invoke('git:get-commit-file-diff', args),
-  gitSoftReset: (args: { taskPath: string }) => ipcRenderer.invoke('git:soft-reset', args),
+  gitSoftReset: (args: { taskPath: string; allowPushed?: boolean }) =>
+    ipcRenderer.invoke('git:soft-reset', args),
   gitCommitAndPush: (args: {
     taskPath: string;
     taskId?: string;

@@ -1,11 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowUp, ArrowDown, Undo2, Loader2, GitBranchPlus } from 'lucide-react';
+import { ArrowUp, ArrowDown, Undo2, Loader2, GitBranchPlus, ChevronDown } from 'lucide-react';
 import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import { useToast } from '../../hooks/use-toast';
 import type { FileChange } from '../../hooks/useFileChanges';
 import { subscribeToFileChanges } from '../../lib/fileChangeEvents';
 import { useTaskManagementContext } from '../../contexts/TaskManagementContext';
 import { useProjectManagementContext } from '../../contexts/ProjectManagementProvider';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
 interface CommitAreaProps {
   taskPath?: string;
@@ -42,6 +53,8 @@ function friendlyGitError(raw: string): string {
     return 'Authentication failed. Check your credentials.';
   if (s.includes('could not resolve host') || s.includes('unable to access'))
     return 'Cannot reach remote. Check your network connection.';
+  if (s.includes('stale info'))
+    return 'Remote changed since your last fetch. Pull or fetch before force pushing.';
   if (s.includes('no such remote')) return 'No remote configured for this repository.';
   if (s.includes('cannot undo the initial commit')) return 'Cannot undo the initial commit.';
   if (s.includes('nothing to commit')) return 'Nothing to commit.';
@@ -65,6 +78,8 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   const [latestCommit, setLatestCommit] = useState<LatestCommit | null>(null);
   const [aheadCount, setAheadCount] = useState(0);
   const [behindCount, setBehindCount] = useState(0);
+  const [showForcePushConfirm, setShowForcePushConfirm] = useState(false);
+  const [showUndoPushedConfirm, setShowUndoPushedConfirm] = useState(false);
 
   const hasStagedFiles = fileChanges.some((f) => f.isStaged);
   const hasOnlyUnstagedChanges = fileChanges.length > 0 && !hasStagedFiles;
@@ -166,17 +181,18 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   };
 
   const hasUnpushed = aheadCount > 0 || (latestCommit != null && !latestCommit.isPushed);
+  const canForcePush = !!taskPath && !isLocked;
 
-  const handlePush = async () => {
-    if (!taskPath || !hasUnpushed || isLocked) return;
+  const handlePush = async (force = false) => {
+    if (!taskPath || isLocked || (!force && !hasUnpushed)) return;
     beginOperation('push');
     try {
-      const result = await window.electronAPI.gitPush({ taskPath });
+      const result = await window.electronAPI.gitPush({ taskPath, force: force || undefined });
       if (result?.success) {
-        toast({ title: 'Pushed successfully' });
+        toast({ title: force ? 'Force pushed successfully' : 'Pushed successfully' });
       } else {
         toast({
-          title: 'Push failed',
+          title: force ? 'Force push failed' : 'Push failed',
           description: friendlyGitError(result?.error || 'Unknown error'),
           variant: 'destructive',
         });
@@ -185,7 +201,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
       await fetchLatestCommit();
     } catch (err) {
       toast({
-        title: 'Push failed',
+        title: force ? 'Force push failed' : 'Push failed',
         description: friendlyGitError(err instanceof Error ? err.message : String(err)),
         variant: 'destructive',
       });
@@ -222,11 +238,15 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
     }
   };
 
-  const handleUndo = async () => {
+  const handleUndo = async (allowPushed = false) => {
     if (!taskPath || isLocked) return;
+    const undoingPushedCommit = allowPushed || latestCommit?.isPushed === true;
     beginOperation('undo');
     try {
-      const result = await window.electronAPI.gitSoftReset({ taskPath });
+      const result = await window.electronAPI.gitSoftReset({
+        taskPath,
+        allowPushed: allowPushed || undefined,
+      });
       if (result.success) {
         if (result.subject) setCommitMessage(result.subject);
         if (result.body) setDescription(result.body);
@@ -234,8 +254,10 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         await fetchLatestCommit();
         await fetchBranch();
         toast({
-          title: 'Commit undone',
-          description: result.subject || 'The last commit was moved back to staged changes.',
+          title: undoingPushedCommit ? 'Commit undone locally' : 'Commit undone',
+          description: undoingPushedCommit
+            ? `${result.subject || 'The last commit was undone.'} Force push to update origin.`
+            : result.subject || 'The last commit was moved back to staged changes.',
         });
       } else {
         toast({
@@ -331,23 +353,47 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
             'Commit & Push'
           )}
         </button>
-        <button
-          onClick={() => void handlePush()}
-          disabled={!hasUnpushed || isLocked}
-          className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-          title={
-            hasUnpushed
-              ? `Push${aheadCount > 0 ? ` ${aheadCount} commit${aheadCount > 1 ? 's' : ''}` : ''}`
-              : 'No unpushed commits'
-          }
-        >
-          {isPushing ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <ArrowUp className="h-3 w-3" />
-          )}
-          {isPushing ? 'Pushing...' : <>Push{aheadCount > 0 ? ` (${aheadCount})` : ''}</>}
-        </button>
+        <div className="flex flex-1">
+          <button
+            onClick={() => void handlePush()}
+            disabled={!hasUnpushed || isLocked}
+            className="flex flex-1 items-center justify-center gap-1 rounded-l-md rounded-r-none border border-border border-r-0 bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              hasUnpushed
+                ? `Push${aheadCount > 0 ? ` ${aheadCount} commit${aheadCount > 1 ? 's' : ''}` : ''}`
+                : 'No unpushed commits'
+            }
+          >
+            {isPushing ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <ArrowUp className="h-3 w-3" />
+            )}
+            {isPushing ? 'Pushing...' : <>Push{aheadCount > 0 ? ` (${aheadCount})` : ''}</>}
+          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={!canForcePush}
+                className="flex items-center justify-center rounded-r-md border border-border bg-background px-2 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                title="More push actions"
+                aria-label="More push actions"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1">
+              <button
+                type="button"
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-accent"
+                onClick={() => setShowForcePushConfirm(true)}
+              >
+                Force push to origin
+              </button>
+            </PopoverContent>
+          </Popover>
+        </div>
         {behindCount > 0 && (
           <button
             onClick={() => void handlePull()}
@@ -373,19 +419,72 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
           >
             {latestCommit.subject}
           </span>
-          {!latestCommit.isPushed && (
-            <button
-              onClick={() => void handleUndo()}
-              disabled={isLocked}
-              className="flex flex-shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              title="Undo last commit"
-            >
-              <Undo2 className="h-3 w-3" />
-              Undo
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (latestCommit.isPushed) {
+                setShowUndoPushedConfirm(true);
+                return;
+              }
+              void handleUndo();
+            }}
+            disabled={isLocked}
+            className="flex flex-shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            title={latestCommit.isPushed ? 'Undo last pushed commit' : 'Undo last commit'}
+          >
+            <Undo2 className="h-3 w-3" />
+            Undo
+          </button>
         </div>
       )}
+      <AlertDialog open={showForcePushConfirm} onOpenChange={setShowForcePushConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force push this branch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will rewrite the remote branch with your current local HEAD using{' '}
+              <code className="font-mono text-xs">--force-with-lease</code>. It is safer than a
+              plain force push, but it can still replace commits on origin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setShowForcePushConfirm(false);
+                void handlePush(true);
+              }}
+            >
+              Force push
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showUndoPushedConfirm} onOpenChange={setShowUndoPushedConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Undo pushed commit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the latest commit from your local branch and move its changes back
+              to staged files. Because the commit is already on origin, you will need to force push
+              afterward to update the remote branch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setShowUndoPushedConfirm(false);
+                void handleUndo(true);
+              }}
+            >
+              Undo locally
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

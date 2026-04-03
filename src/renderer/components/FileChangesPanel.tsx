@@ -218,6 +218,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const [showPushAfterCommit, setShowPushAfterCommit] = useState(false);
   const [isMergingToMain, setIsMergingToMain] = useState(false);
   const [showMergeConfirm, setShowMergeConfirm] = useState(false);
+  const [showForcePushConfirm, setShowForcePushConfirm] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
   const [prMode, setPrMode] = useState<PrMode>(() => {
     try {
@@ -528,15 +529,18 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     await handleCommit('commitAndPush');
   };
 
-  const handlePush = async () => {
-    if (!safeTaskPath || isLocked) return;
+  const handlePush = async (force = false) => {
+    if (!safeTaskPath || isLocked || (!force && pushCount <= 0)) return;
     beginOperation('push');
     try {
       const taskPathAtPush = safeTaskPath;
-      const result = await window.electronAPI.gitPush({ taskPath: safeTaskPath });
+      const result = await window.electronAPI.gitPush({
+        taskPath: safeTaskPath,
+        force: force || undefined,
+      });
       if (result?.success) {
         setShowPushAfterCommit(false);
-        toast({ title: 'Pushed successfully' });
+        toast({ title: force ? 'Force pushed successfully' : 'Pushed successfully' });
         try {
           await refreshPr();
         } catch {
@@ -546,14 +550,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
         await refreshBranchStatus(taskPathAtPush);
       } else {
         toast({
-          title: 'Push Failed',
+          title: force ? 'Force Push Failed' : 'Push Failed',
           description: result?.error || 'Failed to push changes.',
           variant: 'destructive',
         });
       }
     } catch (error) {
       toast({
-        title: 'Push Failed',
+        title: force ? 'Force Push Failed' : 'Push Failed',
         description: error instanceof Error ? error.message : 'An unexpected error occurred.',
         variant: 'destructive',
       });
@@ -865,16 +869,43 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
               >
                 {operation === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                title="Push committed changes"
-                onClick={() => void handlePush()}
-                disabled={isLocked || pushCount <= 0}
-              >
-                {isPushingOp ? <Spinner size="sm" /> : `Push (${pushCount})`}
-              </Button>
+              <div className="flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-r-none border-r-0 px-2 text-xs"
+                  title="Push committed changes"
+                  onClick={() => void handlePush()}
+                  disabled={isLocked || pushCount <= 0}
+                >
+                  {isPushingOp ? <Spinner size="sm" /> : `Push (${pushCount})`}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-l-none px-2"
+                      title="More push actions"
+                      aria-label="More push actions"
+                      disabled={isLocked}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-1">
+                    <PopoverClose asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-accent"
+                        onClick={() => setShowForcePushConfirm(true)}
+                      >
+                        Force push to origin
+                      </button>
+                    </PopoverClose>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
         ) : (
@@ -1161,6 +1192,30 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
           )}
         </div>
       )}
+      <AlertDialog open={showForcePushConfirm} onOpenChange={setShowForcePushConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg">Force push this branch?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription className="text-sm">
+            This will rewrite the remote branch using{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">--force-with-lease</code>.
+            It is safer than a plain force push, but it can still replace commits on origin.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowForcePushConfirm(false);
+                void handlePush(true);
+              }}
+              className="bg-destructive px-4 py-2 text-destructive-foreground hover:bg-destructive/90"
+            >
+              Force Push
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={showMergeConfirm} onOpenChange={setShowMergeConfirm}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>

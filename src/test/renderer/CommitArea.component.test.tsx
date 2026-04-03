@@ -92,11 +92,38 @@ describe('CommitArea', () => {
     await waitFor(() =>
       expect(gitCommitAndPush).toHaveBeenCalledWith({
         taskPath: '/tmp/repo',
-        commitMessage: 'ship it\n\nmore context',
+        commitMessage: 'ship it',
+        body: 'more context',
         createBranchIfOnDefault: false,
       })
     );
     expect(gitPush).not.toHaveBeenCalled();
+  });
+
+  it('allows commit and push with a blank subject so the backend can generate one', async () => {
+    render(
+      <CommitArea
+        taskPath="/tmp/repo"
+        fileChanges={[{ path: 'file.ts', status: 'modified', isStaged: true } as any]}
+      />
+    );
+
+    const commitAndPushButton = screen.getByRole('button', { name: /commit & push/i });
+    expect(commitAndPushButton).toBeEnabled();
+
+    fireEvent.change(screen.getByPlaceholderText('Description'), {
+      target: { value: 'more context' },
+    });
+    fireEvent.click(commitAndPushButton);
+
+    await waitFor(() =>
+      expect(gitCommitAndPush).toHaveBeenCalledWith({
+        taskPath: '/tmp/repo',
+        commitMessage: undefined,
+        body: 'more context',
+        createBranchIfOnDefault: false,
+      })
+    );
   });
 
   it('shows the push button disabled when there is nothing to push', async () => {

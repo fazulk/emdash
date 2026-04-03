@@ -444,7 +444,7 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
               </div>
             ) : null}
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 pb-4">
               <div className="space-y-2">
                 <Label htmlFor="config-preserve-patterns">Preserved patterns</Label>
                 <Textarea

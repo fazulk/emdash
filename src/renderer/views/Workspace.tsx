@@ -12,6 +12,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { RightSidebarProvider, useRightSidebar } from '@/components/ui/right-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
+import { GitWorkspaceBusyProvider } from '@/contexts/GitWorkspaceBusyContext';
 import { useModalContext } from '@/contexts/ModalProvider';
 import { ModalRenderer } from '@/components/ModalRenderer';
 import {
@@ -435,11 +436,12 @@ export function Workspace() {
                 onToggleEditor={handleTitlebarEditorToggle}
               />
               <div className="relative flex flex-1 overflow-hidden pt-[var(--tb)]">
-                <ResizablePanelGroup
-                  direction="horizontal"
-                  className="flex-1 overflow-hidden"
-                  onLayout={handlePanelLayout}
-                >
+                <GitWorkspaceBusyProvider>
+                  <ResizablePanelGroup
+                    direction="horizontal"
+                    className="flex-1 overflow-hidden"
+                    onLayout={handlePanelLayout}
+                  >
                   <ResizablePanel
                     ref={leftSidebarPanelRef}
                     className="sidebar-panel sidebar-panel--left"
@@ -538,7 +540,8 @@ export function Workspace() {
                       }}
                     />
                   </ResizablePanel>
-                </ResizablePanelGroup>
+                  </ResizablePanelGroup>
+                </GitWorkspaceBusyProvider>
               </div>
               <CommandPaletteWrapper
                 isOpen={showCommandPalette}

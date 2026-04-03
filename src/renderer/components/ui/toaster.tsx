@@ -60,7 +60,8 @@ function ToastWithCopy({
           </div>
           <div className="mt-3 flex items-center gap-2">
             <button
-              onClick={handleCopy}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); handleCopy(); }}
               className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
               {copied ? (

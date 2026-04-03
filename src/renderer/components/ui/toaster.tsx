@@ -52,7 +52,7 @@ function ToastWithCopy({
             {title && <ToastTitle>{title}</ToastTitle>}
             {description && (
               <ToastDescription
-                className={isDestructive ? `break-words text-sm opacity-90 ${descriptionClassName ?? ''}` : descriptionClassName}
+                className={isDestructive ? `whitespace-pre-wrap break-words text-sm opacity-90 ${descriptionClassName ?? ''}` : descriptionClassName}
               >
                 {description}
               </ToastDescription>

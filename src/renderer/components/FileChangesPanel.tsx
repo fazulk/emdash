@@ -653,7 +653,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
   const isActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain || isPushing;
   const hasDisplayChanges = displayChanges.length > 0;
-  const shouldShowPushButton = showPushAfterCommit || (branchAhead ?? 0) > 0;
+  const pushCount = Math.max(branchAhead ?? 0, showPushAfterCommit ? 1 : 0);
 
   return (
     <div className={`flex h-full flex-col bg-card shadow-sm ${className ?? ''}`}>
@@ -792,62 +792,50 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
               </div>
             </div>
 
-            {(hasStagedChanges || shouldShowPushButton) && (
-              <div
-                className={`flex items-center gap-2 ${hasStagedChanges ? '' : 'justify-end'}`}
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Enter commit message..."
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                className="h-8 flex-1 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleCommitAndPush();
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                title="Commit staged changes without pushing"
+                onClick={() => void handleCommit('commit')}
+                disabled={isCommitting || !hasStagedChanges || !commitMessage.trim()}
               >
-                {hasStagedChanges && (
-                  <Input
-                    placeholder="Enter commit message..."
-                    value={commitMessage}
-                    onChange={(e) => setCommitMessage(e.target.value)}
-                    className="h-8 flex-1 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleCommitAndPush();
-                      }
-                    }}
-                  />
-                )}
-                {hasStagedChanges && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    title="Commit staged changes without pushing"
-                    onClick={() => void handleCommit('commit')}
-                    disabled={isCommitting || !commitMessage.trim()}
-                  >
-                    {commitAction === 'commit' ? <Spinner size="sm" /> : 'Commit'}
-                  </Button>
-                )}
-                {hasStagedChanges && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    title="Commit all staged changes and push"
-                    onClick={() => void handleCommitAndPush()}
-                    disabled={isCommitting || !commitMessage.trim()}
-                  >
-                    {commitAction === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
-                  </Button>
-                )}
-                {shouldShowPushButton && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    title="Push committed changes"
-                    onClick={() => void handlePush()}
-                    disabled={isPushing || isCommitting}
-                  >
-                    {isPushing ? <Spinner size="sm" /> : 'Push'}
-                  </Button>
-                )}
-              </div>
-            )}
+                {commitAction === 'commit' ? <Spinner size="sm" /> : 'Commit'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                title="Commit all staged changes and push"
+                onClick={() => void handleCommitAndPush()}
+                disabled={isCommitting || !hasStagedChanges || !commitMessage.trim()}
+              >
+                {commitAction === 'commitAndPush' ? <Spinner size="sm" /> : 'Commit & Push'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                title="Push committed changes"
+                onClick={() => void handlePush()}
+                disabled={isPushing || isCommitting || pushCount <= 0}
+              >
+                {isPushing ? <Spinner size="sm" /> : `Push (${pushCount})`}
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="flex w-full items-center justify-between gap-2">

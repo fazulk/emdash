@@ -45,7 +45,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   const [description, setDescription] = useState('');
   const [branch, setBranch] = useState<string | null>(null);
   const [latestCommit, setLatestCommit] = useState<LatestCommit | null>(null);
-  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitAction, setCommitAction] = useState<'commit' | 'commitAndPush' | null>(null);
   const [isPushing, setIsPushing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
@@ -53,6 +53,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
   const [behindCount, setBehindCount] = useState(0);
 
   const hasStagedFiles = fileChanges.some((f) => f.isStaged);
+  const isCommitting = commitAction !== null;
   const canCommit = hasStagedFiles && commitMessage.trim().length > 0 && !isCommitting;
 
   const fetchBranch = useCallback(async () => {
@@ -89,35 +90,45 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
     });
   }, [taskPath, fetchBranch, fetchLatestCommit]);
 
-  const handleCommit = async () => {
+  const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     if (!taskPath || !canCommit) return;
-    setIsCommitting(true);
+    setCommitAction(action);
     try {
       const message = description.trim()
         ? `${commitMessage.trim()}\n\n${description.trim()}`
         : commitMessage.trim();
-      const result = await window.electronAPI.gitCommit({ taskPath, message });
+      const result =
+        action === 'commitAndPush'
+          ? await window.electronAPI.gitCommitAndPush({
+              taskPath,
+              commitMessage: message,
+              createBranchIfOnDefault: false,
+            })
+          : await window.electronAPI.gitCommit({ taskPath, message });
       if (result.success) {
         setCommitMessage('');
         setDescription('');
         await onRefreshChanges?.();
         await fetchLatestCommit();
         await fetchBranch();
+        if (action === 'commitAndPush') {
+          toast({ title: 'Committed and pushed' });
+        }
       } else {
         toast({
-          title: 'Commit failed',
+          title: action === 'commitAndPush' ? 'Commit & push failed' : 'Commit failed',
           description: friendlyGitError(result?.error || 'Unknown error'),
           variant: 'destructive',
         });
       }
     } catch (err) {
       toast({
-        title: 'Commit failed',
+        title: action === 'commitAndPush' ? 'Commit & push failed' : 'Commit failed',
         description: friendlyGitError(err instanceof Error ? err.message : String(err)),
         variant: 'destructive',
       });
     } finally {
-      setIsCommitting(false);
+      setCommitAction(null);
     }
   };
 
@@ -223,7 +234,7 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
         className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && canCommit) {
-            void handleCommit();
+            void handleCommit('commit');
           }
         }}
       />
@@ -240,11 +251,11 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
       {/* Commit & Push & Pull buttons */}
       <div className="flex gap-2">
         <button
-          onClick={() => void handleCommit()}
+          onClick={() => void handleCommit('commit')}
           disabled={!canCommit}
           className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isCommitting ? (
+          {commitAction === 'commit' ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" />
               Committing...
@@ -254,9 +265,23 @@ export const CommitArea: React.FC<CommitAreaProps> = ({
           )}
         </button>
         <button
+          onClick={() => void handleCommit('commitAndPush')}
+          disabled={!canCommit}
+          className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {commitAction === 'commitAndPush' ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Committing...
+            </>
+          ) : (
+            'Commit & Push'
+          )}
+        </button>
+        <button
           onClick={() => void handlePush()}
-          disabled={!hasUnpushed || isPushing}
-          className="flex items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!hasUnpushed || isPushing || isCommitting}
+          className="flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           title={
             hasUnpushed
               ? `Push${aheadCount > 0 ? ` ${aheadCount} commit${aheadCount > 1 ? 's' : ''}` : ''}`

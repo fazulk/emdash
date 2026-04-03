@@ -16,6 +16,7 @@ interface MultiAgentDropdownProps {
   onChange: (agentRuns: AgentRun[]) => void;
   className?: string;
   disabledAgents?: string[];
+  visibleAgents?: string[];
 }
 
 export const MultiAgentDropdown: React.FC<MultiAgentDropdownProps> = ({
@@ -23,6 +24,7 @@ export const MultiAgentDropdown: React.FC<MultiAgentDropdownProps> = ({
   onChange,
   className = '',
   disabledAgents = [],
+  visibleAgents,
 }) => {
   // Use agentConfig order directly (already properly ordered)
   const sortedAgents = Object.entries(agentConfig);
@@ -112,7 +114,10 @@ export const MultiAgentDropdown: React.FC<MultiAgentDropdownProps> = ({
         >
           <TooltipProvider delayDuration={150}>
             {sortedAgents
-              .filter(([key]) => !disabledAgents.includes(key))
+              .filter(([key]) =>
+                !disabledAgents.includes(key) &&
+                (visibleAgents ? visibleAgents.includes(key) : true)
+              )
               .map(([key, config]) => {
               const agent = key as Agent;
               const isSelected = selectedAgents.has(agent);

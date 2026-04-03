@@ -39,6 +39,7 @@ import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
 import { filterDisabledProviders, getDisabledProviderIds } from '@/lib/agentAvailability';
 import { PROVIDER_IDS } from '@shared/providers/registry';
+import { useCliAgentDetection } from '@/hooks/useCliAgentDetection';
 
 const DEFAULT_AGENT: Agent = 'claude';
 
@@ -150,6 +151,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
 
   const workspaceProviderEnabled = useFeatureFlag('workspace-provider');
   const { settings: appSettings } = useAppSettings();
+  const { cliAgents } = useCliAgentDetection();
   const project = initialProject ?? selectedProject;
   const projectName = project?.name || '';
   const existingNames = (project?.tasks || []).map((w) => w.name);
@@ -237,6 +239,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
 
   const disabledAgents = useMemo(() => getDisabledProviderIds(appSettings), [appSettings]);
   const enabledAgents = useMemo(() => filterDisabledProviders(PROVIDER_IDS, appSettings), [appSettings]);
+  const visibleAgents = useMemo(
+    () =>
+      cliAgents
+        .filter((agent) => agent.status === 'connected' && !disabledAgents.includes(agent.id))
+        .map((agent) => agent.id),
+    [cliAgents, disabledAgents]
+  );
 
   // Computed values
   const activeAgents = useMemo(() => agentRuns.map((ar) => ar.agent), [agentRuns]);
@@ -319,11 +328,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
       if (cancel) return;
 
       const settingsAgent = settings?.defaultProvider;
+      const firstVisibleAgent = (visibleAgents[0] as Agent | undefined) ?? undefined;
       const firstEnabledAgent = (enabledAgents[0] as Agent | undefined) ?? DEFAULT_AGENT;
       const agent: Agent =
-        isValidProviderId(settingsAgent) && !disabledAgents.includes(settingsAgent)
+        isValidProviderId(settingsAgent) && visibleAgents.includes(settingsAgent)
           ? (settingsAgent as Agent)
-          : firstEnabledAgent;
+          : (firstVisibleAgent ?? firstEnabledAgent);
       setAgentRuns([{ agent, runs: 1 }]);
 
       const autoApproveByDefault = settings?.tasks?.autoApproveByDefault ?? false;
@@ -349,6 +359,16 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
       cancel = true;
     };
   }, [disabledAgents, enabledAgents]);
+
+  useEffect(() => {
+    if (!visibleAgents.length) return;
+
+    setAgentRuns((current) => {
+      const next = current.filter((run) => visibleAgents.includes(run.agent));
+      if (next.length === current.length) return current;
+      return [{ agent: visibleAgents[0] as Agent, runs: 1 }];
+    });
+  }, [visibleAgents]);
 
   // Auto-generate name from context (prompt / linked issue) with debounce.
   // Only active when both auto-generate and auto-infer settings are enabled.
@@ -545,6 +565,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
               agentRuns={agentRuns}
               onChange={setAgentRuns}
               disabledAgents={disabledAgents}
+              visibleAgents={visibleAgents}
             />
           </div>
 

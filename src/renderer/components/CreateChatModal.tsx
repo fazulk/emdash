@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +43,11 @@ export function CreateChatModal({
   onCreateChat,
   installedAgents,
 }: CreateChatModalProps) {
+  const focusCreateButton = () => {
+    requestAnimationFrame(() => {
+      createButtonRef.current?.focus();
+    });
+  };
   const { settings } = useAppSettings();
   const settingsDisabledAgents = getDisabledProviderIds(settings);
   const [selectedAgent, setSelectedAgent] = useState<Agent>(DEFAULT_AGENT);
@@ -51,6 +56,7 @@ export function CreateChatModal({
   const [reviewPrompt, setReviewPrompt] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
 
   const installedSet = useMemo(() => new Set(installedAgents), [installedAgents]);
   const reviewSettings = useMemo(() => getReviewSettings(settings), [settings]);
@@ -155,7 +161,13 @@ export function CreateChatModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isCreating && onClose()}>
-      <DialogContent className="max-h-[calc(100vh-48px)] max-w-md overflow-visible">
+      <DialogContent
+        className="max-h-[calc(100vh-48px)] max-w-md overflow-visible"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          focusCreateButton();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Add Agent to Task</DialogTitle>
           <DialogDescription className="text-xs">
@@ -172,7 +184,10 @@ export function CreateChatModal({
               <Label className="shrink-0">Agent</Label>
               <AgentDropdown
                 value={selectedAgent}
-                onChange={setSelectedAgent}
+                onChange={(agent) => {
+                  setSelectedAgent(agent);
+                  focusCreateButton();
+                }}
                 installedAgents={installedAgents}
                 hiddenAgents={settingsDisabledAgents}
               />
@@ -203,6 +218,7 @@ export function CreateChatModal({
 
           <DialogFooter>
             <Button
+              ref={createButtonRef}
               type="submit"
               disabled={!!error || isCreating || (reviewEnabled && !reviewAvailable)}
             >

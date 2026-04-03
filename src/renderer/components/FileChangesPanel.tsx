@@ -854,7 +854,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
                 {operation === 'commit' ? (
-                  <Spinner size="sm" className="[animation-duration:0.65s]" />
+                  <Spinner size="sm" className="[animation-duration:0.45s]" />
                 ) : (
                   'Commit'
                 )}
@@ -872,7 +872,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
               >
                 {operation === 'commitAndPush' ? (
-                  <Spinner size="sm" className="[animation-duration:0.65s]" />
+                  <Spinner size="sm" className="[animation-duration:0.45s]" />
                 ) : (
                   'Commit & Push'
                 )}
@@ -887,7 +887,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                   disabled={isLocked || pushCount <= 0}
                 >
                   {isPushingOp ? (
-                    <Spinner size="sm" className="[animation-duration:0.65s]" />
+                    <Spinner size="sm" className="[animation-duration:0.45s]" />
                   ) : (
                     `Push (${pushCount})`
                   )}

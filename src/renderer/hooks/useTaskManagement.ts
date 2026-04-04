@@ -873,14 +873,11 @@ export function useTaskManagement() {
         variant: 'destructive',
       });
     },
-    onSuccess: (_, { project, task, options }, context) => {
+    onSuccess: (_, { project, task }, context) => {
       if (context?.blocked) return;
       archivingTaskIdsRef.current.delete(task.id);
       queryClient.invalidateQueries({ queryKey: ['tasks', project.id] });
       queryClient.invalidateQueries({ queryKey: ['archivedTasks', project.id] });
-      if (!options?.silent) {
-        toast({ title: 'Task archived', description: task.name });
-      }
     },
   });
 

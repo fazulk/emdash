@@ -7,7 +7,6 @@ import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Spinner } from './ui/spinner';
-import { Switch } from './ui/switch';
 import { Close as PopoverClose } from '@radix-ui/react-popover';
 
 type MergeUiStateKind = 'merged' | 'ready' | 'draft' | 'conflicts' | 'blocked' | 'unknown';
@@ -40,7 +39,7 @@ const MERGE_STRATEGIES: Array<{
   },
 ];
 
-function computeMergeUiState(pr: PrStatus, adminOverride: boolean): MergeUiState {
+function computeMergeUiState(pr: PrStatus): MergeUiState {
   const prState = typeof pr.state === 'string' ? pr.state.toUpperCase() : '';
   if (prState === 'MERGED') {
     return { kind: 'merged', title: 'Merged', canMerge: false };
@@ -79,22 +78,22 @@ function computeMergeUiState(pr: PrStatus, adminOverride: boolean): MergeUiState
       return {
         kind: 'blocked',
         title: 'Blocked',
-        detail: adminOverride ? 'Bypass enabled' : 'Branch protections or approvals required.',
-        canMerge: adminOverride,
+        detail: 'Branch protections or approvals required.',
+        canMerge: false,
       };
     case 'HAS_HOOKS':
       return {
         kind: 'blocked',
         title: 'Checks required',
-        detail: adminOverride ? 'Bypass enabled' : 'Required checks are not satisfied yet.',
-        canMerge: adminOverride,
+        detail: 'Required checks are not satisfied yet.',
+        canMerge: false,
       };
     case 'UNSTABLE':
       return {
         kind: 'blocked',
         title: 'Checks failing',
-        detail: adminOverride ? 'Bypass enabled' : 'Fix failing checks before merging.',
-        canMerge: adminOverride,
+        detail: 'Fix failing checks before merging.',
+        canMerge: false,
       };
     default:
       return {
@@ -140,7 +139,7 @@ function StatusBadge({ state }: { state: MergeUiState }) {
       return (
         <Badge variant="outline">
           <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-          {state.canMerge ? 'Bypass' : 'Blocked'}
+          Blocked
         </Badge>
       );
     case 'unknown':
@@ -173,17 +172,12 @@ export function MergePrSection({
     } catch {}
     return 'merge';
   });
-  const [adminOverride, setAdminOverride] = useState(false);
-
   const activePr = pr && typeof pr.number === 'number' && Number.isFinite(pr.number) ? pr : null;
-  const mergeUiState = activePr ? computeMergeUiState(activePr, adminOverride) : null;
+  const mergeUiState = activePr ? computeMergeUiState(activePr) : null;
   const mergeState =
     activePr && typeof activePr.mergeStateStatus === 'string'
       ? activePr.mergeStateStatus.toUpperCase()
       : '';
-  const showBypassToggle =
-    mergeUiState?.kind === 'blocked' &&
-    (mergeState === 'BLOCKED' || mergeState === 'HAS_HOOKS' || mergeState === 'UNSTABLE');
 
   const isAutoMergeEnabled = !!activePr?.autoMergeRequest;
   const autoMergeMethod = activePr?.autoMergeRequest?.mergeMethod?.toUpperCase();
@@ -217,10 +211,6 @@ export function MergePrSection({
     return cleaned.length > 240 ? `${cleaned.slice(0, 237)}...` : cleaned;
   };
 
-  const setAndPersistAdminOverride = (next: boolean) => {
-    setAdminOverride(next);
-  };
-
   const setAndPersistStrategy = (next: MergeStrategy) => {
     setStrategy(next);
     try {
@@ -235,7 +225,6 @@ export function MergePrSection({
         taskPath,
         prNumber: activePr.number,
         strategy,
-        admin: adminOverride,
       });
 
       if (res?.success) {
@@ -350,19 +339,6 @@ export function MergePrSection({
             >
               {isTogglingAutoMerge ? <Spinner size="sm" /> : 'Cancel'}
             </Button>
-          </div>
-        )}
-        {!isAutoMergeEnabled && showBypassToggle && (
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-muted-foreground" title="Attempts `gh pr merge --admin`">
-              {adminOverride ? 'Bypass enabled' : 'Merge without waiting'}
-            </div>
-            <Switch
-              checked={adminOverride}
-              onCheckedChange={setAndPersistAdminOverride}
-              disabled={isMerging}
-              aria-label="Merge without waiting"
-            />
           </div>
         )}
         {isMerged ? (

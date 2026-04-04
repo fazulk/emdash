@@ -1709,19 +1709,16 @@ export function registerGitIpc() {
         taskPath: string;
         prNumber?: number;
         strategy?: 'merge' | 'squash' | 'rebase';
-        admin?: boolean;
       }
     ) => {
       const {
         taskPath,
         prNumber,
         strategy = 'merge',
-        admin = false,
       } = (args || {}) as {
         taskPath: string;
         prNumber?: number;
         strategy?: 'merge' | 'squash' | 'rebase';
-        admin?: boolean;
       };
 
       try {
@@ -1733,7 +1730,6 @@ export function registerGitIpc() {
           if (typeof prNumber === 'number' && Number.isFinite(prNumber))
             ghArgs.push(String(prNumber));
           ghArgs.push(strategyFlag);
-          if (admin) ghArgs.push('--admin');
           const result = await remoteGitService.execGh(
             remoteProject.sshConnectionId,
             taskPath,
@@ -1762,7 +1758,6 @@ export function registerGitIpc() {
           ghArgs.push(String(prNumber));
         }
         ghArgs.push(strategyFlag);
-        if (admin) ghArgs.push('--admin');
 
         try {
           const { stdout, stderr } = await execFileAsync('gh', ghArgs, { cwd: taskPath });

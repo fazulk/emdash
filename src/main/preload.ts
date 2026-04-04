@@ -457,7 +457,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     taskPath: string;
     prNumber?: number;
     strategy?: 'merge' | 'squash' | 'rebase';
-    admin?: boolean;
   }) => ipcRenderer.invoke('git:merge-pr', args),
   getPrStatus: (args: { taskPath: string }) => ipcRenderer.invoke('git:get-pr-status', args),
   enableAutoMerge: (args: {

@@ -557,7 +557,6 @@ declare global {
         taskPath: string;
         prNumber?: number;
         strategy?: 'merge' | 'squash' | 'rebase';
-        admin?: boolean;
       }) => Promise<{
         success: boolean;
         output?: string;

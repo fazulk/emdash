@@ -25,6 +25,7 @@ export function App() {
   );
 
   const renderContent = () => {
+    // hi again
     // Handle legacy string value '1' from old implementation
     const isFirstLaunchBool = isFirstLaunch === true || isFirstLaunch === 1;
 

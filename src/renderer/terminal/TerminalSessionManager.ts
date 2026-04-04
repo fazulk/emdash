@@ -1383,7 +1383,7 @@ export class TerminalSessionManager {
         return { ok: false, error: message };
       });
 
-      if (shouldApplyPtyReplay(result)) {
+      if (shouldApplyPtyReplay(result) && result.replay) {
         this.applyReplay(result.replay);
       }
 

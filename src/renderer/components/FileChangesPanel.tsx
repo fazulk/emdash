@@ -1005,15 +1005,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     View PR
                     <ArrowUpRight className="size-3" />
                   </button>
-                ) : branchStatusLoading || (branchAhead !== null && branchAhead > 0) ? (
+                ) : (
                   <PrActionButton
                     mode={prMode}
                     onModeChange={selectPrMode}
                     onExecute={handlePrAction}
                     isLoading={isActionLoading || branchStatusLoading}
                   />
-                ) : (
-                  <span className="text-xs text-muted-foreground">No PR for this task</span>
                 )}
               </div>
             </div>

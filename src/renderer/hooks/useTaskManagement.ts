@@ -280,6 +280,10 @@ export function useTaskManagement() {
     if (!selectedProject || !route.taskId) return;
     if (selectedProjectQuery?.data === undefined) return;
     if (activeTask) return;
+    // Don't redirect to the project page while a task is being created —
+    // the optimistic task may briefly disappear from the cache when a
+    // background refetch (triggered by invalidateQueries) settles.
+    if (isCreatingTask) return;
     navigate(
       buildWorkspaceHref({
         kind: 'project',
@@ -287,7 +291,7 @@ export function useTaskManagement() {
       }),
       { replace: true }
     );
-  }, [activeTask, navigate, route.taskId, selectedProject, selectedProjectQuery?.data]);
+  }, [activeTask, isCreatingTask, navigate, route.taskId, selectedProject, selectedProjectQuery?.data]);
 
   // ---------------------------------------------------------------------------
   // Cache helpers
@@ -1072,6 +1076,9 @@ export function useTaskManagement() {
         useWorktree: params.useWorktree,
       };
 
+      // Cancel any in-flight task fetches so stale results don't overwrite
+      // the optimistic entry we're about to insert.
+      void queryClient.cancelQueries({ queryKey: ['tasks', params.project.id] });
       updateTaskCache(params.project.id, (old) => [optimisticTask, ...old]);
       navigate(
         buildWorkspaceHref({

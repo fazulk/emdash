@@ -61,6 +61,13 @@ const MainContentArea: React.FC<MainContentAreaProps> = ({
     handleRestoreTask,
     handleRenameTask: onRenameTask,
   } = useTaskManagementContext();
+  // Keep showing the creation overlay while the optimistic placeholder is active
+  // (or before any task route exists). Once the real task exists, let its UI mount
+  // immediately so it can become the destination instead of falling back to the
+  // project pane.
+  const isOptimisticTask = activeTask?.id?.startsWith('optimistic-') ?? false;
+  const shouldShowTaskCreationLoading = isOptimisticTask || (isCreatingTask && !activeTask);
+  const visibleTask = isOptimisticTask ? null : activeTask;
   if (showSettingsPage) {
     return (
       <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden bg-background">
@@ -114,10 +121,10 @@ const MainContentArea: React.FC<MainContentAreaProps> = ({
   if (selectedProject) {
     return (
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {activeTask ? (
-          (activeTask.metadata as any)?.multiAgent?.enabled ? (
+        {visibleTask ? (
+          (visibleTask.metadata as any)?.multiAgent?.enabled ? (
             <MultiAgentTask
-              task={activeTask}
+              task={visibleTask}
               projectName={selectedProject.name}
               projectId={selectedProject.id}
               projectPath={selectedProject.path}
@@ -128,7 +135,7 @@ const MainContentArea: React.FC<MainContentAreaProps> = ({
             />
           ) : (
             <ChatInterface
-              task={activeTask}
+              task={visibleTask}
               project={selectedProject}
               projectName={selectedProject.name}
               projectPath={selectedProject.path}
@@ -157,15 +164,17 @@ const MainContentArea: React.FC<MainContentAreaProps> = ({
           />
         )}
 
-        {isCreatingTask && (
+        {shouldShowTaskCreationLoading && (
           <div className="absolute inset-0 z-10 bg-background">
             <TaskCreationLoading />
           </div>
         )}
 
-        {workspaceProviderEnabled && activeTask?.metadata?.workspace && !isCreatingTask && (
-          <WorkspaceProvisioningOverlay task={activeTask} project={selectedProject} />
-        )}
+        {workspaceProviderEnabled &&
+          visibleTask?.metadata?.workspace &&
+          !shouldShowTaskCreationLoading && (
+            <WorkspaceProvisioningOverlay task={visibleTask} project={selectedProject} />
+          )}
       </div>
     );
   }

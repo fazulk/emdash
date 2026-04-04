@@ -351,6 +351,22 @@ describe('FileChangesPanel', () => {
     expect(toastUi.getByText('Update src/file.ts')).toBeInTheDocument();
   });
 
+  it('still shows PR actions when no PR exists and the branch is already synced', async () => {
+    getBranchStatusMock.mockResolvedValue({
+      success: true,
+      branch: 'feature/task-1',
+      ahead: 0,
+      behind: 0,
+    });
+
+    render(<FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />);
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+
+    expect(screen.getByRole('button', { name: 'Create PR' })).toBeInTheDocument();
+    expect(screen.queryByText('No PR for this task')).not.toBeInTheDocument();
+  });
+
   it('shows View PR in the top action row when a PR already exists', async () => {
     usePrStatusMock.mockReturnValue({
       pr: {

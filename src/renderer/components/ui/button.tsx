@@ -3,6 +3,7 @@ import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
+import { Spinner } from './spinner';
 
 const buttonVariants = cva(
   'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
@@ -37,6 +38,16 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
+export interface ButtonContentWithSpinnerProps {
+  children: React.ReactNode;
+  loading: boolean;
+  className?: string;
+  contentClassName?: string;
+  spinner?: React.ReactNode;
+  spinnerClassName?: string;
+  spinnerSize?: React.ComponentProps<typeof Spinner>['size'];
+}
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
@@ -45,6 +56,32 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     );
   }
 );
+
+function ButtonContentWithSpinner({
+  children,
+  loading,
+  className,
+  contentClassName,
+  spinner,
+  spinnerClassName,
+  spinnerSize = 'sm',
+}: ButtonContentWithSpinnerProps) {
+  return (
+    <span className={cn('relative inline-flex items-center justify-center', className)}>
+      <span
+        className={cn('inline-flex items-center justify-center', loading && 'invisible', contentClassName)}
+      >
+        {children}
+      </span>
+      {loading ? (
+        <span aria-hidden="true" className="absolute inset-0 inline-flex items-center justify-center">
+          {spinner ?? <Spinner size={spinnerSize} className={spinnerClassName} />}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 Button.displayName = 'Button';
 
-export { Button, buttonVariants };
+export { Button, ButtonContentWithSpinner, buttonVariants };

@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { SlugInput } from './ui/slug-input';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Spinner } from './ui/spinner';
 import { Separator } from './ui/separator';
 
 interface NewProjectModalProps {
@@ -270,15 +269,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose, onSuc
               disabled={
                 !!validationError || !repoName.trim() || !owner || isCreating || isValidating
               }
+              aria-busy={isCreating}
             >
-              {isCreating ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Creating...
-                </>
-              ) : (
-                'Create Project'
-              )}
+              <ButtonContentWithSpinner loading={isCreating}>Create Project</ButtonContentWithSpinner>
             </Button>
           </div>
         </form>

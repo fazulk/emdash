@@ -6,10 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Label } from './ui/label';
 import { SlugInput } from './ui/slug-input';
-import { Spinner } from './ui/spinner';
 import type { BaseModalProps } from '@/contexts/ModalProvider';
 import type { Agent } from '@/types';
 import type { Project, Task } from '@/types/app';
@@ -158,14 +157,7 @@ function MoveChangesToTaskModal({
 
         <DialogFooter>
           <Button type="submit" disabled={isCreating} aria-busy={isCreating}>
-            {isCreating ? (
-              <>
-                <Spinner size="sm" className="mr-2" />
-                Creating…
-              </>
-            ) : (
-              'Create Task'
-            )}
+            <ButtonContentWithSpinner loading={isCreating}>Create Task</ButtonContentWithSpinner>
           </Button>
         </DialogFooter>
       </form>

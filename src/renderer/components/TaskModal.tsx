@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FolderOpen, Server } from 'lucide-react';
-import { Button } from './ui/button';
-import { Spinner } from './ui/spinner';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import {
   DialogContent,
   DialogDescription,
@@ -698,14 +697,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ onClose, initialProject, onCreate
 
         <DialogFooter className="shrink-0 px-6 py-4">
           <Button type="submit" disabled={!!error || isCreating} aria-busy={isCreating}>
-            {isCreating ? (
-              <>
-                <Spinner size="sm" className="mr-2" />
-                Creating…
-              </>
-            ) : (
-              'Create'
-            )}
+            <ButtonContentWithSpinner loading={isCreating}>Create</ButtonContentWithSpinner>
           </Button>
         </DialogFooter>
       </form>

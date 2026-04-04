@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Spinner } from './ui/spinner';
 import { Separator } from './ui/separator';
 import { rpc } from '@/lib/rpc';
 
@@ -250,15 +249,9 @@ export const CloneFromUrlModal: React.FC<CloneFromUrlModalProps> = ({ onClose, o
                 isCloning ||
                 (touched && !validateUrl(cleanUrl(repoUrl)).valid)
               }
+              aria-busy={isCloning}
             >
-              {isCloning ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Cloning...
-                </>
-              ) : (
-                'Clone Repository'
-              )}
+              <ButtonContentWithSpinner loading={isCloning}>Clone Repository</ButtonContentWithSpinner>
             </Button>
           </div>
         </form>

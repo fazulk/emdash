@@ -28,7 +28,7 @@ import {
   MAX_LIFECYCLE_LOG_LINES,
   formatLifecycleLogLine,
 } from '@shared/lifecycle';
-import { shouldDisablePlay } from '../lib/lifecycleUi';
+
 import ExpandedTerminalModal from './ExpandedTerminalModal';
 
 /**
@@ -312,7 +312,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     runStatus !== 'running' &&
     setupStatus !== 'running';
 
-  const isRunSelection = !selection.selectedLifecycle || selection.selectedLifecycle === 'run';
+
   const selectedTerminalScope = useMemo(() => {
     if (selection.selectedScript) return 'SCRIPT';
     if (selection.parsed?.mode === 'task') return 'WORKTREE';
@@ -338,20 +338,20 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     },
   });
 
-  const handlePlay = useCallback(async () => {
+  const handlePlayPhase = useCallback(async (phase: 'setup' | 'run' | 'teardown') => {
     if (!task || !projectPath) return;
     const api = window.electronAPI as any;
     setRunActionBusy(true);
     try {
       let result: { success: boolean; error?: string } | undefined;
-      if (selection.selectedLifecycle === 'setup') {
+      if (phase === 'setup') {
         result = await api.lifecycleSetup?.({
           taskId: task.id,
           taskPath: task.path,
           projectPath,
           taskName: task.name,
         });
-      } else if (selection.selectedLifecycle === 'teardown') {
+      } else if (phase === 'teardown') {
         result = await api.lifecycleTeardown?.({
           taskId: task.id,
           taskPath: task.path,
@@ -367,7 +367,6 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
         });
       }
       if (result && !result.success) {
-        const phase = selection.selectedLifecycle || 'run';
         const errorMsg = result.error || 'An unknown error occurred.';
         // If run failed due to setup, navigate to setup logs
         const failedPhase = errorMsg.toLowerCase().includes('setup failed') ? 'setup' : phase;
@@ -388,7 +387,6 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
       }
     } catch (error) {
       console.error('Failed lifecycle play action:', error);
-      const phase = selection.selectedLifecycle || 'run';
       const label = phase.charAt(0).toUpperCase() + phase.slice(1);
       toast({
         title: `${label} failed`,
@@ -412,7 +410,6 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     task?.name,
     task?.path,
     projectPath,
-    selection.selectedLifecycle,
     selection.onChange,
     refreshLifecycleState,
     toast,
@@ -630,40 +627,6 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
               </SelectGroup>
             )}
 
-            {task && (
-              <SelectGroup>
-                <div className="px-2 py-1.5">
-                  <span className="text-[11px] font-bold text-muted-foreground">Lifecycle</span>
-                </div>
-                <SelectItem value="lifecycle::setup" className="text-xs font-normal pl-5">
-                  Setup
-                </SelectItem>
-                <SelectItem value="lifecycle::run" className="text-xs font-normal pl-5">
-                  Run
-                </SelectItem>
-                <SelectItem value="lifecycle::teardown" className="text-xs font-normal pl-5">
-                  Teardown
-                </SelectItem>
-              </SelectGroup>
-            )}
-
-            {customScriptNames.length > 0 && (
-              <SelectGroup>
-                <div className="px-2 py-1.5">
-                  <span className="text-[11px] font-bold text-muted-foreground">Scripts</span>
-                </div>
-                {customScriptNames.map((name) => (
-                  <SelectItem
-                    key={`script::${name}`}
-                    value={`script::${name}`}
-                    className="text-xs font-normal pl-5"
-                  >
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            )}
-
             {(projectPath || !task) && (
               <>
                 {task && (
@@ -714,114 +677,115 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
           </span>
         )}
 
-        {task && !selection.selectedScript && (
+        {/* Spacer to push actions to the right */}
+        <div className="flex-1" />
+
+        {/* --- Lifecycle & Script action buttons --- */}
+        {task && (
           <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {isRunSelection && runStatus === 'running' ? (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handleStop}
-                    disabled={runActionBusy}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <Square className="h-3.5 w-3.5" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={handlePlay}
-                    disabled={shouldDisablePlay({
-                      runActionBusy,
-                      hasProjectPath: !!projectPath,
-                      isRunSelection,
-                      canStartRun,
-                    })}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {isRunSelection && setupStatus === 'failed' ? (
-                      <RotateCw className="h-3.5 w-3.5" />
-                    ) : (
-                      <Play className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                )}
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p className="text-xs">
-                  {isRunSelection && runStatus === 'running'
-                    ? 'Stop run script'
-                    : selection.selectedLifecycle === 'setup'
-                      ? 'Run setup script'
-                      : selection.selectedLifecycle === 'teardown'
-                        ? 'Run teardown script'
-                        : setupStatus === 'running'
-                          ? 'Setup is still running'
-                          : setupStatus === 'failed'
-                            ? 'Retry setup and start run script'
-                            : 'Start run script'}
-                </p>
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex items-center">
+              {/* Lifecycle phases — each with status dot, label, and its own play/stop */}
+              {(['setup', 'run', 'teardown'] as const).map((phase, i) => {
+                const status = phase === 'setup' ? setupStatus : phase === 'run' ? runStatus : teardownStatus;
+                const label = phase.charAt(0).toUpperCase() + phase.slice(1);
+                const isActive = selection.selectedLifecycle === phase;
+                const isPhaseRunning = status === 'running';
+                const canPlay = phase === 'run'
+                  ? canStartRun && !!projectPath
+                  : !!projectPath && !runActionBusy && status !== 'running';
+                return (
+                  <React.Fragment key={phase}>
+                    {i > 0 && <div className="mx-1 h-4 w-px bg-border" />}
+                    <div className="flex items-center gap-0">
+                      {/* Label button — navigates to this phase's logs */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => selection.onChange(`lifecycle::${phase}`)}
+                            className={cn(
+                              'h-6 gap-1 rounded-r-none px-1.5 text-[11px] font-medium',
+                              isActive && 'bg-accent',
+                              status === 'running'
+                                ? 'text-blue-500 dark:text-blue-400'
+                                : status === 'succeeded'
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : status === 'failed'
+                                    ? 'text-red-500 dark:text-red-400'
+                                    : 'text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            {status === 'running' ? (
+                              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
+                            ) : status === 'succeeded' ? (
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                            ) : status === 'failed' ? (
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                            ) : (
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400/50" />
+                            )}
+                            {label}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="text-xs">{label} — {status}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      {/* Play/Stop button — always present, always in the same spot per phase */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {isPhaseRunning && phase === 'run' ? (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={handleStop}
+                              disabled={runActionBusy}
+                              className="h-6 w-6 rounded-l-none text-muted-foreground hover:text-destructive"
+                            >
+                              <Square className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handlePlayPhase(phase)}
+                              disabled={!canPlay || runActionBusy}
+                              className={cn(
+                                'h-6 w-6 rounded-l-none text-muted-foreground hover:text-foreground',
+                                isActive && 'bg-accent',
+                              )}
+                            >
+                              {phase === 'run' && setupStatus === 'failed' ? (
+                                <RotateCw className="h-3 w-3" />
+                              ) : (
+                                <Play className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="text-xs">
+                            {isPhaseRunning && phase === 'run'
+                              ? 'Stop run script'
+                              : phase === 'run' && setupStatus === 'failed'
+                                ? 'Retry setup & start run'
+                                : `Run ${label.toLowerCase()} script`}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+
+            </div>
           </TooltipProvider>
         )}
 
-        {/* Script play/stop/restart buttons */}
-        {selection.selectedScript && (
-          <TooltipProvider delayDuration={200}>
-            {runningScripts.has(selection.selectedScript) ? (
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleScriptStop(selection.selectedScript!)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Square className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="text-xs">Stop {selection.selectedScript}</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleScriptRestart(selection.selectedScript!)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <RotateCw className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="text-xs">Restart {selection.selectedScript}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => handleScriptPlay(selection.selectedScript!)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <Play className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p className="text-xs">Run {selection.selectedScript}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </TooltipProvider>
+        {/* Divider before utility actions */}
+        {(task || (selection.activeTerminalId && !selection.selectedLifecycle)) && (
+          <div className="mx-0.5 h-4 w-px bg-border" />
         )}
 
         {/* Expand terminal to full-screen modal */}
@@ -872,7 +836,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                         }
                       }
                     }}
-                    className="ml-auto text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive"
                     disabled={!selection.activeTerminalId || !canDelete}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -888,6 +852,104 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
           );
         })()}
       </div>
+
+      {/* Scripts row — shown below the toolbar when custom scripts exist */}
+      {task && customScriptNames.length > 0 && (
+        <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-2 py-1.5 dark:bg-background/50">
+          <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">Scripts</span>
+          <TooltipProvider delayDuration={200}>
+            {customScriptNames.map((name, i) => {
+              const isActive = selection.selectedScript === name;
+              const isScriptRunning = runningScripts.has(name);
+              return (
+                <React.Fragment key={`script-row::${name}`}>
+                  {i > 0 && <div className="mx-1 h-4 w-px bg-border" />}
+                  <div className="flex items-center gap-0">
+                    {/* Label — navigates to this script's terminal */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => selection.onChange(`script::${name}`)}
+                          className={cn(
+                            'h-6 gap-1 rounded-r-none px-1.5 text-[11px] font-medium',
+                            isActive && 'bg-accent',
+                            isScriptRunning
+                              ? 'text-blue-500 dark:text-blue-400'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {isScriptRunning ? (
+                            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
+                          ) : (
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400/50" />
+                          )}
+                          {name}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p className="text-xs">{isScriptRunning ? `${name} (running)` : name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    {/* Play/Stop — always in the same spot per script */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        {isScriptRunning ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => handleScriptStop(name)}
+                            className="h-6 w-6 rounded-l-none text-muted-foreground hover:text-destructive"
+                          >
+                            <Square className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              selection.onChange(`script::${name}`);
+                              handleScriptPlay(name);
+                            }}
+                            className={cn(
+                              'h-6 w-6 rounded-l-none text-muted-foreground hover:text-foreground',
+                              isActive && 'bg-accent',
+                            )}
+                          >
+                            <Play className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p className="text-xs">{isScriptRunning ? `Stop ${name}` : `Run ${name}`}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    {/* Restart — only when running */}
+                    {isScriptRunning && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => handleScriptRestart(name)}
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          >
+                            <RotateCw className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p className="text-xs">Restart {name}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </TooltipProvider>
+        </div>
+      )}
 
       {selection.selectedLifecycle ? (
         <div className="flex h-full flex-1 flex-col overflow-hidden">

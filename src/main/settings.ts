@@ -70,7 +70,7 @@ export interface KeyboardSettings {
 export interface InterfaceSettings {
   autoRightSidebarBehavior?: boolean;
   showResourceMonitor?: boolean;
-  theme?: 'light' | 'dark' | 'dark-black' | 'system';
+  theme?: 'light' | 'dark' | 'dark-black' | 'dark-gray' | 'system';
   taskHoverAction?: 'delete' | 'archive';
 }
 
@@ -577,7 +577,7 @@ export function normalizeSettings(input: AppSettings): AppSettings {
     showResourceMonitor: Boolean(
       iface?.showResourceMonitor ?? DEFAULT_SETTINGS.interface!.showResourceMonitor
     ),
-    theme: ['light', 'dark', 'dark-black', 'system'].includes(iface?.theme)
+    theme: ['light', 'dark', 'dark-black', 'dark-gray', 'system'].includes(iface?.theme)
       ? iface.theme
       : DEFAULT_SETTINGS.interface!.theme,
     taskHoverAction: iface?.taskHoverAction === 'archive' ? 'archive' : 'delete',

@@ -390,13 +390,14 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     const isMistral = agent === 'mistral';
     const darkBackground = isMistral ? '#202938' : '#1e1e1e';
     const blackBackground = isMistral ? '#141820' : '#000000';
+    const grayBackground = isMistral ? '#282C33' : '#282C33';
 
-    return effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+    return effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
       ? {
-          background: effectiveTheme === 'dark-black' ? blackBackground : darkBackground,
+          background: effectiveTheme === 'dark-black' ? blackBackground : effectiveTheme === 'dark-gray' ? grayBackground : darkBackground,
           foreground: '#d4d4d4',
           cursor: '#aeafad',
-          cursorAccent: effectiveTheme === 'dark-black' ? blackBackground : darkBackground,
+          cursorAccent: effectiveTheme === 'dark-black' ? blackBackground : effectiveTheme === 'dark-gray' ? grayBackground : darkBackground,
           selectionBackground: 'rgba(96, 165, 250, 0.35)',
           selectionForeground: '#f9fafb',
           black: '#000000',
@@ -831,11 +832,13 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
             <div
               className={cn(
                 'bw-terminal flex flex-1 flex-col overflow-hidden',
-                effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
                   ? agent === 'mistral'
                     ? effectiveTheme === 'dark-black'
                       ? 'bg-[#141820]'
-                      : 'bg-[#202938]'
+                      : effectiveTheme === 'dark-gray'
+                        ? 'bg-[#282C33]'
+                        : 'bg-[#202938]'
                     : 'bg-card'
                   : 'bg-white'
               )}
@@ -848,7 +851,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                     id={terminalId}
                     cwd={task.path}
                     env={taskEnv}
-                    variant={effectiveTheme === 'dark' || effectiveTheme === 'dark-black' ? 'dark' : 'light'}
+                    variant={effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray' ? 'dark' : 'light'}
                     themeOverride={themeOverride}
                     className="h-full w-full"
                     keepAlive
@@ -862,11 +865,13 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
         <div
           className={cn(
             'bw-terminal flex flex-1 flex-col overflow-hidden',
-            effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+            effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
               ? agent === 'mistral'
                 ? effectiveTheme === 'dark-black'
                   ? 'bg-[#141820]'
-                  : 'bg-[#202938]'
+                  : effectiveTheme === 'dark-gray'
+                    ? 'bg-[#282C33]'
+                    : 'bg-[#202938]'
                 : 'bg-card'
               : 'bg-white'
           )}
@@ -891,7 +896,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                       remote?.connectionId ? { connectionId: remote.connectionId } : undefined
                     }
                     variant={
-                      effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                      effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
                         ? 'dark'
                         : 'light'
                     }
@@ -908,11 +913,13 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
         <div
           className={cn(
             'bw-terminal flex flex-1 flex-col overflow-hidden',
-            effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+            effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
               ? agent === 'mistral'
                 ? effectiveTheme === 'dark-black'
                   ? 'bg-[#141820]'
-                  : 'bg-[#202938]'
+                  : effectiveTheme === 'dark-gray'
+                    ? 'bg-[#282C33]'
+                    : 'bg-[#202938]'
                 : 'bg-card'
               : 'bg-white'
           )}
@@ -956,7 +963,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                           }
                           env={taskEnv}
                           variant={
-                            effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                            effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
                               ? 'dark'
                               : 'light'
                           }
@@ -988,7 +995,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                           remote?.connectionId ? { connectionId: remote.connectionId } : undefined
                         }
                         variant={
-                          effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                          effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray'
                             ? 'dark'
                             : 'light'
                         }
@@ -1021,7 +1028,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                 : 'Terminal'
           }
           onClose={handleCloseExpandedTerminal}
-          variant={effectiveTheme === 'dark' || effectiveTheme === 'dark-black' ? 'dark' : 'light'}
+          variant={effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray' ? 'dark' : 'light'}
         />
       )}
     </div>

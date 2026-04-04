@@ -43,6 +43,20 @@ export function defineMonacoThemes(monaco: Monaco): void {
     },
   });
 
+  // Dark gray theme - softer dark
+  monaco.editor.defineTheme('custom-dark-gray', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#282C33', // charcoal
+      'editor.foreground': '#f0f1f3',
+      'editor.lineHighlightBackground': '#2e323a',
+      'editorLineNumber.foreground': '#7a7e85',
+      'editorGutter.background': '#282C33',
+    },
+  });
+
   // Light theme matching app's light mode
   monaco.editor.defineTheme('custom-light', {
     base: 'vs',
@@ -67,6 +81,8 @@ export function getMonacoTheme(effectiveTheme: string): string {
   switch (effectiveTheme) {
     case 'dark-black':
       return 'custom-black';
+    case 'dark-gray':
+      return 'custom-dark-gray';
     case 'dark':
       return 'custom-dark';
     case 'light':

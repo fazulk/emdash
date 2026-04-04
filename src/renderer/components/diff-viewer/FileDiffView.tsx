@@ -42,7 +42,7 @@ export const FileDiffView: React.FC<FileDiffViewProps> = ({
   baseRef,
 }) => {
   const { effectiveTheme } = useTheme();
-  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black';
+  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray';
 
   const [fileData, setFileData] = useState<{
     original: string;

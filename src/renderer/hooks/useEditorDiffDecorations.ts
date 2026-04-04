@@ -147,7 +147,7 @@ export function useEditorDiffDecorations({
         return;
       }
 
-      const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black';
+      const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray';
       const newDecorations: any[] = [];
 
       for (const diff of diffLines) {

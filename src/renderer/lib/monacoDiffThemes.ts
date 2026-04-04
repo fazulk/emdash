@@ -38,6 +38,21 @@ export async function registerDiffThemes(): Promise<void> {
     },
   });
 
+  monacoInstance.editor.defineTheme('custom-diff-dark-gray', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': MONACO_DIFF_COLORS['dark-gray'].editorBackground,
+      'editorGutter.background': MONACO_DIFF_COLORS['dark-gray'].editorBackground,
+      'diffEditor.insertedTextBackground': MONACO_DIFF_COLORS['dark-gray'].insertedTextBackground,
+      'diffEditor.insertedLineBackground': MONACO_DIFF_COLORS['dark-gray'].insertedLineBackground,
+      'diffEditor.removedTextBackground': MONACO_DIFF_COLORS['dark-gray'].removedTextBackground,
+      'diffEditor.removedLineBackground': MONACO_DIFF_COLORS['dark-gray'].removedLineBackground,
+      'diffEditor.unchangedRegionBackground': '#2e323a',
+    },
+  });
+
   monacoInstance.editor.defineTheme('custom-diff-light', {
     base: 'vs',
     inherit: true,
@@ -56,6 +71,7 @@ export async function registerDiffThemes(): Promise<void> {
 
 export function getDiffThemeName(effectiveTheme: string): string {
   if (effectiveTheme === 'dark-black') return 'custom-diff-black';
+  if (effectiveTheme === 'dark-gray') return 'custom-diff-dark-gray';
   if (effectiveTheme === 'light') return 'custom-diff-light';
   return 'custom-diff-dark';
 }

@@ -587,7 +587,7 @@ const MultiAgentTask: React.FC<Props> = ({
     <TaskScopeProvider value={{ taskId: task.id, taskPath: activeVariantPath, projectPath }}>
       <div className="relative flex h-full flex-col">
         {variants.map((v, idx) => {
-          const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black';
+          const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray';
           const isActive = idx === activeTabIndex;
           return (
             <div
@@ -703,9 +703,11 @@ const MultiAgentTask: React.FC<Props> = ({
                                 background:
                                   effectiveTheme === 'dark-black'
                                     ? '#141820'
-                                    : isDark
-                                      ? '#202938'
-                                      : '#ffffff',
+                                    : effectiveTheme === 'dark-gray'
+                                      ? '#282C33'
+                                      : isDark
+                                        ? '#202938'
+                                        : '#ffffff',
                                 selectionBackground: 'rgba(96, 165, 250, 0.35)',
                                 selectionForeground: isDark ? '#f9fafb' : '#0f172a',
                               }
@@ -715,7 +717,13 @@ const MultiAgentTask: React.FC<Props> = ({
                                   selectionBackground: 'rgba(96, 165, 250, 0.35)',
                                   selectionForeground: '#f9fafb',
                                 }
-                              : undefined
+                              : effectiveTheme === 'dark-gray'
+                                ? {
+                                    background: '#282C33',
+                                    selectionBackground: 'rgba(96, 165, 250, 0.35)',
+                                    selectionForeground: '#f9fafb',
+                                  }
+                                : undefined
                         }
                         className="h-full w-full"
                         onStartSuccess={() => {

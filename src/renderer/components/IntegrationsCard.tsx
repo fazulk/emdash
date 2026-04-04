@@ -30,7 +30,7 @@ import { GithubDeviceFlowModal } from './GithubDeviceFlowModal';
 /** Light mode: original SVG colors. Dark / dark-black: primary colour. */
 const SvgLogo = ({ raw }: { raw: string }) => {
   const { effectiveTheme } = useTheme();
-  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black';
+  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray';
 
   const processed = isDark
     ? raw

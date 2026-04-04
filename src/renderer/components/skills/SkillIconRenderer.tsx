@@ -28,7 +28,7 @@ const SkillIconRenderer: React.FC<SkillIconRendererProps> = ({ skill, size = 'sm
   const [iconUrlError, setIconUrlError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const { effectiveTheme } = useTheme();
-  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black';
+  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray';
 
   const iconDef = resolveSkillIcon(skill.id, skill.source);
   const remoteUrl = !iconDef ? skill.iconUrl : undefined;

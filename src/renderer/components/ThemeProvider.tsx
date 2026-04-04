@@ -1,8 +1,8 @@
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 
-type Theme = 'light' | 'dark' | 'dark-black' | 'system';
-type EffectiveTheme = 'light' | 'dark' | 'dark-black';
+type Theme = 'light' | 'dark' | 'dark-black' | 'dark-gray' | 'system';
+type EffectiveTheme = 'light' | 'dark' | 'dark-black' | 'dark-gray';
 
 function getSystemTheme(): EffectiveTheme {
   if (typeof window === 'undefined') return 'light';
@@ -15,12 +15,14 @@ function applyTheme(theme: Theme, systemTheme: EffectiveTheme) {
   const root = document.documentElement;
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
-  root.classList.remove('dark', 'dark-black');
+  root.classList.remove('dark', 'dark-black', 'dark-gray');
 
   if (effectiveTheme === 'dark') {
     root.classList.add('dark');
   } else if (effectiveTheme === 'dark-black') {
     root.classList.add('dark', 'dark-black');
+  } else if (effectiveTheme === 'dark-gray') {
+    root.classList.add('dark', 'dark-gray');
   }
 }
 
@@ -59,7 +61,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = () => {
     const base = theme === 'system' ? effectiveTheme : theme;
-    const next: Theme = base === 'light' ? 'dark' : base === 'dark' ? 'dark-black' : 'light';
+    const next: Theme = base === 'light' ? 'dark' : base === 'dark' ? 'dark-gray' : base === 'dark-gray' ? 'dark-black' : 'light';
     setTheme(next);
   };
 

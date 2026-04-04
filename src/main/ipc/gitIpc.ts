@@ -431,9 +431,23 @@ export function registerGitIpc() {
       draft?: boolean;
       web?: boolean;
       fill?: boolean;
+      skipPrePush?: boolean;
+      createBranchIfOnDefault?: boolean;
+      branchPrefix?: string;
     }
   ): Promise<{ success: boolean; url?: string; output?: string; error?: string; code?: string }> {
-    const { title, body, base, head, draft, web, fill } = opts;
+    const {
+      title,
+      body,
+      base,
+      head,
+      draft,
+      web,
+      fill,
+      skipPrePush,
+      createBranchIfOnDefault = true,
+      branchPrefix = 'orch',
+    } = opts;
     const outputs: string[] = [];
 
     const autoCloseLinkedIssuesOnPrCreate = shouldAutoCloseLinkedIssuesOnPrCreate();
@@ -460,59 +474,60 @@ export function registerGitIpc() {
       enrichedBody: prBody,
     });
 
-    // Stage and commit pending changes
-    const statusResult = await remoteGitService.execGit(
-      connectionId,
-      taskPath,
-      'status --porcelain --untracked-files=all'
-    );
-    if (statusResult.stdout?.trim()) {
-      await remoteGitService.updateIndex(connectionId, taskPath, {
-        action: 'stage',
-        scope: 'all',
-      });
-      const commitResult = await remoteGitService.commit(
-        connectionId,
-        taskPath,
-        'stagehand: prepare pull request'
-      );
-      if (commitResult.exitCode !== 0 && !/nothing to commit/i.test(commitResult.stderr || '')) {
-        outputs.push(commitResult.stderr || '');
-      }
-    }
-
-    // Push branch
-    const pushResult = await remoteGitService.push(connectionId, taskPath);
-    if (pushResult.exitCode !== 0) {
-      const branch = await remoteGitService.getCurrentBranch(connectionId, taskPath);
-      const retryResult = await remoteGitService.push(connectionId, taskPath, branch, true);
-      if (retryResult.exitCode !== 0) {
-        return {
-          success: false,
-          error:
-            'Failed to push branch to origin. Please check your Git remotes and authentication.',
-        };
-      }
-    }
-    outputs.push('git push: success');
-
-    // Resolve branches
-    const currentBranch = await remoteGitService.getCurrentBranch(connectionId, taskPath);
+    let currentBranch = await remoteGitService.getCurrentBranch(connectionId, taskPath);
     const defaultBranch = await remoteGitService.getDefaultBranchName(connectionId, taskPath);
 
-    // Validate commits ahead
+    // Guard early so we don't create/push an empty branch when there are no commits
+    // to include in the pull request.
     const baseRef = base || defaultBranch;
-    const aheadResult = await remoteGitService.execGit(
+    const initialAheadResult = await remoteGitService.execGit(
       connectionId,
       taskPath,
       `rev-list --count origin/${quoteGhArg(baseRef)}..HEAD`
     );
-    const aheadCount = parseInt((aheadResult.stdout || '0').trim(), 10) || 0;
-    if (aheadCount <= 0) {
+    const initialAheadCount = parseInt((initialAheadResult.stdout || '0').trim(), 10) || 0;
+    if (initialAheadCount <= 0) {
       return {
         success: false,
-        error: `No commits to create a PR. Make a commit on current branch '${currentBranch}' ahead of base '${baseRef}'.`,
+        error:
+          `No commits to create a PR. Commit your changes first, then create the PR. ` +
+          `(current branch: '${currentBranch}', base: '${baseRef}')`,
       };
+    }
+
+    if (!skipPrePush) {
+      if (createBranchIfOnDefault && (!currentBranch || currentBranch === defaultBranch)) {
+        const short = Date.now().toString(36);
+        const nextBranch = `${branchPrefix}/${short}`;
+        await remoteGitService.createBranch(connectionId, taskPath, nextBranch);
+        currentBranch = nextBranch;
+        outputs.push(`git checkout -b ${nextBranch}: success`);
+      }
+
+      const pushResult = await remoteGitService.push(connectionId, taskPath);
+      if (pushResult.exitCode !== 0) {
+        const branchForPush = currentBranch || (await remoteGitService.getCurrentBranch(connectionId, taskPath));
+        const retryResult = await remoteGitService.push(
+          connectionId,
+          taskPath,
+          branchForPush,
+          true
+        );
+        if (retryResult.exitCode !== 0) {
+          return {
+            success: false,
+            error:
+              'Failed to push branch to origin. Please check your Git remotes and authentication.',
+          };
+        }
+        outputs.push(`git push --set-upstream origin ${branchForPush}: success`);
+      } else {
+        outputs.push('git push: success');
+      }
+    }
+
+    if (!currentBranch) {
+      currentBranch = await remoteGitService.getCurrentBranch(connectionId, taskPath);
     }
 
     // Build gh pr create command
@@ -1240,9 +1255,23 @@ export function registerGitIpc() {
         web?: boolean;
         fill?: boolean;
         skipPrePush?: boolean;
+        createBranchIfOnDefault?: boolean;
+        branchPrefix?: string;
       }
     ) => {
-      const { taskPath, title, body, base, head, draft, web, fill, skipPrePush } =
+      const {
+        taskPath,
+        title,
+        body,
+        base,
+        head,
+        draft,
+        web,
+        fill,
+        skipPrePush,
+        createBranchIfOnDefault = true,
+        branchPrefix = 'orch',
+      } =
         args ||
         ({} as {
           taskPath: string;
@@ -1254,6 +1283,8 @@ export function registerGitIpc() {
           web?: boolean;
           fill?: boolean;
           skipPrePush?: boolean;
+          createBranchIfOnDefault?: boolean;
+          branchPrefix?: string;
         });
       try {
         const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
@@ -1266,6 +1297,9 @@ export function registerGitIpc() {
             draft,
             web,
             fill,
+            skipPrePush,
+            createBranchIfOnDefault,
+            branchPrefix,
           });
         }
 
@@ -1288,74 +1322,6 @@ export function registerGitIpc() {
           rawBody: body,
           enrichedBody: prBody,
         });
-
-        // Stage, commit, and push — skip when the caller already did this (skipPrePush)
-        if (!skipPrePush) {
-          try {
-            const { stdout: statusOut } = await execAsync(
-              'git status --porcelain --untracked-files=all',
-              {
-                cwd: taskPath,
-              }
-            );
-            if (statusOut && statusOut.trim().length > 0) {
-              const { stdout: addOut, stderr: addErr } = await execAsync('git add -A', {
-                cwd: taskPath,
-              });
-              if (addOut?.trim()) outputs.push(addOut.trim());
-              if (addErr?.trim()) outputs.push(addErr.trim());
-
-              const commitMsg = 'stagehand: prepare pull request';
-              try {
-                const { stdout: commitOut, stderr: commitErr } = await execAsync(
-                  `git commit -m ${JSON.stringify(commitMsg)}`,
-                  { cwd: taskPath }
-                );
-                if (commitOut?.trim()) outputs.push(commitOut.trim());
-                if (commitErr?.trim()) outputs.push(commitErr.trim());
-              } catch (commitErr) {
-                const msg = commitErr instanceof Error ? commitErr.message : String(commitErr);
-                if (msg && /nothing to commit/i.test(msg)) {
-                  outputs.push('git commit: nothing to commit');
-                } else {
-                  throw commitErr;
-                }
-              }
-            }
-          } catch (stageErr) {
-            const stageMsg = stageErr instanceof Error ? stageErr.message : String(stageErr);
-            if (/nothing to commit/i.test(stageMsg)) {
-              outputs.push('git: nothing to commit');
-            } else {
-              log.error('Failed to stage/commit changes before PR:', stageMsg);
-              throw stageErr;
-            }
-          }
-
-          // Ensure branch is pushed to origin so PR includes latest commit
-          try {
-            await execAsync('git push', { cwd: taskPath });
-            outputs.push('git push: success');
-          } catch (pushErr) {
-            try {
-              const { stdout: branchOut } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-                cwd: taskPath,
-              });
-              const branch = branchOut.trim();
-              await execAsync(`git push --set-upstream origin ${JSON.stringify(branch)}`, {
-                cwd: taskPath,
-              });
-              outputs.push(`git push --set-upstream origin ${branch}: success`);
-            } catch (pushErr2) {
-              log.error('Failed to push branch before PR:', pushErr2 as string);
-              return {
-                success: false,
-                error:
-                  'Failed to push branch to origin. Please check your Git remotes and authentication.',
-              };
-            }
-          }
-        }
 
         // Determine current branch and default base branch (fallback to main)
         let currentBranch = '';
@@ -1382,9 +1348,10 @@ export function registerGitIpc() {
           } catch {}
         }
 
-        // Guard: ensure there is at least one commit ahead of base
+        // Guard early so we don't create/push an empty branch when there are no
+        // commits to include in the pull request.
+        const baseRef = base || defaultBranch;
         try {
-          const baseRef = base || defaultBranch;
           const { stdout: aheadOut } = await execAsync(
             `git rev-list --count ${JSON.stringify(`origin/${baseRef}`)}..HEAD`,
             { cwd: taskPath }
@@ -1393,12 +1360,50 @@ export function registerGitIpc() {
           if (aheadCount <= 0) {
             return {
               success: false,
-              error: `No commits to create a PR. Make a commit on 
-current branch '${currentBranch}' ahead of base '${baseRef}'.`,
+              error:
+                `No commits to create a PR. Commit your changes first, then create the PR. ` +
+                `(current branch: '${currentBranch}', base: '${baseRef}')`,
             };
           }
         } catch {
-          // Non-fatal; continue
+          // Non-fatal; continue and let later gh/git errors surface.
+        }
+
+        // Optionally create a feature branch and push it before opening the PR.
+        // This prepares the branch for PR creation without creating a commit.
+        if (!skipPrePush) {
+          if (createBranchIfOnDefault && (!currentBranch || currentBranch === defaultBranch)) {
+            const short = Date.now().toString(36);
+            const nextBranch = `${branchPrefix}/${short}`;
+            await execAsync(`git checkout -b ${JSON.stringify(nextBranch)}`, { cwd: taskPath });
+            currentBranch = nextBranch;
+            outputs.push(`git checkout -b ${nextBranch}: success`);
+          }
+
+          try {
+            await execAsync('git push', { cwd: taskPath });
+            outputs.push('git push: success');
+          } catch (pushErr) {
+            try {
+              const branch = currentBranch || (
+                await execAsync('git rev-parse --abbrev-ref HEAD', {
+                  cwd: taskPath,
+                })
+              ).stdout.trim();
+              if (branch) currentBranch = branch;
+              await execAsync(`git push --set-upstream origin ${JSON.stringify(branch)}`, {
+                cwd: taskPath,
+              });
+              outputs.push(`git push --set-upstream origin ${branch}: success`);
+            } catch (pushErr2) {
+              log.error('Failed to push branch before PR:', pushErr2 as string);
+              return {
+                success: false,
+                error:
+                  'Failed to push branch to origin. Please check your Git remotes and authentication.',
+              };
+            }
+          }
         }
 
         // Build gh pr create command

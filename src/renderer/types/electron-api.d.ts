@@ -539,6 +539,8 @@ declare global {
         web?: boolean;
         fill?: boolean;
         skipPrePush?: boolean;
+        createBranchIfOnDefault?: boolean;
+        branchPrefix?: string;
       }) => Promise<{
         success: boolean;
         url?: string;
@@ -1753,6 +1755,8 @@ export interface ElectronAPI {
     web?: boolean;
     fill?: boolean;
     skipPrePush?: boolean;
+    createBranchIfOnDefault?: boolean;
+    branchPrefix?: string;
   }) => Promise<{
     success: boolean;
     url?: string;

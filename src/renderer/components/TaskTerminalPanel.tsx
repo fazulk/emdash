@@ -856,7 +856,6 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
       {/* Scripts row — shown below the toolbar when custom scripts exist */}
       {task && customScriptNames.length > 0 && (
         <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-2 py-1.5 dark:bg-background/50">
-          <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">Scripts</span>
           <TooltipProvider delayDuration={200}>
             {customScriptNames.map((name, i) => {
               const isActive = selection.selectedScript === name;
@@ -864,7 +863,12 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
               return (
                 <React.Fragment key={`script-row::${name}`}>
                   {i > 0 && <div className="mx-1 h-4 w-px bg-border" />}
-                  <div className="flex items-center gap-0">
+                  <div
+                    className={cn(
+                      'flex items-center gap-0 overflow-hidden rounded-md',
+                      isActive && 'bg-accent',
+                    )}
+                  >
                     {/* Label — navigates to this script's terminal */}
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -873,8 +877,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                           size="sm"
                           onClick={() => selection.onChange(`script::${name}`)}
                           className={cn(
-                            'h-6 gap-1 rounded-r-none px-1.5 text-[11px] font-medium',
-                            isActive && 'bg-accent',
+                            'h-6 gap-1 rounded-none px-1.5 text-[11px] font-medium hover:bg-transparent',
                             isScriptRunning
                               ? 'text-blue-500 dark:text-blue-400'
                               : 'text-muted-foreground hover:text-foreground',
@@ -900,7 +903,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                             variant="ghost"
                             size="icon-sm"
                             onClick={() => handleScriptStop(name)}
-                            className="h-6 w-6 rounded-l-none text-muted-foreground hover:text-destructive"
+                            className="h-6 w-6 rounded-none text-muted-foreground hover:bg-transparent hover:text-destructive"
                           >
                             <Square className="h-3 w-3" />
                           </Button>
@@ -912,10 +915,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                               selection.onChange(`script::${name}`);
                               handleScriptPlay(name);
                             }}
-                            className={cn(
-                              'h-6 w-6 rounded-l-none text-muted-foreground hover:text-foreground',
-                              isActive && 'bg-accent',
-                            )}
+                            className="h-6 w-6 rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
                           >
                             <Play className="h-3 w-3" />
                           </Button>
@@ -933,7 +933,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                             variant="ghost"
                             size="icon-sm"
                             onClick={() => handleScriptRestart(name)}
-                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            className="h-6 w-6 rounded-none text-muted-foreground hover:bg-transparent hover:text-foreground"
                           >
                             <RotateCw className="h-3 w-3" />
                           </Button>

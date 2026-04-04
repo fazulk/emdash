@@ -3,6 +3,7 @@ import { useToast } from './use-toast';
 import { ToastAction } from '../components/ui/toast';
 import { ArrowUpRight } from 'lucide-react';
 import githubLogo from '../../assets/images/github.png';
+
 type CreatePROptions = {
   taskPath: string;
   commitMessage?: string;
@@ -19,6 +20,25 @@ type CreatePROptions = {
   };
   onSuccess?: () => Promise<void> | void;
 };
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.ceil(ms / 1000)}s`));
+    }, ms);
+
+    void promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
 
 export function useCreatePR() {
   const { toast } = useToast();
@@ -40,7 +60,7 @@ export function useCreatePR() {
     try {
       // Guard: ensure Electron bridge methods exist (prevents hard crashes in plain web builds)
       const api: any = (window as any).electronAPI;
-      if (!api?.gitCommitAndPush || !api?.createPullRequest) {
+      if (!api?.createPullRequest) {
         const msg = 'PR creation is only available in the Electron app. Start via "pnpm run d".';
         toast({ title: 'Create PR Unavailable', description: msg, variant: 'destructive' });
         return { success: false, error: 'Electron bridge unavailable' } as any;
@@ -49,25 +69,56 @@ export function useCreatePR() {
       const finalPrOptions = { ...(prOptions || {}) };
       const inferredName = taskPath.split(/[/\\]/).filter(Boolean).pop() || 'Task';
 
-      // Start PR content generation in parallel with commit+push when title/body not provided.
-      // This saves 10-30s by overlapping the LLM call with git operations.
+      let branchStatus: any = null;
+      let defaultBranch = 'main';
+      try {
+        branchStatus = await api.getBranchStatus?.({ taskPath });
+        if (branchStatus?.success && branchStatus.defaultBranch) {
+          defaultBranch = branchStatus.defaultBranch;
+        }
+      } catch {}
+
+      const baseBranch = finalPrOptions.base || defaultBranch;
+
+      // Guard: PR creation only includes committed changes. If there are no commits
+      // to compare against the default/base branch, fail fast instead of letting gh
+      // fall into an interactive flow.
+      if (
+        branchStatus?.success &&
+        (!finalPrOptions.base || finalPrOptions.base === defaultBranch)
+      ) {
+        const branch = typeof branchStatus.branch === 'string' ? branchStatus.branch : '';
+        const hasCommitsForPr =
+          branch && branch === defaultBranch
+            ? (branchStatus.ahead ?? 0) > 0
+            : (branchStatus.aheadOfDefault ?? 0) > 0;
+
+        if (!hasCommitsForPr) {
+          const message =
+            'Only committed changes can be included in a pull request. Commit your changes first, then create the PR.';
+          toast({
+            title: 'No committed changes for PR',
+            description: message,
+            variant: 'destructive',
+          });
+          return { success: false, error: message } as any;
+        }
+      }
+
+      // Generate PR content when title/body are not provided.
       let generatePromise: Promise<any> | null = null;
       if (!finalPrOptions.title || !finalPrOptions.body) {
         generatePromise = (async () => {
           try {
-            let defaultBranch = 'main';
-            try {
-              const branchStatus = await api.getBranchStatus?.({ taskPath });
-              if (branchStatus?.success && branchStatus.defaultBranch) {
-                defaultBranch = branchStatus.defaultBranch;
-              }
-            } catch {}
-
             if (api.generatePrContent) {
-              return await api.generatePrContent({
-                taskPath,
-                base: finalPrOptions.base || defaultBranch,
-              });
+              return await withTimeout(
+                api.generatePrContent({
+                  taskPath,
+                  base: baseBranch,
+                }),
+                8000,
+                'PR content generation'
+              );
             }
           } catch {
             // Non-fatal: fallback title will be used
@@ -76,25 +127,9 @@ export function useCreatePR() {
         })();
       }
 
-      // Use a simple commit message derived from task path while generation runs in parallel
-      const commitMessage = explicitCommitMessage || finalPrOptions.title || inferredName;
-
-      // Run commit+push concurrently with PR content generation
-      const commitRes = await api.gitCommitAndPush({
-        taskPath,
-        commitMessage,
-        createBranchIfOnDefault,
-        branchPrefix,
-      });
-
-      if (!commitRes?.success) {
-        toast({
-          title: 'Commit/Push Failed',
-          description: commitRes?.error || 'Unable to push changes.',
-          variant: 'destructive',
-        });
-        return { success: false, error: commitRes?.error || 'Commit/push failed' } as any;
-      }
+      // Preserve backward compatibility with callers that still pass commitMessage,
+      // but PR creation no longer creates a commit.
+      void explicitCommitMessage;
 
       // Now await the parallel generation result (if started) and apply it
       if (generatePromise) {
@@ -114,12 +149,17 @@ export function useCreatePR() {
         finalPrOptions.title = inferredName;
       }
 
-      const res = await api.createPullRequest({
-        taskPath,
-        fill: true,
-        skipPrePush: true, // commit+push already done above
-        ...finalPrOptions,
-      });
+      const res: any = await withTimeout<any>(
+        api.createPullRequest({
+          taskPath,
+          fill: true,
+          createBranchIfOnDefault,
+          branchPrefix,
+          ...finalPrOptions,
+        }),
+        45000,
+        'Pull request creation'
+      );
 
       if (res?.success) {
         void (async () => {
@@ -248,7 +288,7 @@ export function useCreatePR() {
                   // Retry using web flow
                   void createPR({
                     taskPath,
-                    commitMessage,
+                    commitMessage: explicitCommitMessage,
                     createBranchIfOnDefault,
                     branchPrefix,
                     prOptions: { ...(prOptions || {}), web: true, fill: true },

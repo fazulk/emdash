@@ -22,12 +22,9 @@ import {
   Puzzle,
   Plug,
   Timer,
-  Archive,
-  RotateCcw,
   ChevronRight,
   ArrowUpDown,
   Check,
-  Trash2,
 } from 'lucide-react';
 import SidebarEmptyState from '../SidebarEmptyState';
 import { TaskItem } from '../TaskItem';
@@ -304,13 +301,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const {
     activeTask,
     tasksByProjectId,
-    archivedTasksByProjectId,
     handleSelectTask: onSelectTask,
     handleStartCreateTaskFromSidebar: onCreateTaskForProject,
     handleOpenCreateTaskFromCurrentBranchModal,
     handleRenameTask: onRenameTask,
     handleArchiveTask: onArchiveTask,
-    handleRestoreTask: onRestoreTask,
     handleDeleteTask,
     handlePinTask,
   } = useTaskManagementContext();
@@ -644,58 +639,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                     );
                                   }}
                                 </ReorderList>
-                                {(archivedTasksByProjectId[typedProject.id]?.length ?? 0) > 0 && (
-                                  <Collapsible className="group/archived mt-1">
-                                    <CollapsibleTrigger asChild>
-                                      <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-black/5">
-                                        <Archive className="h-3 w-3 opacity-50" />
-                                        <span>
-                                          Archived (
-                                          {archivedTasksByProjectId[typedProject.id].length})
-                                        </span>
-                                        <ChevronRight className="ml-auto h-3 w-3 transition-transform group-data-[state=open]/archived:rotate-90" />
-                                      </button>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                      <div className="ml-1.5 space-y-0.5 border-l pl-2">
-                                        {archivedTasksByProjectId[typedProject.id].map(
-                                          (archivedTask) => (
-                                            <div
-                                              key={archivedTask.id}
-                                              className="group flex min-w-0 items-center justify-between gap-2 px-2 py-1.5 text-muted-foreground"
-                                            >
-                                              <span className="truncate text-xs font-medium">
-                                                {archivedTask.name}
-                                              </span>
-                                              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon-sm"
-                                                  onClick={() =>
-                                                    onRestoreTask?.(typedProject, archivedTask)
-                                                  }
-                                                  aria-label={`Unarchive task ${archivedTask.name}`}
-                                                >
-                                                  <RotateCcw className="h-3 w-3" />
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon-sm"
-                                                  onClick={() =>
-                                                    handleDeleteTask(typedProject, archivedTask)
-                                                  }
-                                                  aria-label={`Delete archived task ${archivedTask.name}`}
-                                                >
-                                                  <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                              </div>
-                                            </div>
-                                          )
-                                        )}
-                                      </div>
-                                    </CollapsibleContent>
-                                  </Collapsible>
-                                )}
                               </div>
                             </CollapsibleContent>
                           </Collapsible>

@@ -842,11 +842,16 @@ const ChatInterface: React.FC<Props> = ({
         return;
       }
 
-      // Dispose the terminal for this chat
+      // Dispose the terminal for this chat and fully clean up its PTY.
       const convToDelete = conversations.find((c) => c.id === conversationId);
       const convAgent = (convToDelete?.provider ?? 'claude') as Agent;
       const terminalToDispose = makePtyId(convAgent, 'chat', conversationId);
       terminalSessionRegistry.dispose(terminalToDispose);
+      try {
+        await window.electronAPI.ptyCleanupSessions({ ids: [terminalToDispose] });
+      } catch {
+        // Continue closing the chat even if PTY cleanup fails.
+      }
 
       await rpc.db.deleteConversation(conversationId);
 

@@ -11,12 +11,18 @@ const {
   updateConversationTitleMock,
   getOrCreateDefaultConversationMock,
   saveTaskMock,
+  deleteConversationMock,
+  terminalDisposeMock,
+  ptyCleanupSessionsMock,
 } = vi.hoisted(() => ({
   getConversationsMock: vi.fn(),
   setActiveConversationMock: vi.fn(),
   updateConversationTitleMock: vi.fn(),
   getOrCreateDefaultConversationMock: vi.fn(),
   saveTaskMock: vi.fn(),
+  deleteConversationMock: vi.fn(),
+  terminalDisposeMock: vi.fn(),
+  ptyCleanupSessionsMock: vi.fn(),
 }));
 
 vi.mock('../../renderer/hooks/use-toast', () => ({
@@ -164,7 +170,7 @@ vi.mock('../../renderer/lib/rpc', () => ({
       getOrCreateDefaultConversation: getOrCreateDefaultConversationMock,
       saveTask: saveTaskMock,
       createConversation: vi.fn(),
-      deleteConversation: vi.fn(),
+      deleteConversation: deleteConversationMock,
       updateConversation: vi.fn(),
     },
   },
@@ -177,7 +183,7 @@ vi.mock('@shared/providers/registry', () => ({
 vi.mock('../../renderer/terminal/SessionRegistry', () => ({
   terminalSessionRegistry: {
     getSession: () => null,
-    dispose: vi.fn(),
+    dispose: terminalDisposeMock,
   },
 }));
 
@@ -245,6 +251,7 @@ describe('ChatInterface refresh tab restore', () => {
         onPtyStarted: vi.fn(() => () => {}),
         openExternal: vi.fn(),
         ptyInput: vi.fn(),
+        ptyCleanupSessions: ptyCleanupSessionsMock,
       },
       configurable: true,
     });
@@ -321,6 +328,80 @@ describe('ChatInterface refresh tab restore', () => {
     expect(setActiveConversationMock).toHaveBeenCalledWith({
       taskId: 'task-1',
       conversationId: 'conv-main',
+    });
+  });
+
+  it('fully cleans up the chat PTY when closing a chat', async () => {
+    getConversationsMock
+      .mockResolvedValueOnce([
+        {
+          id: 'conv-main',
+          taskId: 'task-1',
+          title: 'Claude',
+          provider: undefined,
+          isMain: true,
+          isActive: true,
+          createdAt: '2026-04-03T00:00:00.000Z',
+          updatedAt: '2026-04-03T00:00:00.000Z',
+        },
+        {
+          id: 'conv-codex',
+          taskId: 'task-1',
+          title: 'Codex',
+          provider: 'codex',
+          isMain: false,
+          isActive: false,
+          createdAt: '2026-04-03T00:01:00.000Z',
+          updatedAt: '2026-04-03T00:01:00.000Z',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'conv-main',
+          taskId: 'task-1',
+          title: 'Claude',
+          provider: undefined,
+          isMain: true,
+          isActive: true,
+          createdAt: '2026-04-03T00:00:00.000Z',
+          updatedAt: '2026-04-03T00:00:00.000Z',
+        },
+      ]);
+
+    render(
+      <ChatInterface
+        task={{
+          id: 'task-1',
+          projectId: 'project-1',
+          name: 'Refresh bug',
+          branch: 'main',
+          path: '/tmp/task-1',
+          status: 'active',
+          useWorktree: true,
+          agentId: 'claude',
+          metadata: null,
+        } as any}
+        project={null}
+        projectName="Project"
+        projectPath="/tmp/project"
+        initialAgent="claude"
+      />
+    );
+
+    await screen.findByText('Codex');
+
+    const codexTab = screen.getByText('Codex').closest('div');
+    const closeButton = codexTab?.querySelector('[title="Close chat"]') as HTMLElement | null;
+    expect(closeButton).toBeTruthy();
+
+    fireEvent.click(closeButton!);
+
+    await waitFor(() => {
+      expect(terminalDisposeMock).toHaveBeenCalledWith(makePtyId('codex', 'chat', 'conv-codex'));
+      expect(ptyCleanupSessionsMock).toHaveBeenCalledWith({
+        ids: [makePtyId('codex', 'chat', 'conv-codex')],
+      });
+      expect(deleteConversationMock).toHaveBeenCalledWith('conv-codex');
     });
   });
 });

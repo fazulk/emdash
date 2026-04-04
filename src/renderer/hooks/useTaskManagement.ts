@@ -968,61 +968,27 @@ export function useTaskManagement() {
       project,
       task,
       newName,
-      newBranch,
     }: {
       project: Project;
       task: Task;
       newName: string;
-      newBranch: string;
     }) => {
-      const oldBranch = task.branch;
-      let branchRenamed = false;
-
-      if (newBranch !== oldBranch) {
-        const branchResult = await window.electronAPI.renameBranch({
-          repoPath: task.path,
-          oldBranch,
-          newBranch,
-        });
-        if (!branchResult?.success) {
-          throw new Error(branchResult?.error || 'Failed to rename branch');
-        }
-        branchRenamed = true;
-      }
-
       const updatedMetadata = task.metadata?.nameGenerated
         ? { ...task.metadata, nameGenerated: null }
         : task.metadata;
 
-      try {
-        await rpc.db.saveTask({
-          ...task,
-          name: newName,
-          branch: newBranch,
-          metadata: updatedMetadata,
-        });
-      } catch (err) {
-        if (branchRenamed) {
-          try {
-            await window.electronAPI.renameBranch({
-              repoPath: task.path,
-              oldBranch: newBranch,
-              newBranch: oldBranch,
-            });
-          } catch (rollbackErr) {
-            const { log } = await import('../lib/logger');
-            log.error('Failed to rollback branch rename:', rollbackErr as any);
-          }
-        }
-        throw err;
-      }
+      await rpc.db.saveTask({
+        ...task,
+        name: newName,
+        metadata: updatedMetadata,
+      });
     },
-    onMutate: ({ project, task, newName, newBranch }) => {
+    onMutate: ({ project, task, newName }) => {
       // Optimistic cache update
       updateTaskCache(project.id, (old) =>
         old.map((t) => {
           if (t.id !== task.id) return t;
-          const updated = { ...t, name: newName, branch: newBranch };
+          const updated = { ...t, name: newName };
           if (updated.metadata?.nameGenerated) {
             updated.metadata = { ...updated.metadata, nameGenerated: null };
           }
@@ -1049,24 +1015,12 @@ export function useTaskManagement() {
 
   const handleRenameTask = useCallback(
     async (targetProject: Project, task: Task, newName: string) => {
-      const oldBranch = task.branch;
-      let newBranch: string;
-      const branchMatch = oldBranch.match(/^([^/]+)\/(.+)-([a-z0-9]+)$/i);
-      if (branchMatch) {
-        const [, prefix, , hash] = branchMatch;
-        const sluggedName = newName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '');
-        newBranch = `${prefix}/${sluggedName}-${hash}`;
-      } else {
-        newBranch = oldBranch;
-      }
+      // Renaming a task is purely a visual/organisational action – the
+      // underlying git branch is intentionally left unchanged.
       await renameTaskMutation.mutateAsync({
         project: targetProject,
         task,
         newName,
-        newBranch,
       });
     },
     [renameTaskMutation]

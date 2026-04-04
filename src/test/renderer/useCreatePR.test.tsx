@@ -90,6 +90,79 @@ describe('useCreatePR', () => {
     });
   });
 
+  it('uses generated AI title and description when available', async () => {
+    getBranchStatusMock.mockResolvedValue({
+      success: true,
+      branch: 'feature/task-1',
+      defaultBranch: 'main',
+      ahead: 0,
+      aheadOfDefault: 1,
+    });
+    generatePrContentMock.mockResolvedValue({
+      success: true,
+      title: 'feat: improve PR generation',
+      description: '## Summary\n\n- Generate a better title\n- Add an initial PR description',
+    });
+
+    render(<TestHarness options={{ taskPath: '/tmp/repo' }} />);
+
+    await waitFor(() => expect(createPullRequestMock).toHaveBeenCalledTimes(1));
+
+    expect(createPullRequestMock).toHaveBeenCalledWith({
+      taskPath: '/tmp/repo',
+      title: 'feat: improve PR generation',
+      body: '## Summary\n\n- Generate a better title\n- Add an initial PR description',
+      fill: true,
+      createBranchIfOnDefault: true,
+      branchPrefix: 'orch',
+    });
+  });
+
+  it(
+    'waits long enough for slower AI PR generation before falling back',
+    async () => {
+      vi.useFakeTimers();
+      getBranchStatusMock.mockResolvedValue({
+        success: true,
+        branch: 'feature/task-1',
+        defaultBranch: 'main',
+        ahead: 0,
+        aheadOfDefault: 1,
+      });
+      generatePrContentMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                success: true,
+                title: 'fix: generate PR metadata from branch changes',
+                description: '## Summary\n\n- Infer the PR title\n- Infer the initial description',
+              });
+            }, 10000);
+          })
+      );
+
+      render(<TestHarness options={{ taskPath: '/tmp/repo' }} />);
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(10000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(createPullRequestMock).toHaveBeenCalledTimes(1);
+      expect(createPullRequestMock).toHaveBeenCalledWith({
+        taskPath: '/tmp/repo',
+        title: 'fix: generate PR metadata from branch changes',
+        body: '## Summary\n\n- Infer the PR title\n- Infer the initial description',
+        fill: true,
+        createBranchIfOnDefault: true,
+        branchPrefix: 'orch',
+      });
+    },
+    10000
+  );
+
   it('fails fast when there are no committed changes for a PR', async () => {
     getBranchStatusMock.mockResolvedValue({
       success: true,

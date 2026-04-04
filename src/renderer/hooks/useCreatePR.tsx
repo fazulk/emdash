@@ -116,7 +116,7 @@ export function useCreatePR() {
                   taskPath,
                   base: baseBranch,
                 }),
-                8000,
+                30000,
                 'PR content generation'
               );
             }

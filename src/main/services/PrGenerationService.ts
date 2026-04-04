@@ -1,10 +1,14 @@
 import { execFile, spawn } from 'child_process';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'util';
 import { log } from '../lib/logger';
 import { getProvider, PROVIDER_IDS, type ProviderId } from '../../shared/providers/registry';
 import { stripAnsi } from '@shared/text/stripAnsi';
 
 const execFileAsync = promisify(execFile);
+const CODEX_MODEL = 'gpt-5.4-mini';
 
 export interface GeneratedPrContent {
   title: string;
@@ -27,49 +31,79 @@ export class PrGenerationService {
     preferredProviderId?: string | null
   ): Promise<GeneratedPrContent> {
     try {
-      // Get git diff and commit messages
-      const { diff, commits, changedFiles } = await this.getGitContext(taskPath, baseBranch);
-
-      if (!diff && commits.length === 0) {
-        return this.generateFallbackContent(changedFiles);
-      }
-
-      // Build ordered list of providers to try: preferred → claude → remaining
-      const attempted = new Set<ProviderId>();
-      const tryOrder: ProviderId[] = [];
-
-      if (preferredProviderId && this.isValidProviderId(preferredProviderId)) {
-        tryOrder.push(preferredProviderId as ProviderId);
-      }
-      tryOrder.push('claude');
-      for (const id of PROVIDER_IDS) {
-        tryOrder.push(id);
-      }
-
-      for (const providerId of tryOrder) {
-        if (attempted.has(providerId)) continue;
-        attempted.add(providerId);
-
-        try {
-          const result = await this.generateWithProvider(providerId, taskPath, diff, commits);
-          if (result) {
-            log.info(`Generated PR content with ${providerId}`);
-            return {
-              title: result.title,
-              description: this.normalizeMarkdown(result.description),
-            };
-          }
-        } catch (error) {
-          log.debug(`Provider ${providerId} generation failed, trying next`, { error });
-        }
-      }
-
-      // Fallback to heuristic-based generation
-      return this.generateHeuristicContent(diff, commits, changedFiles);
+      const context = await this.getGitContext(taskPath, baseBranch);
+      return await this.generatePrContentFromContext({
+        taskPath,
+        preferredProviderId,
+        ...context,
+      });
     } catch (error) {
       log.error('Failed to generate PR content', { error });
       return this.generateFallbackContent([]);
     }
+  }
+
+  async generatePrContentFromContext(args: {
+    taskPath: string;
+    diff: string;
+    commits: string[];
+    changedFiles: string[];
+    preferredProviderId?: string | null;
+  }): Promise<GeneratedPrContent> {
+    const { taskPath, diff, commits, changedFiles, preferredProviderId } = args;
+
+    if (!diff && commits.length === 0) {
+      return this.generateFallbackContent(changedFiles);
+    }
+
+    try {
+      const codexResult = await this.generateWithCodex(diff, commits, changedFiles);
+      if (codexResult) {
+        log.info('Generated PR content with codex exec', { model: CODEX_MODEL });
+        return {
+          title: codexResult.title,
+          description: this.normalizeMarkdown(codexResult.description),
+        };
+      }
+    } catch (error) {
+      log.warn('Codex PR generation failed, falling back to provider pipeline', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Build ordered list of providers to try after Codex: preferred → claude → remaining
+    const attempted = new Set<ProviderId>();
+    const tryOrder: ProviderId[] = [];
+
+    if (preferredProviderId && this.isValidProviderId(preferredProviderId)) {
+      tryOrder.push(preferredProviderId as ProviderId);
+    }
+    tryOrder.push('claude');
+    for (const id of PROVIDER_IDS) {
+      tryOrder.push(id);
+    }
+
+    for (const providerId of tryOrder) {
+      if (providerId === 'codex') continue;
+      if (attempted.has(providerId)) continue;
+      attempted.add(providerId);
+
+      try {
+        const result = await this.generateWithProvider(providerId, taskPath, diff, commits);
+        if (result) {
+          log.info(`Generated PR content with ${providerId}`);
+          return {
+            title: result.title,
+            description: this.normalizeMarkdown(result.description),
+          };
+        }
+      } catch (error) {
+        log.debug(`Provider ${providerId} generation failed, trying next`, { error });
+      }
+    }
+
+    // Fallback to heuristic-based generation
+    return this.generateHeuristicContent(diff, commits, changedFiles);
   }
 
   /**
@@ -237,6 +271,89 @@ export class PrGenerationService {
     if (provider.useKeystrokeInjection) return false;
     if (provider.initialPromptFlag === undefined) return false;
     return true;
+  }
+
+  private async generateWithCodex(
+    diff: string,
+    commits: string[],
+    changedFiles: string[]
+  ): Promise<GeneratedPrContent | null> {
+    try {
+      await execFileAsync('codex', ['--version']);
+    } catch {
+      log.debug('Codex CLI not available for PR generation');
+      return null;
+    }
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'emdash-pr-generation-'));
+    const outputPath = path.join(tempDir, 'pr-content.json');
+    const schemaPath = path.join(tempDir, 'pr-schema.json');
+
+    try {
+      await fs.writeFile(
+        schemaPath,
+        JSON.stringify({
+          type: 'object',
+          additionalProperties: false,
+          required: ['title', 'description'],
+          properties: {
+            title: { type: 'string', minLength: 1, maxLength: 72 },
+            description: { type: 'string', minLength: 1 },
+          },
+        }),
+        'utf8'
+      );
+
+      const prompt = this.buildCodexPrGenerationPrompt(diff, commits, changedFiles);
+
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(
+          'codex',
+          [
+            'exec',
+            '--model',
+            CODEX_MODEL,
+            '--sandbox',
+            'read-only',
+            '--skip-git-repo-check',
+            '--color',
+            'never',
+            '--output-schema',
+            schemaPath,
+            '--output-last-message',
+            outputPath,
+            prompt,
+          ],
+          {
+            cwd: tempDir,
+            env: process.env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
+
+        let stderr = '';
+
+        child.stderr?.on('data', (chunk: Buffer | string) => {
+          stderr += chunk.toString();
+        });
+
+        child.on('error', reject);
+        child.on('exit', (code) => {
+          if (code === 0) {
+            resolve();
+            return;
+          }
+
+          reject(new Error(stderr.trim() || `codex exited with code ${code ?? 'unknown'}`));
+        });
+      });
+
+      const raw = await fs.readFile(outputPath, 'utf8');
+      const parsed = this.parseProviderResponse(raw);
+      return parsed;
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
   }
 
   /**
@@ -413,6 +530,46 @@ export class PrGenerationService {
         child.stdin.end();
       }
     });
+  }
+
+  private buildCodexPrGenerationPrompt(
+    diff: string,
+    commits: string[],
+    changedFiles: string[]
+  ): string {
+    const commitContext =
+      commits.length > 0 ? commits.map((c) => `- ${c}`).join('\n') : '(no commits found)';
+    const fileContext =
+      changedFiles.length > 0
+        ? changedFiles
+            .slice(0, 200)
+            .map((f) => `- ${f}`)
+            .join('\n')
+        : '(no changed files found)';
+    const diffContext = diff ? diff.substring(0, 6000) : '(no diff summary available)';
+
+    return `You are writing pull request metadata.
+
+Generate a high-quality pull request title and a brief initial pull request description based on the branch changes below.
+
+Requirements:
+- Infer intent from the full set of changes, not the branch name.
+- Return ONLY a JSON object matching the requested schema.
+- Title must be specific, concise, and <= 72 characters.
+- Prefer conventional-commit style for the title when it fits naturally.
+- Description should be brief but useful: 2-4 bullets or short sections in markdown.
+- Mention the main user-visible or developer-visible changes.
+- Do not say the description is unavailable.
+- Do not mention branch names.
+
+Commit subjects:
+${commitContext}
+
+Changed files:
+${fileContext}
+
+Diff summary:
+${diffContext}`;
   }
 
   /**

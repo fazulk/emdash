@@ -228,7 +228,13 @@ export function registerGitIpc() {
       createBranchIfOnDefault: boolean;
       branchPrefix: string;
     }
-  ): Promise<{ success: boolean; branch?: string; output?: string; error?: string; message?: string }> {
+  ): Promise<{
+    success: boolean;
+    branch?: string;
+    output?: string;
+    error?: string;
+    message?: string;
+  }> {
     const { commitMessage, body, createBranchIfOnDefault, branchPrefix } = opts;
 
     // Verify git repo
@@ -506,7 +512,8 @@ export function registerGitIpc() {
 
       const pushResult = await remoteGitService.push(connectionId, taskPath);
       if (pushResult.exitCode !== 0) {
-        const branchForPush = currentBranch || (await remoteGitService.getCurrentBranch(connectionId, taskPath));
+        const branchForPush =
+          currentBranch || (await remoteGitService.getCurrentBranch(connectionId, taskPath));
         const retryResult = await remoteGitService.push(
           connectionId,
           taskPath,
@@ -1184,37 +1191,6 @@ export function registerGitIpc() {
     ) => {
       const { taskPath, base = 'main' } = args || ({} as { taskPath: string; base?: string });
       try {
-        // For remote projects, PR content generation still runs locally — it just needs
-        // the diff text. The prGenerationService can get diff data via the now-remote-aware
-        // git:get-status and git:get-file-diff handlers, or we pass the taskPath which the
-        // service uses with local git commands. For remote, we get the diff over SSH and
-        // pass it to the generation service.
-        const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
-        if (remoteProject) {
-          const connId = remoteProject.sshConnectionId;
-          // Get diff text over SSH
-          const diffResult = await remoteGitService.execGit(
-            connId,
-            taskPath,
-            `diff --stat origin/${quoteGhArg(base)}...HEAD`
-          );
-          const logResult = await remoteGitService.execGit(
-            connId,
-            taskPath,
-            `log --oneline origin/${quoteGhArg(base)}..HEAD`
-          );
-          const diffText = (diffResult.stdout || '').trim();
-          const logText = (logResult.stdout || '').trim();
-          // Use simple title/description generation from diff summary
-          const lines = logText.split('\n').filter((l) => l.trim());
-          const generatedTitle = lines.length === 1 ? lines[0].replace(/^[a-f0-9]+ /, '') : '';
-          return {
-            success: true,
-            title: generatedTitle,
-            description: diffText ? `## Changes\n\n\`\`\`\n${diffText}\n\`\`\`` : '',
-          };
-        }
-
         // Try to get the task to find which provider was used
         let providerId: string | null = null;
         try {
@@ -1226,6 +1202,47 @@ export function registerGitIpc() {
         } catch (error) {
           log.debug('Could not lookup task provider', { error });
           // Non-fatal - continue without provider
+        }
+
+        const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
+        if (remoteProject) {
+          const connId = remoteProject.sshConnectionId;
+          const [diffResult, commitsResult, filesResult] = await Promise.all([
+            remoteGitService.execGit(
+              connId,
+              taskPath,
+              `diff --stat origin/${quoteGhArg(base)}...HEAD`
+            ),
+            remoteGitService.execGit(
+              connId,
+              taskPath,
+              `log --pretty=format:%s origin/${quoteGhArg(base)}..HEAD`
+            ),
+            remoteGitService.execGit(
+              connId,
+              taskPath,
+              `diff --name-only origin/${quoteGhArg(base)}...HEAD`
+            ),
+          ]);
+
+          const diff = (diffResult.stdout || '').trim();
+          const commits = (commitsResult.stdout || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+          const changedFiles = (filesResult.stdout || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const result = await prGenerationService.generatePrContentFromContext({
+            taskPath,
+            diff,
+            commits,
+            changedFiles,
+            preferredProviderId: providerId,
+          });
+          return { success: true, ...result };
         }
 
         const result = await prGenerationService.generatePrContent(taskPath, base, providerId);
@@ -1271,21 +1288,20 @@ export function registerGitIpc() {
         skipPrePush,
         createBranchIfOnDefault = true,
         branchPrefix = 'orch',
-      } =
-        args ||
-        ({} as {
-          taskPath: string;
-          title?: string;
-          body?: string;
-          base?: string;
-          head?: string;
-          draft?: boolean;
-          web?: boolean;
-          fill?: boolean;
-          skipPrePush?: boolean;
-          createBranchIfOnDefault?: boolean;
-          branchPrefix?: string;
-        });
+      } = args ||
+      ({} as {
+        taskPath: string;
+        title?: string;
+        body?: string;
+        base?: string;
+        head?: string;
+        draft?: boolean;
+        web?: boolean;
+        fill?: boolean;
+        skipPrePush?: boolean;
+        createBranchIfOnDefault?: boolean;
+        branchPrefix?: string;
+      });
       try {
         const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
         if (remoteProject) {
@@ -1304,24 +1320,6 @@ export function registerGitIpc() {
         }
 
         const outputs: string[] = [];
-        const autoCloseLinkedIssuesOnPrCreate = shouldAutoCloseLinkedIssuesOnPrCreate();
-        let taskMetadata: unknown = undefined;
-        let prBody = body;
-        if (autoCloseLinkedIssuesOnPrCreate) {
-          try {
-            const task = await databaseService.getTaskByPath(taskPath);
-            taskMetadata = task?.metadata;
-            prBody = injectIssueFooter(body, task?.metadata);
-          } catch (error) {
-            log.debug('Unable to enrich PR body with issue footer', { taskPath, error });
-          }
-        }
-        const { shouldPatchFilledBody, shouldUseBodyFile, shouldUseFill } = getCreatePrBodyPlan({
-          fill,
-          title,
-          rawBody: body,
-          enrichedBody: prBody,
-        });
 
         // Determine current branch and default base branch (fallback to main)
         let currentBranch = '';
@@ -1369,6 +1367,25 @@ export function registerGitIpc() {
           // Non-fatal; continue and let later gh/git errors surface.
         }
 
+        const autoCloseLinkedIssuesOnPrCreate = shouldAutoCloseLinkedIssuesOnPrCreate();
+        let taskMetadata: unknown = undefined;
+        let prBody = body;
+        if (autoCloseLinkedIssuesOnPrCreate) {
+          try {
+            const task = await databaseService.getTaskByPath(taskPath);
+            taskMetadata = task?.metadata;
+            prBody = injectIssueFooter(body, task?.metadata);
+          } catch (error) {
+            log.debug('Unable to enrich PR body with issue footer', { taskPath, error });
+          }
+        }
+        const { shouldPatchFilledBody, shouldUseBodyFile, shouldUseFill } = getCreatePrBodyPlan({
+          fill,
+          title,
+          rawBody: body,
+          enrichedBody: prBody,
+        });
+
         // Optionally create a feature branch and push it before opening the PR.
         // This prepares the branch for PR creation without creating a commit.
         if (!skipPrePush) {
@@ -1385,11 +1402,13 @@ export function registerGitIpc() {
             outputs.push('git push: success');
           } catch (pushErr) {
             try {
-              const branch = currentBranch || (
-                await execAsync('git rev-parse --abbrev-ref HEAD', {
-                  cwd: taskPath,
-                })
-              ).stdout.trim();
+              const branch =
+                currentBranch ||
+                (
+                  await execAsync('git rev-parse --abbrev-ref HEAD', {
+                    cwd: taskPath,
+                  })
+                ).stdout.trim();
               if (branch) currentBranch = branch;
               await execAsync(`git push --set-upstream origin ${JSON.stringify(branch)}`, {
                 cwd: taskPath,
@@ -2297,7 +2316,8 @@ export function registerGitIpc() {
 
           if (stagedFiles.length > 0) {
             if (!finalCommitSubject) {
-              finalCommitSubject = await commitMessageGenerationService.generateForLocalTask(taskPath);
+              finalCommitSubject =
+                await commitMessageGenerationService.generateForLocalTask(taskPath);
             }
             const fullCommitMessage = finalCommitBody
               ? `${finalCommitSubject}\n\n${finalCommitBody}`

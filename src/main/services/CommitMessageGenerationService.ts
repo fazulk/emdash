@@ -160,19 +160,31 @@ function normalizeDescriptionText(raw: string): string {
 }
 
 function looksLikeDocPath(filePath: string): boolean {
-  return /(^|\/)(readme|changelog|contributing|license)(\.[^/]+)?$/i.test(filePath) || /\.(md|mdx|rst|txt)$/i.test(filePath);
+  return (
+    /(^|\/)(readme|changelog|contributing|license)(\.[^/]+)?$/i.test(filePath) ||
+    /\.(md|mdx|rst|txt)$/i.test(filePath)
+  );
 }
 
 function looksLikeTestPath(filePath: string): boolean {
-  return /(^|\/)(test|tests|__tests__|spec|specs)(\/|$)/i.test(filePath) || /\.(test|spec)\.[^.]+$/i.test(filePath);
+  return (
+    /(^|\/)(test|tests|__tests__|spec|specs)(\/|$)/i.test(filePath) ||
+    /\.(test|spec)\.[^.]+$/i.test(filePath)
+  );
 }
 
 function looksLikeCiPath(filePath: string): boolean {
-  return filePath.startsWith('.github/workflows/') || filePath.startsWith('.circleci/') || filePath.startsWith('.buildkite/');
+  return (
+    filePath.startsWith('.github/workflows/') ||
+    filePath.startsWith('.circleci/') ||
+    filePath.startsWith('.buildkite/')
+  );
 }
 
 function looksLikeBuildPath(filePath: string): boolean {
-  return /(^|\/)(package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|Cargo\.toml|Cargo\.lock|Makefile|Dockerfile)$/i.test(filePath);
+  return /(^|\/)(package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|Cargo\.toml|Cargo\.lock|Makefile|Dockerfile)$/i.test(
+    filePath
+  );
 }
 
 function inferTypeFromMessage(message: string): ConventionalCommitType | null {
@@ -207,10 +219,7 @@ function inferTypeFromContext(context?: CommitMessageContext): ConventionalCommi
   return null;
 }
 
-export function normalizeCommitSubject(
-  raw: string,
-  context?: CommitMessageContext
-): string {
+export function normalizeCommitSubject(raw: string, context?: CommitMessageContext): string {
   const candidate = sanitizeCommitMessage(raw) ?? '';
 
   if (!candidate) {

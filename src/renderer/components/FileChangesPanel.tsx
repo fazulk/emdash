@@ -63,23 +63,26 @@ interface PrActionButtonProps {
   onModeChange: (mode: PrMode) => void;
   onExecute: () => Promise<void>;
   isLoading: boolean;
+  disabled?: boolean;
 }
 
-function PrActionButton({ mode, onModeChange, onExecute, isLoading }: PrActionButtonProps) {
+function PrActionButton({
+  mode,
+  onModeChange,
+  onExecute,
+  isLoading,
+  disabled = false,
+}: PrActionButtonProps) {
   return (
     <div className="flex shrink-0">
       <Button
         variant="outline"
         size="sm"
         className="h-8 whitespace-nowrap rounded-r-none border-r-0 px-2 text-xs"
-        disabled={isLoading}
+        disabled={disabled || isLoading}
         onClick={onExecute}
       >
-        {isLoading ? (
-          <Spinner size="sm" className="[animation-duration:0.25s]" />
-        ) : (
-          PR_MODE_LABELS[mode]
-        )}
+        <ButtonContentWithSpinner loading={isLoading}>{PR_MODE_LABELS[mode]}</ButtonContentWithSpinner>
       </Button>
       <Popover>
         <PopoverTrigger asChild>
@@ -87,7 +90,7 @@ function PrActionButton({ mode, onModeChange, onExecute, isLoading }: PrActionBu
             variant="outline"
             size="sm"
             className="h-8 rounded-l-none px-1.5"
-            disabled={isLoading}
+            disabled={disabled || isLoading}
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </Button>
@@ -153,6 +156,32 @@ function CommitMessageToastDescription({ message }: { message: string }) {
   );
 }
 
+function ButtonContentWithSpinner({
+  loading,
+  children,
+}: {
+  loading: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="relative inline-flex items-center justify-center">
+      <span
+        className={
+          loading
+            ? 'inline-flex items-center justify-center invisible'
+            : 'inline-flex items-center justify-center'
+        }
+      >
+        {children}
+      </span>
+      {loading ? (
+        <span aria-hidden="true" className="absolute inset-0 inline-flex items-center justify-center">
+          <Spinner size="sm" className="[animation-duration:0.25s]" />
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   taskId,
@@ -699,7 +728,8 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     return null;
   }
 
-  const isActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain || isLocked;
+  const isPrActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain;
+  const isPrActionDisabled = isPrActionLoading || isLocked;
   const hasDisplayChanges = displayChanges.length > 0;
   const pushCount = Math.max(branchAhead ?? 0, showPushAfterCommit ? 1 : 0);
 
@@ -853,7 +883,8 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     mode={prMode}
                     onModeChange={selectPrMode}
                     onExecute={handlePrAction}
-                    isLoading={isActionLoading}
+                    isLoading={isPrActionLoading}
+                    disabled={isPrActionDisabled}
                   />
                 )}
               </div>
@@ -1010,7 +1041,8 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     mode={prMode}
                     onModeChange={selectPrMode}
                     onExecute={handlePrAction}
-                    isLoading={isActionLoading || branchStatusLoading}
+                    isLoading={isPrActionLoading}
+                    disabled={isPrActionDisabled || branchStatusLoading}
                   />
                 )}
               </div>

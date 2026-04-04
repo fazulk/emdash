@@ -536,10 +536,10 @@ export function registerGitIpc() {
     // Can't use --body-file on remote, use --body instead
     if (prBody && !shouldUseFill) flags.push(`--body ${quoteGhArg(prBody)}`);
     flags.push(`--base ${quoteGhArg(baseRef)}`);
+    // Only pass --head when explicitly requested. Otherwise let gh resolve the head
+    // from the branch's configured upstream, which is more reliable for fork remotes.
     if (head) {
       flags.push(`--head ${quoteGhArg(head)}`);
-    } else if (currentBranch) {
-      flags.push(`--head ${quoteGhArg(currentBranch)}`);
     }
     if (draft) flags.push('--draft');
     if (web) flags.push('--web');
@@ -1431,10 +1431,11 @@ export function registerGitIpc() {
         }
 
         if (base || defaultBranch) flags.push(`--base ${JSON.stringify(base || defaultBranch)}`);
+        // Only pass --head when the caller explicitly provided one. Otherwise let gh infer
+        // the correct head branch/repo from the local branch's upstream tracking config.
+        // This avoids failures for branches tracking fork remotes or non-origin remotes.
         if (head) {
           flags.push(`--head ${JSON.stringify(head)}`);
-        } else if (currentBranch) {
-          flags.push(`--head ${JSON.stringify(currentBranch)}`);
         }
         if (draft) flags.push('--draft');
         if (web) flags.push('--web');

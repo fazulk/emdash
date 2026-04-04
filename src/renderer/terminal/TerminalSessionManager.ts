@@ -24,6 +24,7 @@ import {
   type TerminalSearchBufferLike,
   type TerminalSearchMatch,
 } from './terminalSearch';
+import { shouldApplyPtyReplay } from './replayPolicy';
 import { scheduleTerminalWriteDrain } from './writeDrainScheduler';
 import { rpc } from '@/lib/rpc';
 import { APP_SHORTCUTS, normalizeShortcutKey } from '@/hooks/useKeyboardShortcuts';
@@ -1382,7 +1383,7 @@ export class TerminalSessionManager {
         return { ok: false, error: message };
       });
 
-      if (result?.replay) {
+      if (shouldApplyPtyReplay(result)) {
         this.applyReplay(result.replay);
       }
 

@@ -8,6 +8,7 @@ import { type PlainThreadSummary } from '../types/plain';
 import { type GitLabIssueSummary } from '../types/gitlab';
 import { type ForgejoIssueSummary } from '../types/forgejo';
 import { rpc } from './rpc';
+import { runLifecyclePhase } from './lifecycleTerminals';
 
 export interface CreateTaskParams {
   project: Project;
@@ -47,11 +48,12 @@ async function runSetupOnCreate(
   taskName: string
 ): Promise<void> {
   try {
-    const result = await window.electronAPI.lifecycleSetup({
+    const result = await runLifecyclePhase({
       taskId,
       taskPath,
       projectPath,
       taskName,
+      phase: 'setup',
     });
     if (!result?.success && !result?.skipped) {
       const { log } = await import('./logger');

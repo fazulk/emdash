@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { TerminalPane } from './TerminalPane';
-import { LifecycleTerminalView } from './LifecycleTerminalView';
 import { Plus, Play, RotateCw, Square, X, Maximize2 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useTaskTerminals } from '@/lib/taskTerminalsStore';
@@ -22,14 +21,9 @@ import {
 } from './ui/select';
 import type { Agent } from '../types';
 import { getTaskEnvVars } from '@shared/task/envVars';
-import {
-  type LifecycleLogs,
-  type LifecyclePhase,
-  MAX_LIFECYCLE_LOG_LINES,
-  formatLifecycleLogLine,
-} from '@shared/lifecycle';
 
 import ExpandedTerminalModal from './ExpandedTerminalModal';
+import { lifecycleTerminalId } from '../lib/lifecycleTerminals';
 
 /**
  * Hook that fetches custom scripts from .emdash.json for a project.
@@ -51,6 +45,46 @@ function useCustomScripts(projectPath: string | undefined): Record<string, strin
     });
     return () => { cancelled = true; };
   }, [projectPath]);
+  return scripts;
+}
+
+function useLifecycleScripts(projectPath: string | undefined): Record<'setup' | 'run' | 'stop' | 'teardown', string> {
+  const [scripts, setScripts] = useState<Record<'setup' | 'run' | 'stop' | 'teardown', string>>({
+    setup: '',
+    run: '',
+    stop: '',
+    teardown: '',
+  });
+
+  useEffect(() => {
+    if (!projectPath) {
+      setScripts({ setup: '', run: '', stop: '', teardown: '' });
+      return;
+    }
+    let cancelled = false;
+    const api = window.electronAPI as any;
+    if (typeof api?.lifecycleGetScript !== 'function') return;
+
+    void Promise.all([
+      api.lifecycleGetScript({ projectPath, phase: 'setup' }),
+      api.lifecycleGetScript({ projectPath, phase: 'run' }),
+      api.lifecycleGetScript({ projectPath, phase: 'stop' }),
+      api.lifecycleGetScript({ projectPath, phase: 'teardown' }),
+    ]).then(([setup, run, stop, teardown]: any[]) => {
+      if (cancelled) return;
+      setScripts({
+        setup: setup?.success && typeof setup.script === 'string' ? setup.script : '',
+        run: run?.success && typeof run.script === 'string' ? run.script : '',
+        stop: stop?.success && typeof stop.script === 'string' ? stop.script : '',
+        teardown: teardown?.success && typeof teardown.script === 'string' ? teardown.script : '',
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectPath]);
+
   return scripts;
 }
 
@@ -117,6 +151,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
 
   // Custom project scripts from .emdash.json
   const customScripts = useCustomScripts(projectPath);
+  const lifecycleScripts = useLifecycleScripts(projectPath);
   const customScriptNames = useMemo(() => Object.keys(customScripts), [customScripts]);
   // Track which script terminals are currently running
   const [runningScripts, setRunningScripts] = useState<Set<string>>(new Set());
@@ -151,16 +186,17 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     return () => clearTimeout(timer);
   }, [selection.activeTerminalId]);
 
-  const [runStatus, setRunStatus] = useState<LifecyclePhaseStatus>('idle');
-  const [setupStatus, setSetupStatus] = useState<LifecyclePhaseStatus>('idle');
-  const [teardownStatus, setTeardownStatus] = useState<LifecyclePhaseStatus>('idle');
   const [runActionBusy, setRunActionBusy] = useState(false);
-  const activeTaskIdRef = useRef<string | null>(task?.id ?? null);
-  const [lifecycleLogs, setLifecycleLogs] = useState<LifecycleLogs>({
-    setup: [],
-    run: [],
-    teardown: [],
+  const [phaseStatuses, setPhaseStatuses] = useState<Record<'setup' | 'run' | 'teardown', LifecyclePhaseStatus>>({
+    setup: 'idle',
+    run: 'idle',
+    teardown: 'idle',
   });
+  const runStopRequestedRef = useRef(false);
+
+  const runStatus = phaseStatuses.run;
+  const setupStatus = phaseStatuses.setup;
+  const teardownStatus = phaseStatuses.teardown;
 
   const taskEnv = useMemo(() => {
     if (!task || !task.path || !projectPath) return undefined;
@@ -175,115 +211,33 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
   }, [task?.id, task?.name, task?.path, projectPath, defaultBranch, portSeed]);
 
   useEffect(() => {
-    activeTaskIdRef.current = task?.id ?? null;
-  }, [task?.id]);
-
-  const refreshLifecycleState = useCallback(async () => {
-    const taskId = task?.id;
-    if (!taskId) return;
-    const api = window.electronAPI as any;
-    if (typeof api?.lifecycleGetState !== 'function') return;
-    try {
-      const res = await api.lifecycleGetState({ taskId });
-      if (activeTaskIdRef.current !== taskId) return;
-      if (!res?.success || !res.state) return;
-      if (res.state.run?.status) setRunStatus(res.state.run.status);
-      if (res.state.setup?.status) setSetupStatus(res.state.setup.status);
-      if (res.state.teardown?.status) setTeardownStatus(res.state.teardown.status);
-
-      // Restore buffered logs from the main process
-      if (typeof api?.lifecycleGetLogs === 'function') {
-        const logsRes = await api.lifecycleGetLogs({ taskId });
-        if (activeTaskIdRef.current !== taskId) return;
-        if (logsRes?.success && logsRes.logs) {
-          setLifecycleLogs(logsRes.logs);
-        }
-      }
-    } catch {}
-  }, [task?.id]);
-
-  useEffect(() => {
-    setRunStatus('idle');
-    setSetupStatus('idle');
-    setTeardownStatus('idle');
     setRunActionBusy(false);
-    setLifecycleLogs({ setup: [], run: [], teardown: [] });
+    runStopRequestedRef.current = false;
+    setPhaseStatuses({ setup: 'idle', run: 'idle', teardown: 'idle' });
     if (!task) return;
 
-    const api = window.electronAPI as any;
-    let cancelled = false;
-
-    void refreshLifecycleState();
-
-    if (typeof api?.onLifecycleEvent !== 'function') {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const off = api.onLifecycleEvent((evt: any) => {
-      if (!evt || evt.taskId !== task.id) return;
-      const phase =
-        evt.phase === 'setup' || evt.phase === 'run' || evt.phase === 'teardown'
-          ? (evt.phase as LifecyclePhase)
-          : null;
-      if (phase) {
-        const line = formatLifecycleLogLine(phase, evt.status, evt);
-        if (line !== null) {
-          setLifecycleLogs((prev) => ({
-            ...prev,
-            [phase]: [...prev[phase], line].slice(-MAX_LIFECYCLE_LOG_LINES),
-          }));
+    const phaseKeys: Array<'setup' | 'run' | 'teardown'> = ['setup', 'run', 'teardown'];
+    const disposers = phaseKeys.map((phase) =>
+      window.electronAPI.onPtyExit(lifecycleTerminalId(task.id, phase), ({ exitCode }) => {
+        setPhaseStatuses((prev) => ({
+          ...prev,
+          [phase]:
+            phase === 'run' && runStopRequestedRef.current
+              ? 'idle'
+              : exitCode === 0
+                ? 'succeeded'
+                : 'failed',
+        }));
+        if (phase === 'run') {
+          runStopRequestedRef.current = false;
         }
-      }
-
-      if (evt.phase === 'setup') {
-        if (evt.status === 'starting') setSetupStatus('running');
-        if (evt.status === 'done') setSetupStatus('succeeded');
-        if (evt.status === 'error') setSetupStatus('failed');
-        return;
-      }
-      if (evt.phase === 'teardown') {
-        if (evt.status === 'starting') setTeardownStatus('running');
-        if (evt.status === 'done') setTeardownStatus('succeeded');
-        if (evt.status === 'error') setTeardownStatus('failed');
-        return;
-      }
-      if (evt.phase !== 'run') return;
-      if (evt.status === 'starting') {
-        setRunStatus('running');
-        return;
-      }
-      if (evt.status === 'error') {
-        setRunStatus('failed');
-        return;
-      }
-      if (evt.status === 'exit') {
-        void (async () => {
-          if (cancelled) return;
-          const apiInner = window.electronAPI as any;
-          if (typeof apiInner?.lifecycleGetState === 'function') {
-            try {
-              const res = await apiInner.lifecycleGetState({ taskId: task.id });
-              if (!cancelled && res?.success && res.state?.run?.status) {
-                setRunStatus(res.state.run.status);
-                return;
-              }
-            } catch {}
-          }
-          if (cancelled) return;
-          if (evt.exitCode === 0) setRunStatus('succeeded');
-          else if (typeof evt.exitCode === 'number') setRunStatus('failed');
-          else setRunStatus('idle');
-        })();
-      }
-    });
+      })
+    );
 
     return () => {
-      cancelled = true;
-      off?.();
+      for (const dispose of disposers) dispose();
     };
-  }, [task?.id, refreshLifecycleState]);
+  }, [task?.id]);
 
   // Auto-switch dropdown to Run when the run phase first starts.
   const prevRunStatusRef = useRef(runStatus);
@@ -297,21 +251,10 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
 
   const totalTerminals = taskTerminals.terminals.length + globalTerminals.terminals.length;
 
-  const lifecycleLogContent = useMemo(() => {
-    if (!selection.selectedLifecycle) return '';
-    const content = lifecycleLogs[selection.selectedLifecycle].join('');
-    return content || 'No lifecycle output yet.';
-  }, [lifecycleLogs, selection.selectedLifecycle]);
-
   const hasActiveTerminal = !selection.selectedLifecycle && !!selection.activeTerminalId;
 
   const canStartRun =
-    !!task &&
-    !!projectPath &&
-    !runActionBusy &&
-    runStatus !== 'running' &&
-    setupStatus !== 'running';
-
+    !!task && !!projectPath && !runActionBusy && runStatus !== 'running' && !!lifecycleScripts.run;
 
   const selectedTerminalScope = useMemo(() => {
     if (selection.selectedScript) return 'SCRIPT';
@@ -340,99 +283,28 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
 
   const handlePlayPhase = useCallback(async (phase: 'setup' | 'run' | 'teardown') => {
     if (!task || !projectPath) return;
-    const api = window.electronAPI as any;
-    setRunActionBusy(true);
-    try {
-      let result: { success: boolean; error?: string } | undefined;
-      if (phase === 'setup') {
-        result = await api.lifecycleSetup?.({
-          taskId: task.id,
-          taskPath: task.path,
-          projectPath,
-          taskName: task.name,
-        });
-      } else if (phase === 'teardown') {
-        result = await api.lifecycleTeardown?.({
-          taskId: task.id,
-          taskPath: task.path,
-          projectPath,
-          taskName: task.name,
-        });
-      } else {
-        result = await api.lifecycleRunStart?.({
-          taskId: task.id,
-          taskPath: task.path,
-          projectPath,
-          taskName: task.name,
-        });
-      }
-      if (result && !result.success) {
-        const errorMsg = result.error || 'An unknown error occurred.';
-        // If run failed due to setup, navigate to setup logs
-        const failedPhase = errorMsg.toLowerCase().includes('setup failed') ? 'setup' : phase;
-        const label = failedPhase.charAt(0).toUpperCase() + failedPhase.slice(1);
-        toast({
-          title: `${label} failed`,
-          description: errorMsg.split('\n')[0],
-          variant: 'destructive',
-          action: (
-            <ToastAction
-              altText="View logs"
-              onClick={() => selection.onChange(`lifecycle::${failedPhase}`)}
-            >
-              View logs
-            </ToastAction>
-          ),
-        });
-      }
-    } catch (error) {
-      console.error('Failed lifecycle play action:', error);
-      const label = phase.charAt(0).toUpperCase() + phase.slice(1);
-      toast({
-        title: `${label} failed`,
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-        action: (
-          <ToastAction
-            altText="View logs"
-            onClick={() => selection.onChange(`lifecycle::${phase}`)}
-          >
-            View logs
-          </ToastAction>
-        ),
-      });
-    } finally {
-      setRunActionBusy(false);
-      void refreshLifecycleState();
+    const command = lifecycleScripts[phase];
+    if (!command) return;
+
+    const terminalId = lifecycleTerminalId(task.id, phase);
+    selection.onChange(`lifecycle::${phase}`);
+    if (phase === 'run') {
+      runStopRequestedRef.current = false;
     }
-  }, [
-    task?.id,
-    task?.name,
-    task?.path,
-    projectPath,
-    selection.onChange,
-    refreshLifecycleState,
-    toast,
-  ]);
+    setPhaseStatuses((prev) => ({ ...prev, [phase]: 'running' }));
+
+    window.setTimeout(() => {
+      const api = window.electronAPI as any;
+      api?.ptyInput?.({ id: terminalId, data: `${command}\r` });
+    }, 300);
+  }, [task?.id, task?.path, projectPath, selection.onChange, lifecycleScripts]);
 
   const handleStop = useCallback(async () => {
     if (!task) return;
+    runStopRequestedRef.current = true;
     const api = window.electronAPI as any;
-    setRunActionBusy(true);
-    try {
-      await api.lifecycleRunStop?.({
-        taskId: task.id,
-        taskPath: task.path,
-        ...(projectPath ? { projectPath } : {}),
-        taskName: task.name,
-      });
-    } catch (error) {
-      console.error('Failed to stop run phase:', error);
-    } finally {
-      setRunActionBusy(false);
-      void refreshLifecycleState();
-    }
-  }, [task?.id, task?.path, task?.name, projectPath, refreshLifecycleState]);
+    api?.ptyInput?.({ id: lifecycleTerminalId(task.id, 'run'), data: '\x03' });
+  }, [task?.id]);
 
   // --- Custom script play/stop ---
   const handleScriptPlay = useCallback(
@@ -952,24 +824,40 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
       )}
 
       {selection.selectedLifecycle ? (
-        <div className="flex h-full flex-1 flex-col overflow-hidden">
-          <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
-            {selection.selectedLifecycle === 'setup'
-              ? `Setup status: ${setupStatus}`
-              : selection.selectedLifecycle === 'teardown'
-                ? `Teardown status: ${teardownStatus}`
-                : `Run status: ${runStatus}`}
-          </div>
-          <LifecycleTerminalView
-            key={`${task?.id ?? 'no-task'}-${selection.selectedLifecycle}`}
-            content={lifecycleLogContent}
-            variant={
-              effectiveTheme === 'dark' || effectiveTheme === 'dark-black' ? 'dark' : 'light'
-            }
-            themeOverride={themeOverride}
-            className="flex-1"
-          />
-        </div>
+        (() => {
+          const phase = selection.selectedLifecycle;
+          const terminalId = task ? lifecycleTerminalId(task.id, phase) : null;
+          return (
+            <div
+              className={cn(
+                'bw-terminal flex flex-1 flex-col overflow-hidden',
+                effectiveTheme === 'dark' || effectiveTheme === 'dark-black'
+                  ? agent === 'mistral'
+                    ? effectiveTheme === 'dark-black'
+                      ? 'bg-[#141820]'
+                      : 'bg-[#202938]'
+                    : 'bg-card'
+                  : 'bg-white'
+              )}
+            >
+              <div className="relative flex-1 overflow-hidden">
+                {task && terminalId ? (
+                  <TerminalPane
+                    key={`${terminalId}${reattachId === terminalId ? `::${reattachCounter.current}` : ''}`}
+                    ref={(r) => setTerminalRef(terminalId, r)}
+                    id={terminalId}
+                    cwd={task.path}
+                    env={taskEnv}
+                    variant={effectiveTheme === 'dark' || effectiveTheme === 'dark-black' ? 'dark' : 'light'}
+                    themeOverride={themeOverride}
+                    className="h-full w-full"
+                    keepAlive
+                  />
+                ) : null}
+              </div>
+            </div>
+          );
+        })()
       ) : selection.selectedScript ? (
         <div
           className={cn(

@@ -25,6 +25,12 @@ import { dispatchFileChangeEvent } from '../lib/fileChangeEvents';
 import { useProjectManagementContext } from '../contexts/ProjectManagementProvider';
 import { useToast } from './use-toast';
 import { useModalContext } from '../contexts/ModalProvider';
+import {
+  clearLifecycleTask,
+  lifecycleTerminalId,
+  runLifecyclePhase,
+  stopLifecycleRun,
+} from '../lib/lifecycleTerminals';
 
 const LIFECYCLE_TEARDOWN_TIMEOUT_MS = 15000;
 type LifecycleTarget = { taskId: string; taskPath: string; label: string };
@@ -62,11 +68,12 @@ const runSetupForTask = async (task: Task, projectPath: string): Promise<void> =
   const targets = getLifecycleTargets(task);
   await Promise.allSettled(
     targets.map((target) =>
-      window.electronAPI.lifecycleSetup({
+      runLifecyclePhase({
         taskId: target.taskId,
         taskPath: target.taskPath,
         projectPath,
         taskName: target.label,
+        phase: 'setup',
       })
     )
   );
@@ -155,7 +162,13 @@ const cleanupPtyResources = async (task: Task): Promise<void> => {
       }
     } catch {}
 
-    const sessionIds = [...mainSessionIds, ...chatSessionIds];
+    const lifecycleSessionIds = getLifecycleTaskIds(task).flatMap((lifecycleTaskId) => [
+      lifecycleTerminalId(lifecycleTaskId, 'setup'),
+      lifecycleTerminalId(lifecycleTaskId, 'run'),
+      lifecycleTerminalId(lifecycleTaskId, 'teardown'),
+    ]);
+
+    const sessionIds = [...mainSessionIds, ...chatSessionIds, ...lifecycleSessionIds];
     for (const sessionId of sessionIds) {
       try {
         terminalSessionRegistry.dispose(sessionId);
@@ -176,6 +189,9 @@ const cleanupPtyResources = async (task: Task): Promise<void> => {
       }
     }
     disposeTaskTerminals(task.id);
+    for (const lifecycleTaskId of getLifecycleTaskIds(task)) {
+      clearLifecycleTask(lifecycleTaskId);
+    }
   } catch (err) {
     const { log } = await import('../lib/logger');
     log.error('Error cleaning up PTY resources:', err as any);
@@ -335,7 +351,7 @@ export function useTaskManagement() {
 
     await Promise.allSettled(
       lifecycleTargets.map((target) =>
-        window.electronAPI.lifecycleRunStop({
+        stopLifecycleRun({
           taskId: target.taskId,
           taskPath: target.taskPath,
           projectPath: targetProject.path,
@@ -346,11 +362,12 @@ export function useTaskManagement() {
 
     for (const target of lifecycleTargets) {
       try {
-        const teardownPromise = window.electronAPI.lifecycleTeardown({
+        const teardownPromise = runLifecyclePhase({
           taskId: target.taskId,
           taskPath: target.taskPath,
           projectPath: targetProject.path,
           taskName: target.label,
+          phase: 'teardown',
         });
         const timeoutPromise = new Promise<'timeout'>((resolve) => {
           window.setTimeout(() => resolve('timeout'), LIFECYCLE_TEARDOWN_TIMEOUT_MS);
@@ -477,7 +494,16 @@ export function useTaskManagement() {
           })
         );
       }
-      cleanupOps.push(window.electronAPI.lifecycleClearTask({ taskId: task.id }));
+      cleanupOps.push(
+        window.electronAPI.ptyCleanupSessions({
+          ids: [
+            lifecycleTerminalId(task.id, 'setup'),
+            lifecycleTerminalId(task.id, 'run'),
+            lifecycleTerminalId(task.id, 'teardown'),
+          ],
+        })
+      );
+      clearLifecycleTask(task.id);
       await Promise.allSettled(cleanupOps);
     },
     [updateTaskCache]
@@ -660,7 +686,13 @@ export function useTaskManagement() {
         }
       } catch {}
 
-      const sessionIds = [...mainSessionIds, ...chatSessionIds];
+      const lifecycleSessionIds = getLifecycleTaskIds(task).flatMap((lifecycleTaskId) => [
+        lifecycleTerminalId(lifecycleTaskId, 'setup'),
+        lifecycleTerminalId(lifecycleTaskId, 'run'),
+        lifecycleTerminalId(lifecycleTaskId, 'teardown'),
+      ]);
+
+      const sessionIds = [...mainSessionIds, ...chatSessionIds, ...lifecycleSessionIds];
       for (const sessionId of sessionIds) {
         try {
           terminalSessionRegistry.dispose(sessionId);
@@ -681,6 +713,9 @@ export function useTaskManagement() {
         }
       }
       disposeTaskTerminals(task.id);
+      for (const lifecycleTaskId of getLifecycleTaskIds(task)) {
+        clearLifecycleTask(lifecycleTaskId);
+      }
 
       const shouldRemoveWorktree = task.useWorktree !== false;
       const promises: Promise<any>[] = [rpc.db.deleteTask(task.id)];
@@ -723,13 +758,9 @@ export function useTaskManagement() {
         );
       }
 
-      await Promise.allSettled(
-        getLifecycleTaskIds(task).map(async (lifecycleTaskId) => {
-          try {
-            await window.electronAPI.lifecycleClearTask({ taskId: lifecycleTaskId });
-          } catch {}
-        })
-      );
+      for (const lifecycleTaskId of getLifecycleTaskIds(task)) {
+        clearLifecycleTask(lifecycleTaskId);
+      }
 
       void import('../lib/telemetryClient').then(({ captureTelemetry }) => {
         captureTelemetry('task_deleted');
@@ -814,9 +845,7 @@ export function useTaskManagement() {
       await rpc.db.archiveTask(task.id);
 
       for (const lifecycleTaskId of getLifecycleTaskIds(task)) {
-        try {
-          await window.electronAPI.lifecycleClearTask({ taskId: lifecycleTaskId });
-        } catch {}
+        clearLifecycleTask(lifecycleTaskId);
       }
 
       void import('../lib/telemetryClient').then(({ captureTelemetry }) => {

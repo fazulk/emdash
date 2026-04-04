@@ -16,10 +16,10 @@ export function registerLifecycleIpc(): void {
       }
     ) => {
       try {
-        if (!LIFECYCLE_PHASES.includes(args.phase as (typeof LIFECYCLE_PHASES)[number])) {
+        if (![...LIFECYCLE_PHASES, 'stop'].includes(args.phase)) {
           return { success: false, error: `Invalid lifecycle phase: ${args.phase}` };
         }
-        const phase = args.phase as (typeof LIFECYCLE_PHASES)[number];
+        const phase = args.phase as keyof import('@shared/lifecycle').LifecycleScriptConfig;
         const script = lifecycleScriptsService.getScript(args.projectPath, phase);
         return { success: true, script };
       } catch (error) {

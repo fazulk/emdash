@@ -15,6 +15,7 @@ import { TaskManagementProvider } from './contexts/TaskManagementContext';
 import { ModalProvider } from './contexts/ModalProvider';
 import { HashRouter } from 'react-router-dom';
 
+// hi
 const queryClient = new QueryClient();
 
 export function App() {

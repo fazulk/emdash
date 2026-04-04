@@ -18,6 +18,7 @@ import { HashRouter } from 'react-router-dom';
 const queryClient = new QueryClient();
 
 export function App() {
+  // hi
   const [isFirstLaunch, setIsFirstLaunch] = useLocalStorage<boolean | number>(
     FIRST_LAUNCH_KEY,
     true

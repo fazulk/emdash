@@ -14,6 +14,7 @@ import { useAutoCheckRunsRefresh } from '../hooks/useAutoCheckRunsRefresh';
 import { usePrComments } from '../hooks/usePrComments';
 import { ChecksPanel } from './CheckRunsList';
 import { PrCommentsList } from './PrCommentsList';
+import { PrReviewStatus, ReviewDecisionBadge } from './PrReviewStatus';
 import MergePrSection from './MergePrSection';
 import { FileIcon } from './FileExplorer/FileIcons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
@@ -1166,6 +1167,15 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             {checkRunsStatus?.hasFailures && checkRunsStatus.allComplete && (
               <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500" />
             )}
+            {pr.reviewDecision === 'CHANGES_REQUESTED' && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500" />
+            )}
+            {pr.reviewDecision === 'REVIEW_REQUIRED' && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />
+            )}
+            {pr.reviewDecision === 'APPROVED' && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            )}
           </TabButton>
         </div>
       )}
@@ -1189,6 +1199,15 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             {checkRunsStatus?.hasFailures && checkRunsStatus.allComplete && (
               <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500" />
             )}
+            {pr?.reviewDecision === 'CHANGES_REQUESTED' && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500" />
+            )}
+            {pr?.reviewDecision === 'REVIEW_REQUIRED' && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />
+            )}
+            {pr?.reviewDecision === 'APPROVED' && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            )}
           </TabButton>
         </div>
       )}
@@ -1199,6 +1218,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             {!hasChanges && (
               <div className="flex items-center gap-1.5 px-4 py-1.5">
                 <span className="text-sm font-medium text-foreground">Checks</span>
+                {pr && <ReviewDecisionBadge decision={pr.reviewDecision} />}
                 {checkRunsStatus?.summary && (
                   <div className="flex items-center gap-1.5">
                     {checkRunsStatus.summary.passed > 0 && (
@@ -1235,11 +1255,13 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 )}
               </div>
             )}
+            {pr && <PrReviewStatus pr={pr} />}
             <ChecksPanel
               status={checkRunsStatus}
               isLoading={checkRunsLoading}
               hasPr={!!pr || isPrReview}
               hideSummary={isPrReview ? !hasDisplayChanges : !hasChanges}
+              extraBadges={pr ? <ReviewDecisionBadge decision={pr.reviewDecision} /> : undefined}
             />
             {pr && (
               <PrCommentsList

@@ -50,9 +50,10 @@ interface ChecksPanelProps {
   isLoading: boolean;
   hasPr: boolean;
   hideSummary?: boolean;
+  extraBadges?: React.ReactNode;
 }
 
-export function ChecksPanel({ status, isLoading, hasPr, hideSummary }: ChecksPanelProps) {
+export function ChecksPanel({ status, isLoading, hasPr, hideSummary, extraBadges }: ChecksPanelProps) {
   if (!hasPr) {
     return (
       <div className="flex flex-1 items-center justify-center p-6 text-center">
@@ -85,6 +86,7 @@ export function ChecksPanel({ status, isLoading, hasPr, hideSummary }: ChecksPan
     <div className="flex flex-col">
       {!hideSummary && (
         <div className="flex items-center gap-1.5 border-b border-border px-4 py-1.5">
+          {extraBadges}
           {summary.passed > 0 && (
             <Badge variant="outline">
               <CheckCircle2 className="h-3 w-3 text-emerald-500" />

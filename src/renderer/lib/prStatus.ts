@@ -11,6 +11,11 @@ export type AutoMergeRequest = {
   mergeMethod?: string;
 };
 
+export type PrReviewer = {
+  login: string;
+  state?: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | 'PENDING';
+};
+
 export type PrStatus = PrInfo & {
   mergeStateStatus?: string;
   headRefName?: string;
@@ -19,6 +24,8 @@ export type PrStatus = PrInfo & {
   deletions?: number;
   changedFiles?: number;
   autoMergeRequest?: AutoMergeRequest | null;
+  reviewDecision?: string | null;
+  reviewers?: PrReviewer[];
 };
 
 export const isActivePr = (pr?: PrInfo | null): pr is PrInfo => {

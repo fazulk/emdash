@@ -365,6 +365,9 @@ export function registerGitIpc() {
       'deletions',
       'changedFiles',
       'autoMergeRequest',
+      'reviewDecision',
+      'reviewRequests',
+      'latestReviews',
     ];
     const fieldsStr = queryFields.join(',');
 
@@ -421,6 +424,29 @@ export function registerGitIpc() {
         }
       }
     }
+
+    // Build reviewers list from reviewRequests + latestReviews
+    const reviewerMap = new Map<string, { login: string; state?: string }>();
+    if (Array.isArray(data.reviewRequests)) {
+      for (const req of data.reviewRequests) {
+        const login = req?.login || req?.name;
+        if (login && typeof login === 'string') {
+          reviewerMap.set(login, { login, state: 'PENDING' });
+        }
+      }
+    }
+    if (Array.isArray(data.latestReviews)) {
+      for (const review of data.latestReviews) {
+        const login = review?.author?.login;
+        const state = review?.state;
+        if (login && typeof login === 'string') {
+          reviewerMap.set(login, { login, state: state || undefined });
+        }
+      }
+    }
+    data.reviewers = Array.from(reviewerMap.values());
+    delete data.reviewRequests;
+    delete data.latestReviews;
 
     return { success: true, pr: data };
   }
@@ -1565,6 +1591,9 @@ export function registerGitIpc() {
         'deletions',
         'changedFiles',
         'autoMergeRequest',
+        'reviewDecision',
+        'reviewRequests',
+        'latestReviews',
       ];
       const cmd = `gh pr view --json ${queryFields.join(',')} -q .`;
       try {
@@ -1633,6 +1662,30 @@ export function registerGitIpc() {
             // best-effort only; ignore failures
           }
         }
+
+        // Build reviewers list from reviewRequests + latestReviews
+        const reviewerMap = new Map<string, { login: string; state?: string }>();
+        if (Array.isArray(data.reviewRequests)) {
+          for (const req of data.reviewRequests) {
+            const login = req?.login || req?.name;
+            if (login && typeof login === 'string') {
+              reviewerMap.set(login, { login, state: 'PENDING' });
+            }
+          }
+        }
+        if (Array.isArray(data.latestReviews)) {
+          for (const review of data.latestReviews) {
+            const login = review?.author?.login;
+            const state = review?.state;
+            if (login && typeof login === 'string') {
+              reviewerMap.set(login, { login, state: state || undefined });
+            }
+          }
+        }
+        data.reviewers = Array.from(reviewerMap.values());
+        // Clean up raw fields not needed by the renderer
+        delete data.reviewRequests;
+        delete data.latestReviews;
 
         return { success: true, pr: data };
       } catch (err) {

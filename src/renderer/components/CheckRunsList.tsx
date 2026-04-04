@@ -18,7 +18,7 @@ function BucketIcon({ bucket }: { bucket: CheckRunBucket }) {
 }
 
 function CheckRunItem({ check }: { check: CheckRun }) {
-  const duration = formatCheckDuration(check.startedAt, check.completedAt);
+  const duration = formatCheckDuration(check.startedAt, check.completedAt) ?? check.durationText ?? null;
 
   return (
     <div className="flex items-center gap-2 px-4 py-1">
@@ -101,6 +101,18 @@ export function ChecksPanel({ status, isLoading, hasPr, hideSummary }: ChecksPan
             <Badge variant="outline">
               <Loader2 className="h-3 w-3 animate-spin" />
               {summary.pending} pending
+            </Badge>
+          )}
+          {summary.skipped > 0 && (
+            <Badge variant="outline">
+              <MinusCircle className="h-3 w-3 text-muted-foreground/60" />
+              {summary.skipped} skipped
+            </Badge>
+          )}
+          {summary.cancelled > 0 && (
+            <Badge variant="outline">
+              <MinusCircle className="h-3 w-3 text-muted-foreground/60" />
+              {summary.cancelled} cancelled
             </Badge>
           )}
         </div>

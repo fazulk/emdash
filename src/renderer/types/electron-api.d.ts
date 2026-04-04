@@ -609,6 +609,7 @@ declare global {
           event?: string;
           startedAt?: string;
           completedAt?: string;
+          durationText?: string;
         }> | null;
         error?: string;
         code?: string;

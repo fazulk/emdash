@@ -1833,175 +1833,106 @@ export function registerGitIpc() {
     }
   );
 
-  const getCheckRunBucket = (status?: string, conclusion?: string | null) => {
-    if ((status || '').toLowerCase() !== 'completed') return 'pending' as const;
-
-    switch ((conclusion || '').toLowerCase()) {
-      case 'success':
-      case 'neutral':
+  const getGhPrChecksBucket = (state?: string) => {
+    switch ((state || '').toLowerCase()) {
+      case 'pass':
         return 'pass' as const;
+      case 'fail':
+        return 'fail' as const;
+      case 'skipping':
       case 'skipped':
         return 'skipping' as const;
+      case 'cancel':
       case 'cancelled':
         return 'cancel' as const;
-      case 'failure':
-      case 'action_required':
-      case 'timed_out':
-      case 'startup_failure':
-      case 'stale':
-        return 'fail' as const;
       default:
         return 'pending' as const;
     }
   };
 
-  const getStatusContextBucket = (state?: string) => {
-    switch ((state || '').toLowerCase()) {
-      case 'success':
-        return 'pass' as const;
-      case 'failure':
-      case 'error':
-        return 'fail' as const;
-      default:
-        return 'pending' as const;
-    }
+  const parseGhPrChecksOutput = (output?: string) => {
+    if (!output) return [];
+
+    return output
+      .split(/\r?\n/)
+      .map((line) => line.trimEnd())
+      .filter(Boolean)
+      .flatMap((line) => {
+        const [name, state, durationText, link, ...descriptionParts] = line.split('\t');
+        if (!name || !state) return [];
+
+        const description = descriptionParts.join('\t').trim();
+
+        return [
+          {
+            name,
+            state,
+            bucket: getGhPrChecksBucket(state),
+            description: description || undefined,
+            link: link || undefined,
+            durationText: durationText || undefined,
+          },
+        ];
+      });
   };
 
-  const parseRepoSlugFromPrUrl = (url?: string): string | null => {
-    if (!url) return null;
-    const match = url.match(/^https?:\/\/[^/]+\/([^/]+\/[^/]+)\/pull\/\d+(?:\/.*)?$/i);
-    return match?.[1] ?? null;
-  };
-
-  const normalizeApiChecks = (checkRunsPayload: any, statusPayload: any) => {
-    const checks = Array.isArray(checkRunsPayload?.check_runs)
-      ? checkRunsPayload.check_runs.map((check: any) => ({
-          name: typeof check?.name === 'string' ? check.name : 'Unnamed check',
-          state:
-            typeof check?.conclusion === 'string'
-              ? check.conclusion
-              : typeof check?.status === 'string'
-                ? check.status
-                : 'unknown',
-          bucket: getCheckRunBucket(check?.status, check?.conclusion),
-          description:
-            typeof check?.output?.title === 'string'
-              ? check.output.title
-              : typeof check?.conclusion === 'string'
-                ? check.conclusion
-                : undefined,
-          link:
-            typeof check?.html_url === 'string'
-              ? check.html_url
-              : typeof check?.details_url === 'string'
-                ? check.details_url
-                : undefined,
-          workflow:
-            typeof check?.app?.name === 'string' && check.app.name.trim()
-              ? check.app.name.trim()
-              : undefined,
-          startedAt: typeof check?.started_at === 'string' ? check.started_at : undefined,
-          completedAt: typeof check?.completed_at === 'string' ? check.completed_at : undefined,
-        }))
-      : [];
-
-    const statuses = Array.isArray(statusPayload?.statuses)
-      ? statusPayload.statuses.map((status: any) => ({
-          name: typeof status?.context === 'string' ? status.context : 'Status',
-          state: typeof status?.state === 'string' ? status.state : 'unknown',
-          bucket: getStatusContextBucket(status?.state),
-          description: typeof status?.description === 'string' ? status.description : undefined,
-          link: typeof status?.target_url === 'string' ? status.target_url : undefined,
-          startedAt: typeof status?.created_at === 'string' ? status.created_at : undefined,
-          completedAt: typeof status?.updated_at === 'string' ? status.updated_at : undefined,
-        }))
-      : [];
-
-    return [...checks, ...statuses];
-  };
-
-  // Git: Get CI/CD check runs for current branch via GitHub CLI
+  // Git: Get CI/CD checks for the current PR using `gh pr checks`.
+  // This matches the GitHub PR checks UI more closely than raw check-runs/status APIs.
   ipcMain.handle('git:get-check-runs', async (_, args: { taskPath: string; prNumber?: number }) => {
     const { taskPath, prNumber } = args || ({} as { taskPath: string; prNumber?: number });
-    const prSelector = prNumber ? `${quoteGhArg(String(prNumber))} ` : '';
+    const ghArgs = ['pr', 'checks'];
+    if (prNumber) ghArgs.push(String(prNumber));
+
     try {
       const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
       if (remoteProject) {
         const connId = remoteProject.sshConnectionId;
-        const prResult = await remoteGitService.execGh(
-          connId,
-          taskPath,
-          `pr view ${prSelector}--json headRefOid,url`
-        );
-        if (prResult.exitCode !== 0) {
-          const msg = prResult.stderr || '';
-          if (/no pull requests? found/i.test(msg) || /not found/i.test(msg)) {
-            return { success: true, checks: null };
-          }
-          if (/not installed|command not found/i.test(msg)) {
-            return { success: false, error: msg, code: 'GH_CLI_UNAVAILABLE' };
-          }
+        const ghCommand = ghArgs.map((arg) => quoteGhArg(arg)).join(' ');
+        const result = await remoteGitService.execGh(connId, taskPath, ghCommand);
+        const parsedChecks = parseGhPrChecksOutput(result.stdout);
+
+        if (parsedChecks.length > 0) {
+          return { success: true, checks: parsedChecks };
+        }
+
+        const msg = [result.stderr, result.stdout].filter(Boolean).join('\n').trim();
+        if (/no pull requests? found/i.test(msg) || /not found/i.test(msg)) {
+          return { success: true, checks: null };
+        }
+        if (/not installed|command not found/i.test(msg)) {
+          return { success: false, error: msg, code: 'GH_CLI_UNAVAILABLE' };
+        }
+        if (result.exitCode !== 0) {
           return { success: false, error: msg || 'Failed to query check runs' };
         }
-
-        const prData = prResult.stdout.trim() ? JSON.parse(prResult.stdout.trim()) : null;
-        const sha = typeof prData?.headRefOid === 'string' ? prData.headRefOid.trim() : '';
-        const repoSlug = parseRepoSlugFromPrUrl(prData?.url);
-        if (!sha || !repoSlug) {
-          return { success: true, checks: [] };
-        }
-
-        const checkRunsResult = await remoteGitService.execGh(
-          connId,
-          taskPath,
-          `api repos/${repoSlug}/commits/${sha}/check-runs?per_page=100`
-        );
-        const statusResult = await remoteGitService.execGh(
-          connId,
-          taskPath,
-          `api repos/${repoSlug}/commits/${sha}/status`
-        );
-
-        const checkRunsPayload = checkRunsResult.stdout.trim()
-          ? JSON.parse(checkRunsResult.stdout.trim())
-          : null;
-        const statusPayload = statusResult.stdout.trim()
-          ? JSON.parse(statusResult.stdout.trim())
-          : null;
-
-        return { success: true, checks: normalizeApiChecks(checkRunsPayload, statusPayload) };
+        return { success: true, checks: [] };
       }
 
       await execFileAsync(GIT, ['rev-parse', '--is-inside-work-tree'], { cwd: taskPath });
 
       try {
-        const { stdout: prOut } = await execFileAsync(
-          'gh',
-          ['pr', 'view', ...(prNumber ? [String(prNumber)] : []), '--json', 'headRefOid,url'],
-          { cwd: taskPath }
-        );
-        const prData = prOut.trim() ? JSON.parse(prOut.trim()) : null;
-        const sha = typeof prData?.headRefOid === 'string' ? prData.headRefOid.trim() : '';
-        const repoSlug = parseRepoSlugFromPrUrl(prData?.url);
-        if (!sha || !repoSlug) {
-          return { success: true, checks: [] };
+        const { stdout } = await execFileAsync('gh', ghArgs, { cwd: taskPath });
+        return { success: true, checks: parseGhPrChecksOutput(stdout) };
+      } catch (error) {
+        const errorWithOutput =
+          error && typeof error === 'object' ? error : ({ stdout: '', stderr: '' } as const);
+        const stdout =
+          'stdout' in errorWithOutput && typeof errorWithOutput.stdout === 'string'
+            ? errorWithOutput.stdout
+            : '';
+        const stderr =
+          'stderr' in errorWithOutput && typeof errorWithOutput.stderr === 'string'
+            ? errorWithOutput.stderr
+            : '';
+        const parsedChecks = parseGhPrChecksOutput(stdout);
+        if (parsedChecks.length > 0) {
+          return { success: true, checks: parsedChecks };
         }
 
-        const [{ stdout: checkRunsOut }, { stdout: statusOut }] = await Promise.all([
-          execFileAsync('gh', ['api', `repos/${repoSlug}/commits/${sha}/check-runs?per_page=100`], {
-            cwd: taskPath,
-          }),
-          execFileAsync('gh', ['api', `repos/${repoSlug}/commits/${sha}/status`], {
-            cwd: taskPath,
-          }),
-        ]);
-
-        const checkRunsPayload = checkRunsOut.trim() ? JSON.parse(checkRunsOut.trim()) : null;
-        const statusPayload = statusOut.trim() ? JSON.parse(statusOut.trim()) : null;
-
-        return { success: true, checks: normalizeApiChecks(checkRunsPayload, statusPayload) };
-      } catch (err) {
-        const msg = String(err as string);
+        const msg = [stderr, stdout, error instanceof Error ? error.message : String(error)]
+          .filter(Boolean)
+          .join('\n')
+          .trim();
         if (/no pull requests? found/i.test(msg) || /not found/i.test(msg)) {
           return { success: true, checks: null };
         }

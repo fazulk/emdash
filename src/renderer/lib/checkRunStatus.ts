@@ -10,6 +10,7 @@ export interface CheckRun {
   event?: string;
   startedAt?: string;
   completedAt?: string;
+  durationText?: string;
 }
 
 export interface CheckRunsSummary {

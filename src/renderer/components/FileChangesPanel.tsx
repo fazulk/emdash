@@ -22,6 +22,7 @@ import { Close as PopoverClose } from '@radix-ui/react-popover';
 import {
   Plus,
   Minus,
+  MinusCircle,
   Undo2,
   ArrowUpRight,
   FileDiff,
@@ -1216,6 +1217,18 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                       <Badge variant="outline">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         {checkRunsStatus.summary.pending} pending
+                      </Badge>
+                    )}
+                    {checkRunsStatus.summary.skipped > 0 && (
+                      <Badge variant="outline">
+                        <MinusCircle className="h-3 w-3 text-muted-foreground/60" />
+                        {checkRunsStatus.summary.skipped} skipped
+                      </Badge>
+                    )}
+                    {checkRunsStatus.summary.cancelled > 0 && (
+                      <Badge variant="outline">
+                        <MinusCircle className="h-3 w-3 text-muted-foreground/60" />
+                        {checkRunsStatus.summary.cancelled} cancelled
                       </Badge>
                     )}
                   </div>

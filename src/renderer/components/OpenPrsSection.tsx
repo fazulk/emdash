@@ -11,7 +11,7 @@ import {
 } from '../lib/pullRequestFilters';
 import { cn } from '../lib/utils';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { useToast } from '../hooks/use-toast';
@@ -510,12 +510,12 @@ const OpenPrsSection: React.FC<OpenPrsSectionProps> = ({ projectPath, projectId 
                               size="sm"
                               className="h-7 px-2 text-xs"
                               disabled={creatingForPr === pr.number}
+                              aria-busy={creatingForPr === pr.number}
                               onClick={() => handleReviewPr(pr)}
                             >
-                              {creatingForPr === pr.number ? (
-                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                              ) : null}
-                              Review
+                              <ButtonContentWithSpinner loading={creatingForPr === pr.number}>
+                                Review
+                              </ButtonContentWithSpinner>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="top">Review PR in Emdash</TooltipContent>
@@ -556,10 +556,12 @@ const OpenPrsSection: React.FC<OpenPrsSectionProps> = ({ projectPath, projectId 
                 size="sm"
                 className="mx-auto h-8 gap-2 text-sm text-muted-foreground"
                 disabled={loadingMore}
+                aria-busy={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                {loadingMore ? 'Loading PRs...' : `Load more PRs (${prs.length}/${totalCount})`}
+                <ButtonContentWithSpinner loading={loadingMore}>
+                  {`Load more PRs (${prs.length}/${totalCount})`}
+                </ButtonContentWithSpinner>
               </Button>
             ) : null}
           </div>

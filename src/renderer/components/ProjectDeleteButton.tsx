@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from './ui/alert-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { cn } from '@/lib/utils';
 import { useDeleteRisks } from '../hooks/useDeleteRisks';
 import DeletePrNotice from './DeletePrNotice';
@@ -91,11 +91,9 @@ export const ProjectDeleteButton: React.FC<Props> = ({
                 disabled={isDeleting}
                 onClick={(e) => e.stopPropagation()}
               >
-                {isDeleting ? (
-                  <Spinner className="h-3.5 w-3.5" size="sm" />
-                ) : (
+                <ButtonContentWithSpinner loading={isDeleting}>
                   <Trash className="h-3.5 w-3.5" />
-                )}
+                </ButtonContentWithSpinner>
               </Button>
             </AlertDialogTrigger>
           </TooltipTrigger>
@@ -253,8 +251,7 @@ export const ProjectDeleteButton: React.FC<Props> = ({
                     } catch {}
                   }}
                 >
-                  {isDeleting ? <Spinner className="mr-2 h-4 w-4" size="sm" /> : null}
-                  Delete
+                  <ButtonContentWithSpinner loading={isDeleting}>Delete</ButtonContentWithSpinner>
                 </AlertDialogAction>
               </TooltipTrigger>
               {disableDelete && !isDeleting ? (

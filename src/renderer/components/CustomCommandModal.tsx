@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { X, RotateCcw, Info, Plus, Trash2 } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
@@ -457,8 +457,9 @@ const CustomCommandModal: React.FC<CustomCommandModalProps> = ({ isOpen, onClose
                   size="sm"
                   onClick={handleSave}
                   disabled={loading || saving || !hasChanges}
+                  aria-busy={saving}
                 >
-                  {saving ? 'Saving...' : 'Save'}
+                  <ButtonContentWithSpinner loading={saving}>Save</ButtonContentWithSpinner>
                 </Button>
               </div>
             </footer>

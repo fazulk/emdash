@@ -5,9 +5,8 @@ import { CornerDownLeft, ExternalLink, MessageSquare, X } from 'lucide-react';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useEmdashAccount } from '../contexts/EmdashAccountProvider';
 import { useGithubContext } from '../contexts/GithubContextProvider';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
-import { Spinner } from './ui/spinner';
 import { Textarea } from './ui/textarea';
 import { useToast } from '../hooks/use-toast';
 const DISCORD_WEBHOOK_URL =
@@ -225,13 +224,9 @@ const AccessRequestModal: React.FC<AccessRequestModalProps> = ({
                   type="submit"
                   className="gap-2 px-4"
                   disabled={submitting || !infrastructure.trim()}
+                  aria-busy={submitting}
                 >
-                  {submitting ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Sending…</span>
-                    </>
-                  ) : (
+                  <ButtonContentWithSpinner loading={submitting} contentClassName="gap-2">
                     <>
                       <span>Send request</span>
                       <span className="flex items-center gap-1 rounded border border-white/40 bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-primary-foreground dark:border-white/20 dark:bg-white/5">
@@ -239,7 +234,7 @@ const AccessRequestModal: React.FC<AccessRequestModalProps> = ({
                         <CornerDownLeft className="h-3 w-3" aria-hidden="true" />
                       </span>
                     </>
-                  )}
+                  </ButtonContentWithSpinner>
                 </Button>
               </div>
             </form>

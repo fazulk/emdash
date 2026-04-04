@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from './ui/alert-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { cn } from '@/lib/utils';
 import { DELETE_RISK_SCAN_FRESH_MS, useDeleteRisks } from '../hooks/useDeleteRisks';
 import { useToast } from '../hooks/use-toast';
@@ -143,11 +143,9 @@ export const TaskDeleteButton: React.FC<Props> = ({
                   disabled={isDeleting}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {isDeleting ? (
-                    <Spinner className="h-4 w-4" size="sm" />
-                  ) : (
+                  <ButtonContentWithSpinner loading={isDeleting}>
                     <Trash className="h-4 w-4" />
-                  )}
+                  </ButtonContentWithSpinner>
                 </Button>
               </AlertDialogTrigger>
             </TooltipTrigger>
@@ -286,8 +284,7 @@ export const TaskDeleteButton: React.FC<Props> = ({
               } catch {}
             }}
           >
-            {showActionSpinner ? <Spinner className="mr-2 h-4 w-4" size="sm" /> : null}
-            Delete
+            <ButtonContentWithSpinner loading={showActionSpinner}>Delete</ButtonContentWithSpinner>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

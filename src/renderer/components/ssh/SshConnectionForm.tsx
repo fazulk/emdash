@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Button } from '../ui/button';
+import { Button, ButtonContentWithSpinner } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Spinner } from '../ui/spinner';
 import { cn } from '@/lib/utils';
 import { FolderOpen, Eye, EyeOff, Server, User, Lock, Key, Shield, Download } from 'lucide-react';
 import { useSshConnections } from '../../hooks/useSshConnections';
@@ -461,15 +460,8 @@ export const SshConnectionForm: React.FC<Props> = ({
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <>
-              <Spinner size="sm" className="mr-2" />
-              Saving...
-            </>
-          ) : (
-            'Save Connection'
-          )}
+        <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+          <ButtonContentWithSpinner loading={isSubmitting}>Save Connection</ButtonContentWithSpinner>
         </Button>
       </div>
     </form>

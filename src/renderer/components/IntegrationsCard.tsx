@@ -10,7 +10,7 @@ import gitlabSvg from '../../assets/images/GitLab.svg?raw';
 import plainSvg from '../../assets/images/Plain.svg?raw';
 import forgejoSvg from '../../assets/images/Forgejo.svg?raw';
 import sentrySvg from '../../assets/images/Sentry.svg?raw';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import {
   Dialog,
@@ -680,9 +680,9 @@ const IntegrationsCard: React.FC = () => {
                   size="sm"
                   onClick={() => void handleForgejoSubmit()}
                   disabled={!(forgejoInstanceUrl.trim() && forgejoToken.trim()) || forgejoLoading}
+                  aria-busy={forgejoLoading}
                 >
-                  {forgejoLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Connect
+                  <ButtonContentWithSpinner loading={forgejoLoading}>Connect</ButtonContentWithSpinner>
                 </Button>
               </DialogFooter>
             </>
@@ -735,9 +735,9 @@ const IntegrationsCard: React.FC = () => {
                   size="sm"
                   onClick={() => void handleLinearConnect()}
                   disabled={!linearInput.trim() || linearLoading}
+                  aria-busy={linearLoading}
                 >
-                  {linearLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Connect
+                  <ButtonContentWithSpinner loading={linearLoading}>Connect</ButtonContentWithSpinner>
                 </Button>
               </DialogFooter>
             </>
@@ -792,9 +792,9 @@ const IntegrationsCard: React.FC = () => {
                   disabled={
                     !(jiraSite.trim() && jiraEmail.trim() && jiraToken.trim()) || jiraLoading
                   }
+                  aria-busy={jiraLoading}
                 >
-                  {jiraLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Connect
+                  <ButtonContentWithSpinner loading={jiraLoading}>Connect</ButtonContentWithSpinner>
                 </Button>
               </DialogFooter>
             </>
@@ -845,9 +845,9 @@ const IntegrationsCard: React.FC = () => {
                   size="sm"
                   onClick={() => void handleGitlabSubmit()}
                   disabled={!(gitlabInstanceUrl.trim() && gitlabToken.trim()) || gitlabLoading}
+                  aria-busy={gitlabLoading}
                 >
-                  {gitlabLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Connect
+                  <ButtonContentWithSpinner loading={gitlabLoading}>Connect</ButtonContentWithSpinner>
                 </Button>
               </DialogFooter>
             </>
@@ -900,9 +900,9 @@ const IntegrationsCard: React.FC = () => {
                   size="sm"
                   onClick={() => void handleSentryConnect()}
                   disabled={!sentryInput.trim() || sentryLoading}
+                  aria-busy={sentryLoading}
                 >
-                  {sentryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Connect
+                  <ButtonContentWithSpinner loading={sentryLoading}>Connect</ButtonContentWithSpinner>
                 </Button>
               </DialogFooter>
             </>
@@ -955,9 +955,9 @@ const IntegrationsCard: React.FC = () => {
                   size="sm"
                   onClick={() => void handlePlainConnect()}
                   disabled={!plainInput.trim() || plainLoading}
+                  aria-busy={plainLoading}
                 >
-                  {plainLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Connect
+                  <ButtonContentWithSpinner loading={plainLoading}>Connect</ButtonContentWithSpinner>
                 </Button>
               </DialogFooter>
             </>

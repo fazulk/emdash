@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Button } from '../ui/button';
-import { Spinner } from '../ui/spinner';
+import { Button, ButtonContentWithSpinner } from '../ui/button';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible';
 import { cn } from '@/lib/utils';
 import { Play, CheckCircle2, XCircle, Zap, ChevronDown, Copy, Check } from 'lucide-react';
@@ -77,10 +76,12 @@ export const SshConnectionTestButton: React.FC<Props> = ({
     switch (testState) {
       case 'testing':
         return (
-          <>
-            <Spinner size="sm" className="mr-2" />
-            <span>Testing...</span>
-          </>
+          <ButtonContentWithSpinner loading>
+            <>
+              <Play className="mr-2 h-4 w-4" />
+              <span>Test</span>
+            </>
+          </ButtonContentWithSpinner>
         );
       case 'success':
         return (

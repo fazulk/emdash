@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonContentWithSpinner } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Download, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { useUpdater, EMDASH_RELEASES_URL } from '@/hooks/useUpdater';
@@ -204,9 +204,13 @@ export function UpdateCard(): JSX.Element {
 
       case 'downloading':
         return (
-          <Button size="sm" variant="outline" disabled className="h-7 text-xs">
-            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-            Downloading
+          <Button size="sm" variant="outline" disabled aria-busy className="h-7 text-xs">
+            <ButtonContentWithSpinner loading contentClassName="gap-1.5" spinnerClassName="h-3 w-3">
+              <>
+                <Download className="h-3 w-3" />
+                Download
+              </>
+            </ButtonContentWithSpinner>
           </Button>
         );
 
@@ -220,9 +224,13 @@ export function UpdateCard(): JSX.Element {
 
       case 'installing':
         return (
-          <Button size="sm" variant="outline" disabled className="h-7 text-xs">
-            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-            Installing
+          <Button size="sm" variant="outline" disabled aria-busy className="h-7 text-xs">
+            <ButtonContentWithSpinner loading contentClassName="gap-1.5" spinnerClassName="h-3 w-3">
+              <>
+                <RefreshCw className="h-3 w-3" />
+                Restart
+              </>
+            </ButtonContentWithSpinner>
           </Button>
         );
 

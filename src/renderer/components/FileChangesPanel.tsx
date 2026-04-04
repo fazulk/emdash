@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import { Spinner } from './ui/spinner';
 import { useToast } from '../hooks/use-toast';
@@ -155,33 +155,6 @@ function CommitMessageToastDescription({ message }: { message: string }) {
         {message}
       </code>
     </div>
-  );
-}
-
-function ButtonContentWithSpinner({
-  loading,
-  children,
-}: {
-  loading: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="relative inline-flex items-center justify-center">
-      <span
-        className={
-          loading
-            ? 'inline-flex items-center justify-center invisible'
-            : 'inline-flex items-center justify-center'
-        }
-      >
-        {children}
-      </span>
-      {loading ? (
-        <span aria-hidden="true" className="absolute inset-0 inline-flex items-center justify-center">
-          <Spinner size="sm" className="[animation-duration:0.25s]" />
-        </span>
-      ) : null}
-    </span>
   );
 }
 
@@ -852,15 +825,17 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     title="Stage all files for commit"
                     onClick={handleStageAll}
                     disabled={isStagingAll || isLocked}
+                    aria-busy={isStagingAll}
                   >
-                    {isStagingAll ? (
-                      <Spinner size="sm" className="[animation-duration:0.25s]" />
-                    ) : (
+                    <ButtonContentWithSpinner
+                      loading={isStagingAll}
+                      spinnerClassName="[animation-duration:0.25s]"
+                    >
                       <>
                         <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
                         <span className="hidden sm:inline">Stage All</span>
                       </>
-                    )}
+                    </ButtonContentWithSpinner>
                   </Button>
                 )}
                 {isPrLoading ? (
@@ -922,12 +897,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 }
                 onClick={() => void handleCommit('commit')}
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
+                aria-busy={operation === 'commit'}
               >
-                {operation === 'commit' ? (
-                  <Spinner size="sm" className="[animation-duration:0.25s]" />
-                ) : (
-                  'Commit'
-                )}
+                <ButtonContentWithSpinner
+                  loading={operation === 'commit'}
+                  spinnerClassName="[animation-duration:0.25s]"
+                >
+                  Commit
+                </ButtonContentWithSpinner>
               </Button>
               <Button
                 variant="outline"
@@ -940,12 +917,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 }
                 onClick={() => void handleCommitAndPush()}
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
+                aria-busy={operation === 'commitAndPush'}
               >
-                {operation === 'commitAndPush' ? (
-                  <Spinner size="sm" className="[animation-duration:0.25s]" />
-                ) : (
-                  'Commit & Push'
-                )}
+                <ButtonContentWithSpinner
+                  loading={operation === 'commitAndPush'}
+                  spinnerClassName="[animation-duration:0.25s]"
+                >
+                  {'Commit & Push'}
+                </ButtonContentWithSpinner>
               </Button>
               <div className="flex">
                 <Button
@@ -955,12 +934,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                   title="Push committed changes"
                   onClick={() => void handlePush()}
                   disabled={isLocked || pushCount <= 0}
+                  aria-busy={isPushingOp}
                 >
-                  {isPushingOp ? (
-                    <Spinner size="sm" className="[animation-duration:0.25s]" />
-                  ) : (
-                    `Push (${pushCount})`
-                  )}
+                  <ButtonContentWithSpinner
+                    loading={isPushingOp}
+                    spinnerClassName="[animation-duration:0.25s]"
+                  >
+                    {`Push (${pushCount})`}
+                  </ButtonContentWithSpinner>
                 </Button>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1080,12 +1061,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 }
                 onClick={() => void handleCommit('commit')}
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
+                aria-busy={operation === 'commit'}
               >
-                {operation === 'commit' ? (
-                  <Spinner size="sm" className="[animation-duration:0.25s]" />
-                ) : (
-                  'Commit'
-                )}
+                <ButtonContentWithSpinner
+                  loading={operation === 'commit'}
+                  spinnerClassName="[animation-duration:0.25s]"
+                >
+                  Commit
+                </ButtonContentWithSpinner>
               </Button>
               <Button
                 variant="outline"
@@ -1098,12 +1081,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                 }
                 onClick={() => void handleCommitAndPush()}
                 disabled={isLocked || (!hasStagedChanges && !hasOnlyUnstagedChanges)}
+                aria-busy={operation === 'commitAndPush'}
               >
-                {operation === 'commitAndPush' ? (
-                  <Spinner size="sm" className="[animation-duration:0.25s]" />
-                ) : (
-                  'Commit & Push'
-                )}
+                <ButtonContentWithSpinner
+                  loading={operation === 'commitAndPush'}
+                  spinnerClassName="[animation-duration:0.25s]"
+                >
+                  {'Commit & Push'}
+                </ButtonContentWithSpinner>
               </Button>
               <div className="flex">
                 <Button
@@ -1113,12 +1098,14 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                   title="Push committed changes"
                   onClick={() => void handlePush()}
                   disabled={isLocked || pushCount <= 0}
+                  aria-busy={isPushingOp}
                 >
-                  {isPushingOp ? (
-                    <Spinner size="sm" className="[animation-duration:0.25s]" />
-                  ) : (
-                    `Push (${pushCount})`
-                  )}
+                  <ButtonContentWithSpinner
+                    loading={isPushingOp}
+                    spinnerClassName="[animation-duration:0.25s]"
+                  >
+                    {`Push (${pushCount})`}
+                  </ButtonContentWithSpinner>
                 </Button>
                 <Popover>
                   <PopoverTrigger asChild>

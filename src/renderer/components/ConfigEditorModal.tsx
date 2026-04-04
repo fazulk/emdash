@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from './ui/button';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -671,15 +671,8 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
                   Cancel
                 </Button>
-                <Button type="button" onClick={handleSave} disabled={!hasChanges || isSaving}>
-                  {isSaving ? (
-                    <>
-                      <Spinner size="sm" className="mr-2" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save'
-                  )}
+                <Button type="button" onClick={handleSave} disabled={!hasChanges || isSaving} aria-busy={isSaving}>
+                  <ButtonContentWithSpinner loading={isSaving}>Save</ButtonContentWithSpinner>
                 </Button>
               </div>
             </div>

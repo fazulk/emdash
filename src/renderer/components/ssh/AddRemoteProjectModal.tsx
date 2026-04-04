@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Button } from '../ui/button';
+import { Button, ButtonContentWithSpinner } from '../ui/button';
 import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -1667,18 +1667,13 @@ export const AddRemoteProjectModal: React.FC<AddRemoteProjectModalProps> = ({
         </Button>
 
         {currentStep === 'confirm' ? (
-          <Button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Spinner size="sm" className="mr-2" />
-                Saving...
-              </>
-            ) : (
+          <Button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting} aria-busy={isSubmitting}>
+            <ButtonContentWithSpinner loading={isSubmitting}>
               <>
                 <Check className="mr-1 h-4 w-4" />
                 {useExistingConnection ? 'Add Project' : 'Save Connection'}
               </>
-            )}
+            </ButtonContentWithSpinner>
           </Button>
         ) : (
           <Button
@@ -1690,28 +1685,20 @@ export const AddRemoteProjectModal: React.FC<AddRemoteProjectModalProps> = ({
               isCreatingRepo ||
               isCloningRepo
             }
+            aria-busy={
+              (currentStep === 'auth' && testStatus === 'testing') || isCreatingRepo || isCloningRepo
+            }
           >
-            {currentStep === 'auth' && testStatus === 'testing' ? (
-              <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                Testing...
-              </>
-            ) : isCreatingRepo ? (
-              <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : isCloningRepo ? (
-              <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                Cloning...
-              </>
-            ) : (
+            <ButtonContentWithSpinner
+              loading={
+                (currentStep === 'auth' && testStatus === 'testing') || isCreatingRepo || isCloningRepo
+              }
+            >
               <>
                 Next
                 <ChevronRight className="ml-1 h-4 w-4" />
               </>
-            )}
+            </ButtonContentWithSpinner>
           </Button>
         )}
       </div>

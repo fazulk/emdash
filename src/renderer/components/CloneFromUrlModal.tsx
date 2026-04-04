@@ -3,6 +3,7 @@ import { Button, ButtonContentWithSpinner } from './ui/button';
 import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Spinner } from './ui/spinner';
 import { Separator } from './ui/separator';
 import { rpc } from '@/lib/rpc';
 

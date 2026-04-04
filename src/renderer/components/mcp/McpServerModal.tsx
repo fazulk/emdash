@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import { DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Button } from '../ui/button';
+import { Button, ButtonContentWithSpinner } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { McpServer, McpCatalogEntry, McpProvidersResponse } from '@shared/mcp/types';
@@ -287,8 +287,8 @@ export const McpServerModal: React.FC<McpServerModalProps> = ({
             Remove
           </Button>
         )}
-        <Button type="button" onClick={handleSave} disabled={!canSave} size="sm">
-          {saving ? (isEdit ? 'Saving...' : 'Adding...') : isEdit ? 'Save' : 'Add'}
+        <Button type="button" onClick={handleSave} disabled={!canSave} size="sm" aria-busy={saving}>
+          <ButtonContentWithSpinner loading={saving}>{isEdit ? 'Save' : 'Add'}</ButtonContentWithSpinner>
         </Button>
       </DialogFooter>
     </DialogContent>

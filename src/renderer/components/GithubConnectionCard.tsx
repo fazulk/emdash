@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from './ui/button';
-import { Spinner } from './ui/spinner';
+import { Button, ButtonContentWithSpinner } from './ui/button';
 import { RefreshCcw, LogOut, ExternalLink } from 'lucide-react';
 import { useGithubContext } from '../contexts/GithubContextProvider';
 
@@ -186,17 +185,12 @@ const GithubConnectionCard: React.FC<GithubConnectionCardProps> = ({ onStatusCha
             <Button
               type="button"
               onClick={handleConnect}
-              disabled={isLoading}
-              aria-busy={isLoading}
+              disabled={isLoading || isInstalling}
+              aria-busy={isLoading || isInstalling}
             >
-              {isLoading || isInstalling ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  {isInstalling ? 'Installing CLI...' : 'Connecting…'}
-                </>
-              ) : (
-                'Sign in with GitHub'
-              )}
+              <ButtonContentWithSpinner loading={isLoading || isInstalling}>
+                Sign in with GitHub
+              </ButtonContentWithSpinner>
             </Button>
             <Button type="button" variant="outline" onClick={handleRefresh} disabled={isLoading}>
               <RefreshCcw className="mr-2 h-4 w-4" /> Check status

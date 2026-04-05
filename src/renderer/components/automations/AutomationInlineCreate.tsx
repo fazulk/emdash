@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GitBranch, FolderGit2, Clock, Github, FolderOpen, Zap } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -284,14 +283,9 @@ const AutomationInlineCreate: React.FC<AutomationInlineCreateProps> = ({
               setUseWorktree(!useWorktree);
             }}
           >
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span
+            <span
                 key={useWorktree ? 'worktree' : 'main'}
-                className="flex items-center justify-center gap-1.5"
-                initial={{ y: 12, opacity: 0, filter: 'blur(2px)' }}
-                animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-                exit={{ y: -12, opacity: 0, filter: 'blur(2px)' }}
-                transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+                className="flex items-center justify-center gap-1.5 animate-in fade-in-0 slide-in-from-bottom-1 duration-150"
               >
                 {useWorktree ? (
                   <>
@@ -304,8 +298,7 @@ const AutomationInlineCreate: React.FC<AutomationInlineCreateProps> = ({
                     Direct
                   </>
                 )}
-              </motion.span>
-            </AnimatePresence>
+              </span>
           </Button>
 
           {/* Agent select */}
@@ -387,14 +380,9 @@ const AutomationInlineCreate: React.FC<AutomationInlineCreateProps> = ({
             className="relative h-7 w-[88px] overflow-hidden text-xs text-muted-foreground"
             onClick={() => setMode(mode === 'trigger' ? 'schedule' : 'trigger')}
           >
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.span
+            <span
                 key={mode}
-                className="flex items-center justify-center gap-1.5"
-                initial={{ y: 12, opacity: 0, filter: 'blur(2px)' }}
-                animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-                exit={{ y: -12, opacity: 0, filter: 'blur(2px)' }}
-                transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+                className="flex items-center justify-center gap-1.5 animate-in fade-in-0 slide-in-from-bottom-1 duration-150"
               >
                 {mode === 'trigger' ? (
                   <>
@@ -407,8 +395,7 @@ const AutomationInlineCreate: React.FC<AutomationInlineCreateProps> = ({
                     Schedule
                   </>
                 )}
-              </motion.span>
-            </AnimatePresence>
+              </span>
           </Button>
 
           {/* Trigger config */}

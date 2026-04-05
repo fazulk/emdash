@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Plus, Pencil, ExternalLink, Globe, Terminal } from 'lucide-react';
 import type { McpServer, McpCatalogEntry } from '@shared/mcp/types';
 import AgentLogo from '../AgentLogo';
@@ -116,11 +115,9 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
   };
 
   return (
-    <motion.div
+    <div
       role="button"
       tabIndex={0}
-      whileTap={{ scale: 0.97 }}
-      transition={{ duration: 0.1, ease: 'easeInOut' }}
       onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -128,7 +125,7 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
           handleClick();
         }
       }}
-      className="group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-muted/20 p-4 text-left text-card-foreground shadow-sm transition-[background-color,box-shadow] hover:bg-muted/40 hover:shadow-md"
+      className="pressable-scale group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-muted/20 p-4 text-left text-card-foreground shadow-sm transition-[background-color,box-shadow] hover:bg-muted/40 hover:shadow-md"
     >
       <McpIcon name={name} catalogKey={catalogEntry?.key ?? server?.name} />
 
@@ -195,6 +192,6 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
           </button>
         ) : null}
       </div>
-    </motion.div>
+    </div>
   );
 };

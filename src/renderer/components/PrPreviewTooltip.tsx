@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import githubLogo from '../../assets/images/github.png';
 import type { PrStatus } from '../lib/prStatus';
@@ -52,13 +51,7 @@ export const PrPreviewTooltip: React.FC<Props> = ({ pr, children, side = 'top' }
           align="start"
           className="border-0 bg-transparent p-0 shadow-none"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="min-w-[260px] max-w-sm rounded-lg border border-border/70 bg-popover/95 p-3 shadow-xl backdrop-blur-sm"
-          >
+          <div className="min-w-[260px] max-w-sm rounded-lg border border-border/70 bg-popover/95 p-3 shadow-xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-150">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <img src={githubLogo} alt="GitHub" className="h-4 w-4" />
               <span className="tracking-wide">Pull Request</span>
@@ -75,7 +68,7 @@ export const PrPreviewTooltip: React.FC<Props> = ({ pr, children, side = 'top' }
                 <span className="text-[11px] text-muted-foreground/80">Diff stats unavailable</span>
               ) : null}
             </div>
-          </motion.div>
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

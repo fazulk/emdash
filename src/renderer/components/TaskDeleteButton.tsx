@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Trash, Folder } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { Spinner } from './ui/spinner';
@@ -165,16 +164,8 @@ export const TaskDeleteButton: React.FC<Props> = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-3 text-sm">
-          <AnimatePresence initial={false}>
-            {showWarnings && (requiresAcknowledge || risky) ? (
-              <motion.div
-                key="delete-risk"
-                initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="space-y-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50"
-              >
+          {showWarnings && (requiresAcknowledge || risky) ? (
+              <div className="space-y-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                 <p className="font-medium">Unmerged or unpushed work detected</p>
                 <div className="rounded-md bg-amber-50/80 px-2 py-1 text-amber-900 dark:bg-amber-500/10 dark:text-amber-50">
                   <div className="flex items-start gap-2">
@@ -211,28 +202,18 @@ export const TaskDeleteButton: React.FC<Props> = ({
                 {status.pr && isActivePr(status.pr) ? (
                   <DeletePrNotice tasks={[{ name: taskName, pr: status.pr }]} />
                 ) : null}
-              </motion.div>
+              </div>
             ) : null}
-          </AnimatePresence>
-          <AnimatePresence initial={false}>
-            {showWarnings && requiresAcknowledge ? (
-              <motion.label
-                key="ack-delete"
-                className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2"
-                initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                transition={{ duration: 0.18, ease: 'easeOut', delay: 0.02 }}
-              >
+          {showWarnings && requiresAcknowledge ? (
+              <label className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                 <Checkbox
                   checked={acknowledge}
                   onCheckedChange={(checked) => setAcknowledge(checked === true)}
                   className="mt-0.5"
                 />
                 <span className="text-sm leading-tight text-foreground">Delete task anyway</span>
-              </motion.label>
+              </label>
             ) : null}
-          </AnimatePresence>
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>

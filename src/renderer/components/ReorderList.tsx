@@ -1,5 +1,4 @@
 import React from 'react';
-import { Reorder } from 'motion/react';
 
 type Axis = 'x' | 'y';
 
@@ -28,27 +27,76 @@ export function ReorderList<T>({
   getKey,
   children,
 }: ReorderListProps<T>) {
+  const [dragIndex, setDragIndex] = React.useState<number | null>(null);
+  const [dropIndex, setDropIndex] = React.useState<number | null>(null);
+  const GroupTag = as as React.ElementType;
+  const ItemTag = itemAs as React.ElementType;
+
+  const moveItem = React.useCallback(
+    (from: number, to: number) => {
+      if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) {
+        return;
+      }
+      const next = [...items];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      onReorder(next);
+    },
+    [items, onReorder]
+  );
+
   return (
-    <Reorder.Group
-      as={as as any}
-      axis={axis}
-      values={items}
-      onReorder={onReorder as any}
-      layoutScroll={layoutScroll}
+    <GroupTag
       className={className}
+      data-reorder-axis={axis}
+      data-layout-scroll={layoutScroll || undefined}
     >
       {items.map((item, index) => (
-        <Reorder.Item
-          as={itemAs as any}
+        <ItemTag
           key={(getKey ? getKey(item, index) : (index as any)) as React.Key}
-          value={item as any}
-          className={itemClassName}
-          transition={{ layout: { duration: 0 } }}
+          draggable
+          onDragStart={(event: React.DragEvent) => {
+            setDragIndex(index);
+            setDropIndex(index);
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(index));
+          }}
+          onDragOver={(event: React.DragEvent) => {
+            event.preventDefault();
+            if (dropIndex !== index) {
+              setDropIndex(index);
+            }
+            event.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(event: React.DragEvent) => {
+            event.preventDefault();
+            const from = dragIndex ?? Number.parseInt(event.dataTransfer.getData('text/plain'), 10);
+            if (Number.isFinite(from)) {
+              moveItem(from, index);
+            }
+            setDragIndex(null);
+            setDropIndex(null);
+          }}
+          onDragEnd={() => {
+            setDragIndex(null);
+            setDropIndex(null);
+          }}
+          className={[
+            itemClassName,
+            dragIndex === index ? 'opacity-60' : '',
+            dropIndex === index && dragIndex !== null && dragIndex !== index
+              ? axis === 'y'
+                ? 'border-t-2 border-primary'
+                : 'border-l-2 border-primary'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
         >
           {children(item, index)}
-        </Reorder.Item>
+        </ItemTag>
       ))}
-    </Reorder.Group>
+    </GroupTag>
   );
 }
 

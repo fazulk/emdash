@@ -1,7 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { formatChangelogPublishedAt } from '@/lib/changelogDate';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 import type { ChangelogEntry } from '@shared/changelog';
 import { ArrowRight, X } from 'lucide-react';
 import { useEmdashAccount } from '@/contexts/EmdashAccountProvider';
@@ -26,17 +25,13 @@ export function ChangelogNotificationCard({
   const { hasAccount } = useEmdashAccount();
 
   return (
-    <motion.div
-      whileTap={{ scale: 0.97 }}
-      className={cn(
-        'relative rounded-xl border border-border/80 bg-background/80 shadow-sm backdrop-blur',
-        className
-      )}
+    <div
+      className={cn('relative rounded-xl border border-border/80 bg-background/80 shadow-sm backdrop-blur', className)}
     >
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full flex-col gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-accent/30"
+        className="pressable-scale flex w-full flex-col gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-accent/30"
       >
         <div className="pr-8">
           {publishedAt && (
@@ -84,6 +79,6 @@ export function ChangelogNotificationCard({
       >
         <X className="h-3.5 w-3.5" />
       </button>
-    </motion.div>
+    </div>
   );
 }

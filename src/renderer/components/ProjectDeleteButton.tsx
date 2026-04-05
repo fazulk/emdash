@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Trash, Folder } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { Spinner } from './ui/spinner';
@@ -111,16 +110,8 @@ export const ProjectDeleteButton: React.FC<Props> = ({
         </AlertDialogHeader>
 
         <div className="space-y-3 text-sm">
-          <AnimatePresence initial={false}>
-            {loading ? (
-              <motion.div
-                key="project-delete-loading"
-                initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="flex items-start gap-3 rounded-md border border-border/70 bg-muted/30 px-4 py-4"
-              >
+          {loading ? (
+              <div className="flex items-start gap-3 rounded-md border border-border/70 bg-muted/30 px-4 py-4 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                 <Spinner className="mt-0.5 h-5 w-5 flex-shrink-0 text-muted-foreground" size="sm" />
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm font-semibold text-foreground">Please wait...</span>
@@ -128,20 +119,11 @@ export const ProjectDeleteButton: React.FC<Props> = ({
                     Scanning tasks for uncommitted changes and open pull requests
                   </span>
                 </div>
-              </motion.div>
+              </div>
             ) : null}
-          </AnimatePresence>
 
-          <AnimatePresence initial={false}>
-            {!loading && tasksWithUncommittedWork.length > 0 ? (
-              <motion.div
-                key="project-delete-risk"
-                initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="space-y-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50"
-              >
+          {!loading && tasksWithUncommittedWork.length > 0 ? (
+              <div className="space-y-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                 <p className="font-medium">
                   {tasksWithUncommittedWork.length === 1
                     ? 'Unmerged or unpushed work detected in 1 task'
@@ -185,19 +167,11 @@ export const ProjectDeleteButton: React.FC<Props> = ({
                     );
                   })}
                 </ul>
-              </motion.div>
+              </div>
             ) : null}
-          </AnimatePresence>
 
-          <AnimatePresence initial={false}>
-            {!loading && tasksWithPRs.length > 0 ? (
-              <motion.div
-                key="project-delete-prs"
-                initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                transition={{ duration: 0.18, ease: 'easeOut', delay: 0.02 }}
-              >
+          {!loading && tasksWithPRs.length > 0 ? (
+              <div className="animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                 <DeletePrNotice
                   tasks={
                     tasksWithPRs
@@ -210,29 +184,19 @@ export const ProjectDeleteButton: React.FC<Props> = ({
                       ) as any
                   }
                 />
-              </motion.div>
+              </div>
             ) : null}
-          </AnimatePresence>
 
-          <AnimatePresence initial={false}>
-            {hasRisks ? (
-              <motion.label
-                key="ack-project-delete"
-                className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2"
-                initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                transition={{ duration: 0.18, ease: 'easeOut', delay: 0.02 }}
-              >
+          {hasRisks ? (
+              <label className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                 <Checkbox
                   checked={acknowledge}
                   onCheckedChange={(checked) => setAcknowledge(checked === true)}
                   className="mt-0.5"
                 />
                 <span className="text-sm leading-tight text-foreground">Delete project anyway</span>
-              </motion.label>
+              </label>
             ) : null}
-          </AnimatePresence>
         </div>
 
         <AlertDialogFooter>

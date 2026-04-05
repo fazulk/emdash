@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Plus, Pencil, Download } from 'lucide-react';
 import type { CatalogSkill } from '@shared/skills/types';
 import SkillIconRenderer from './SkillIconRenderer';
@@ -18,11 +17,9 @@ interface SkillCardProps {
 
 const SkillCard: React.FC<SkillCardProps> = ({ skill, onSelect, onInstall }) => {
   return (
-    <motion.div
+    <div
       role="button"
       tabIndex={0}
-      whileTap={{ scale: 0.97 }}
-      transition={{ duration: 0.1, ease: 'easeInOut' }}
       onClick={() => onSelect(skill)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -30,7 +27,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ skill, onSelect, onInstall }) => 
           onSelect(skill);
         }
       }}
-      className="group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-muted/20 p-4 text-left text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md"
+      className="pressable-scale group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-muted/20 p-4 text-left text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md"
     >
       <SkillIconRenderer skill={skill} />
 
@@ -81,7 +78,7 @@ const SkillCard: React.FC<SkillCardProps> = ({ skill, onSelect, onInstall }) => 
           </button>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 

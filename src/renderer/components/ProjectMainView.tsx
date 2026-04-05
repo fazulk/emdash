@@ -15,7 +15,6 @@ import {
   Check,
   ListFilter,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Separator } from './ui/separator';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { usePrStatus } from '../hooks/usePrStatus';
@@ -805,10 +804,8 @@ const ProjectMainView: React.FC<ProjectMainViewProps> = ({
                     onOpenConfig={() => setShowConfigEditor(true)}
                   />
                   {project.githubInfo?.connected && project.githubInfo.repository ? (
-                    <motion.button
-                      whileTap={{ scale: 0.97 }}
-                      transition={{ duration: 0.1, ease: 'easeInOut' }}
-                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    <button
+                      className="pressable-scale inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       onClick={() =>
                         window.electronAPI.openExternal(
                           `https://github.com/${project.githubInfo?.repository}`
@@ -817,7 +814,7 @@ const ProjectMainView: React.FC<ProjectMainViewProps> = ({
                     >
                       <Github className="size-3.5" />
                       View on GitHub
-                    </motion.button>
+                    </button>
                   ) : null}
                   {onDeleteProject ? (
                     <ProjectDeleteButton
@@ -841,15 +838,13 @@ const ProjectMainView: React.FC<ProjectMainViewProps> = ({
                     Spin up a fresh, isolated task for this project.
                   </p>
                 </div>
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  transition={{ duration: 0.1, ease: 'easeInOut' }}
-                  className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                <button
+                  className="pressable-scale inline-flex h-8 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                   onClick={onCreateTask}
                 >
                   <Plus className="mr-2 size-4" />
                   New Task
-                </motion.button>
+                </button>
               </div>
 
               {hasAnyTasks ? (
@@ -1082,7 +1077,6 @@ const ProjectMainView: React.FC<ProjectMainViewProps> = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
-            <AnimatePresence initial={false}>
               {(() => {
                 const tasksWithUncommittedWorkOnly = selectedTasks.filter((ws) => {
                   const summary = deleteRisks.summaries[ws.id];
@@ -1093,14 +1087,7 @@ const ProjectMainView: React.FC<ProjectMainViewProps> = ({
                 });
 
                 return showDeleteWarnings && tasksWithUncommittedWorkOnly.length > 0 ? (
-                  <motion.div
-                    key="bulk-risk"
-                    initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="space-y-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50"
-                  >
+                  <div className="space-y-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50 animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                     <p className="font-medium">Unmerged or unpushed work detected</p>
                     <ul className="space-y-1">
                       {tasksWithUncommittedWorkOnly.map((ws) => {
@@ -1123,49 +1110,31 @@ const ProjectMainView: React.FC<ProjectMainViewProps> = ({
                         );
                       })}
                     </ul>
-                  </motion.div>
+                  </div>
                 ) : null;
               })()}
-            </AnimatePresence>
 
-            <AnimatePresence initial={false}>
               {(() => {
                 const prTasks = selectedTasks
                   .map((ws) => ({ name: ws.name, pr: deleteStatus[ws.id]?.pr }))
                   .filter((w) => w.pr && isActivePr(w.pr));
                 return showDeleteWarnings && prTasks.length ? (
-                  <motion.div
-                    key="bulk-pr-notice"
-                    initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                    transition={{ duration: 0.2, ease: 'easeOut', delay: 0.02 }}
-                  >
+                  <div className="animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                     <DeletePrNotice tasks={prTasks as any} />
-                  </motion.div>
+                  </div>
                 ) : null;
               })()}
-            </AnimatePresence>
 
-            <AnimatePresence initial={false}>
               {showDeleteWarnings && deleteRisks.riskyIds.size > 0 ? (
-                <motion.label
-                  key="bulk-ack"
-                  className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm"
-                  initial={{ opacity: 0, y: 6, scale: 0.99 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.99 }}
-                  transition={{ duration: 0.18, ease: 'easeOut', delay: 0.03 }}
-                >
+                <label className="flex items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-200">
                   <Checkbox
                     id="ack-delete"
                     checked={acknowledgeDirtyDelete}
                     onCheckedChange={(val) => setAcknowledgeDirtyDelete(val === true)}
                   />
                   <span className="leading-tight">Delete tasks anyway</span>
-                </motion.label>
+                </label>
               ) : null}
-            </AnimatePresence>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting || isCheckingDeleteRisks}>

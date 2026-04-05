@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ExternalLink, User, Folder } from 'lucide-react';
 import jiraLogo from '../../assets/images/jira.png';
@@ -125,12 +124,8 @@ export const JiraIssuePreviewTooltip: React.FC<Props> = ({ issue, children, side
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="min-w-[260px] max-w-sm rounded-lg border border-border/70 bg-popover/95 p-3 shadow-xl backdrop-blur-sm"
+          <div
+            className="min-w-[260px] max-w-sm rounded-lg border border-border/70 bg-popover/95 p-3 shadow-xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">
@@ -185,7 +180,7 @@ export const JiraIssuePreviewTooltip: React.FC<Props> = ({ issue, children, side
                 </span>
               )}
             </div>
-          </motion.div>
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

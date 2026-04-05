@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ExternalLink, Settings } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -117,7 +116,6 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
   isForgejoConnected,
   onForgejoConnect,
 }) => {
-  const shouldReduceMotion = useReducedMotion();
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Linear setup state
@@ -710,22 +708,14 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
         </AccordionItem>
       </Accordion>
 
-      <AnimatePresence>
-        {linearSetupOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[1000] flex items-center justify-center px-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {linearSetupOpen ? (
+          <div
+            className="fixed inset-0 z-[1000] flex items-center justify-center px-3 animate-in fade-in-0 duration-150"
             onClick={() => setLinearSetupOpen(false)}
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div
-              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+            <div
+              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150"
               onClick={(event) => event.stopPropagation()}
             >
               <LinearSetupForm
@@ -736,27 +726,18 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
                 canSubmit={!!linearApiKey.trim()}
                 error={linearConnectionError}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ) : null}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {jiraSetupOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[1000] flex items-center justify-center px-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {jiraSetupOpen ? (
+          <div
+            className="fixed inset-0 z-[1000] flex items-center justify-center px-3 animate-in fade-in-0 duration-150"
             onClick={() => setJiraSetupOpen(false)}
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div
-              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+            <div
+              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150"
               onClick={(event) => event.stopPropagation()}
             >
               <JiraSetupForm
@@ -773,27 +754,18 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
                 error={jiraConnectionError}
                 onSubmit={() => void handleJiraConnect()}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ) : null}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {gitlabSetupOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[1000] flex items-center justify-center px-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {gitlabSetupOpen ? (
+          <div
+            className="fixed inset-0 z-[1000] flex items-center justify-center px-3 animate-in fade-in-0 duration-150"
             onClick={() => setGitlabSetupOpen(false)}
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div
-              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+            <div
+              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150"
               onClick={(event) => event.stopPropagation()}
             >
               <GitLabSetupForm
@@ -808,27 +780,18 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
                 error={gitlabConnectionError}
                 onSubmit={() => void handleGitlabConnect()}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ) : null}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {plainSetupOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[1000] flex items-center justify-center px-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {plainSetupOpen ? (
+          <div
+            className="fixed inset-0 z-[1000] flex items-center justify-center px-3 animate-in fade-in-0 duration-150"
             onClick={() => setPlainSetupOpen(false)}
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div
-              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+            <div
+              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150"
               onClick={(event) => event.stopPropagation()}
             >
               <PlainSetupForm
@@ -839,27 +802,18 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
                 canSubmit={!!plainApiKey.trim()}
                 error={plainConnectionError}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ) : null}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {forgejoSetupOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[1000] flex items-center justify-center px-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {forgejoSetupOpen ? (
+          <div
+            className="fixed inset-0 z-[1000] flex items-center justify-center px-3 animate-in fade-in-0 duration-150"
             onClick={() => setForgejoSetupOpen(false)}
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div
-              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+            <div
+              className="relative z-10 w-full max-w-md rounded-xl border border-border/70 bg-background/95 p-4 shadow-2xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150"
               onClick={(event) => event.stopPropagation()}
             >
               <ForgejoSetupForm
@@ -874,10 +828,9 @@ export const TaskAdvancedSettings: React.FC<TaskAdvancedSettingsProps> = ({
                 error={forgejoConnectionError}
                 onSubmit={() => void handleForgejoConnect()}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ) : null}
-      </AnimatePresence>
     </>
   );
 };

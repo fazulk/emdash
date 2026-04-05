@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import ReorderList from '../ReorderList';
 import { Button } from '../ui/button';
 import {
@@ -526,10 +525,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                   <FolderClosed className="block h-4 w-4 text-foreground/60 group-data-[state=open]/collapsible:hidden" />
                                 </button>
                               </CollapsibleTrigger>
-                              <motion.button
+                              <button
                                 type="button"
-                                className="min-w-0 flex-1 truncate bg-transparent text-left text-foreground/60"
-                                whileTap={{ scale: 0.97 }}
+                                className="pressable-scale min-w-0 flex-1 truncate bg-transparent text-left text-foreground/60"
                                 onClick={() =>
                                   handleNavigationWithCloseSettings(() =>
                                     onSelectProject(typedProject)
@@ -537,7 +535,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                 }
                               >
                                 <ProjectItem project={typedProject} />
-                              </motion.button>
+                              </button>
                               {githubUrl ? (
                                 <button
                                   type="button"
@@ -601,14 +599,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                     const typedTask = task as Task;
                                     const isActive = activeTask?.id === typedTask.id;
                                     return (
-                                      <motion.div
-                                        whileTap={{ scale: 0.97 }}
+                                      <div
                                         onClick={() =>
                                           handleNavigationWithCloseSettings(() =>
                                             onSelectTask?.(typedTask)
                                           )
                                         }
-                                        className={`group/task min-w-0 rounded-md py-1.5 pl-1 pr-2 hover:bg-accent ${isActive ? 'bg-black/[0.06] dark:bg-white/[0.08]' : ''}`}
+                                        className={`pressable-scale group/task min-w-0 rounded-md py-1.5 pl-1 pr-2 hover:bg-accent ${isActive ? 'bg-black/[0.06] dark:bg-white/[0.08]' : ''}`}
                                       >
                                         <TaskItem
                                           task={typedTask}
@@ -635,7 +632,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                                           onArchive={() => onArchiveTask?.(typedProject, typedTask)}
                                           primaryAction={taskHoverAction}
                                         />
-                                      </motion.div>
+                                      </div>
                                     );
                                   }}
                                 </ReorderList>

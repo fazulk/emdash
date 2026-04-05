@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CornerDownLeft, ExternalLink, MessageSquare, X } from 'lucide-react';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useEmdashAccount } from '../contexts/EmdashAccountProvider';
@@ -27,7 +26,6 @@ const AccessRequestModal: React.FC<AccessRequestModalProps> = ({
   githubUser,
   userEmail,
 }) => {
-  const shouldReduceMotion = useReducedMotion();
   const { toast } = useToast();
   const [companyName, setCompanyName] = useState('');
   const [infrastructure, setInfrastructure] = useState('');
@@ -110,32 +108,18 @@ const AccessRequestModal: React.FC<AccessRequestModalProps> = ({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <AnimatePresence>
+    <>
       {isOpen && (
-        <motion.div
+        <div
           role="dialog"
           aria-modal="true"
           aria-label="Request workspace provider access"
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          initial={shouldReduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-          transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-150"
           onClick={onClose}
         >
-          <motion.div
+          <div
             onClick={(e) => e.stopPropagation()}
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 8, scale: 0.995 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={
-              shouldReduceMotion
-                ? { opacity: 1, y: 0, scale: 1 }
-                : { opacity: 0, y: 6, scale: 0.995 }
-            }
-            transition={
-              shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
-            }
-            className="w-full max-w-lg rounded-xl border border-border bg-white shadow-2xl dark:border-border dark:bg-background"
+            className="w-full max-w-lg rounded-xl border border-border bg-white shadow-2xl dark:border-border dark:bg-background animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200"
           >
             <div className="flex items-start justify-between px-6 pb-2 pt-6">
               <div className="flex flex-col gap-1">
@@ -238,10 +222,10 @@ const AccessRequestModal: React.FC<AccessRequestModalProps> = ({
                 </Button>
               </div>
             </form>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>,
+    </>,
     document.body
   );
 };

@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { FolderOpen, Github, Plus, Server } from 'lucide-react';
 import React from 'react';
 import emdashLogo from '../../assets/images/emdash/emdash_logo.svg';
@@ -58,9 +57,7 @@ const HomeView: React.FC<HomeViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:gap-2">
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.1, ease: 'easeInOut' }}
+          <button
             onClick={() => {
               void (async () => {
                 const { captureTelemetry } = await import('../lib/telemetryClient');
@@ -68,49 +65,43 @@ const HomeView: React.FC<HomeViewProps> = ({
               })();
               onOpenProject();
             }}
-            className="group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="pressable-scale group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <FolderOpen className="mb-5 h-5 w-5 text-foreground opacity-70" />
             <div className="w-full min-w-0 text-left">
               <h3 className="truncate text-xs font-semibold">Open project</h3>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.1, ease: 'easeInOut' }}
+          <button
             onClick={onNewProjectClick}
-            className="group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="pressable-scale group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Plus className="mb-5 h-5 w-5 text-foreground opacity-70" />
             <div className="w-full min-w-0 text-left">
               <h3 className="truncate text-xs font-semibold">Create New Project</h3>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.1, ease: 'easeInOut' }}
+          <button
             onClick={onCloneProjectClick}
-            className="group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="pressable-scale group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Github className="mb-5 h-5 w-5 text-foreground opacity-70" />
             <div className="w-full min-w-0 text-left">
               <h3 className="truncate text-xs font-semibold">Clone from GitHub</h3>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            transition={{ duration: 0.1, ease: 'easeInOut' }}
+          <button
             onClick={onAddRemoteProject}
-            className="group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="pressable-scale group flex flex-col items-start justify-between rounded-lg border border-border bg-muted/20 p-4 text-card-foreground shadow-sm transition-all hover:bg-muted/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Server className="mb-5 h-5 w-5 text-foreground opacity-70" />
             <div className="w-full min-w-0 text-left">
               <h3 className="truncate text-xs font-semibold">Add Remote Project</h3>
             </div>
-          </motion.button>
+          </button>
         </div>
       </div>
     </div>

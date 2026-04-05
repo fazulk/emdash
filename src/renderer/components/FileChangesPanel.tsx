@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Badge } from './ui/badge';
 import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
@@ -670,10 +669,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     <div className={`flex h-full flex-col bg-card shadow-sm ${className ?? ''}`}>
       {/* PR review banner */}
       {isPrReview && (
-        <motion.button
+        <button
           type="button"
-          className="flex w-full cursor-pointer items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-3 py-1.5 text-left transition-colors hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
-          whileTap={{ scale: 0.97 }}
+          className="pressable-scale flex w-full cursor-pointer items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-3 py-1.5 text-left transition-colors hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
           onClick={() => {
             const url = prUrl || pr?.url;
             if (url) window.electronAPI.openExternal(url);
@@ -693,7 +691,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
             )}
           </span>
           <ArrowUpRight className="h-3 w-3 shrink-0 text-emerald-500 dark:text-emerald-400" />
-        </motion.button>
+        </button>
       )}
 
       <div className="bg-muted px-3 py-2">

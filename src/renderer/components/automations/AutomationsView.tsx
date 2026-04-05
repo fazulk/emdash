@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Plus, Loader2, X, LayoutGrid } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '../ui/button';
 import {
   AlertDialog,
@@ -150,15 +149,8 @@ const AutomationsView: React.FC = () => {
           )}
 
           {/* Inline Create */}
-          <AnimatePresence>
-            {showCreate && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                className="overflow-hidden"
-              >
+          {showCreate && (
+              <div className="overflow-hidden animate-in fade-in-0 slide-in-from-top-1 duration-200">
                 <AutomationInlineCreate
                   projects={projects}
                   prefill={prefill}
@@ -174,20 +166,12 @@ const AutomationsView: React.FC = () => {
                     setPrefill(null);
                   }}
                 />
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
 
           {/* Inline Edit */}
-          <AnimatePresence>
-            {editingAutomation && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                className="overflow-hidden"
-              >
+          {editingAutomation && (
+              <div className="overflow-hidden animate-in fade-in-0 slide-in-from-top-1 duration-200">
                 <AutomationInlineCreate
                   key={editingAutomation.id}
                   projects={projects}
@@ -196,9 +180,8 @@ const AutomationsView: React.FC = () => {
                   onUpdate={handleUpdate}
                   onCancel={() => setEditingAutomation(null)}
                 />
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
 
           {/* Empty state with inline templates */}
           {!hasAutomations && !showCreate && <ExampleAutomations onSelect={handleExampleClick} />}

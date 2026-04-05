@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Command } from 'cmdk';
 import {
   Search,
@@ -81,7 +80,6 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const { getShortcut } = useKeyboardSettings();
-  const shouldReduceMotion = useReducedMotion();
 
   const getEffectiveShortcut = useCallback(
     (
@@ -303,33 +301,19 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
   }, []);
 
   return createPortal(
-    <AnimatePresence>
+    <>
       {isOpen && (
-        <motion.div
+        <div
           role="dialog"
           aria-modal="true"
           aria-label="Command palette"
-          className="fixed inset-0 z-[130] flex items-start justify-center bg-black/60 pt-[15vh] backdrop-blur-sm"
-          initial={shouldReduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-          transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
+          className="fixed inset-0 z-[130] flex items-start justify-center bg-black/60 pt-[15vh] backdrop-blur-sm animate-in fade-in-0 duration-150"
           onClick={handleClose}
         >
-          <motion.div
+          <div
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
-            initial={shouldReduceMotion ? false : { opacity: 0, y: -8, scale: 0.995 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={
-              shouldReduceMotion
-                ? { opacity: 1, y: 0, scale: 1 }
-                : { opacity: 0, y: -6, scale: 0.995 }
-            }
-            transition={
-              shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
-            }
-            className="mx-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-border/50 bg-background shadow-2xl"
+            className="mx-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-border/50 bg-background shadow-2xl animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200"
           >
             <Command
               shouldFilter={true}
@@ -438,10 +422,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                 </div>
               </div>
             </Command>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>,
+    </>,
     document.body
   );
 };

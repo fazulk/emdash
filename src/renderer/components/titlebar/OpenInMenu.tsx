@@ -1,5 +1,4 @@
 import React from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
@@ -28,7 +27,6 @@ const OpenInMenu: React.FC<OpenInMenuProps> = ({
 }) => {
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const shouldReduceMotion = useReducedMotion();
   const { toast } = useToast();
   const { icons, labels, installedApps, availability, loading } = useOpenInApps({ isRemote });
   const { settings, updateSettings } = useAppSettings();
@@ -185,25 +183,14 @@ const OpenInMenu: React.FC<OpenInMenuProps> = ({
           />
         </Button>
       </div>
-      <AnimatePresence>
-        {open && (
-          <motion.div
+      {open && (
+          <div
             role="menu"
             className={[
-              'absolute z-50 mt-1 min-w-[180px] rounded-md border border-border bg-popover p-1 shadow-md',
+              'absolute z-50 mt-1 min-w-[180px] rounded-md border border-border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-150',
               align === 'right' ? 'right-0' : 'left-0',
             ].join(' ')}
             style={{ transformOrigin: align === 'right' ? 'top right' : 'top left' }}
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={
-              shouldReduceMotion
-                ? { opacity: 1, y: 0, scale: 1 }
-                : { opacity: 0, y: 4, scale: 0.98 }
-            }
-            transition={
-              shouldReduceMotion ? { duration: 0 } : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }
-            }
           >
             {menuApps.map((app) => {
               // While loading, disable apps that aren't confirmed installed
@@ -234,9 +221,8 @@ const OpenInMenu: React.FC<OpenInMenuProps> = ({
                 </button>
               );
             })}
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   );
 };

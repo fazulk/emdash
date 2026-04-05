@@ -16,17 +16,6 @@ const useCheckRunsMock = vi.fn();
 const useAutoCheckRunsRefreshMock = vi.fn();
 const onGitStatusChangedMock = vi.fn();
 
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-      <div {...props}>{children}</div>
-    ),
-    button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-      <button {...props}>{children}</button>
-    ),
-  },
-}));
-
 vi.mock('../../renderer/hooks/use-toast', () => ({
   useToast: () => ({ toast: toastMock }),
 }));

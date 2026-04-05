@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CornerDownLeft, Paperclip, X } from 'lucide-react';
 import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
@@ -23,7 +22,6 @@ interface FeedbackModalProps {
 }
 
 const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, githubUser, blurb }) => {
-  const shouldReduceMotion = useReducedMotion();
   const submitButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [feedbackDetails, setFeedbackDetails] = useState('');
@@ -227,32 +225,18 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, githubUs
   }
 
   return createPortal(
-    <AnimatePresence>
+    <>
       {isOpen && (
-        <motion.div
+        <div
           role="dialog"
           aria-modal="true"
           aria-label="Feedback"
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          initial={shouldReduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-          transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-150"
           onClick={onClose}
         >
-          <motion.div
+          <div
             onClick={(event) => event.stopPropagation()}
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 8, scale: 0.995 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={
-              shouldReduceMotion
-                ? { opacity: 1, y: 0, scale: 1 }
-                : { opacity: 0, y: 6, scale: 0.995 }
-            }
-            transition={
-              shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
-            }
-            className="w-full max-w-lg transform-gpu rounded-xl border border-border bg-white shadow-2xl outline-none will-change-transform dark:border-border dark:bg-background"
+            className="w-full max-w-lg transform-gpu rounded-xl border border-border bg-white shadow-2xl outline-none will-change-transform dark:border-border dark:bg-background animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-200"
           >
             <div className="flex items-start justify-between px-6 pb-2 pt-6">
               <div className="flex flex-col gap-1">
@@ -387,10 +371,10 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, githubUs
                 </Button>
               </div>
             </form>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>,
+    </>,
     document.body
   );
 };

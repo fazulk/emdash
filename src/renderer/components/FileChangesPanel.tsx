@@ -32,7 +32,6 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  GitMerge,
   Check,
   Copy,
 } from 'lucide-react';
@@ -52,12 +51,11 @@ import { fetchPrBaseDiff, parseDiffToFileChanges } from '../lib/parsePrDiff';
 import { formatDiffCount } from '../lib/gitChangePresentation';
 
 type ActiveTab = 'changes' | 'checks';
-type PrMode = 'create' | 'draft' | 'merge';
+type PrMode = 'create' | 'draft';
 
 const PR_MODE_LABELS: Record<PrMode, string> = {
   create: 'Create PR',
   draft: 'Draft PR',
-  merge: 'Merge into Main',
 };
 
 interface PrActionButtonProps {
@@ -98,7 +96,7 @@ function PrActionButton({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-auto min-w-0 p-0.5">
-          {(['create', 'draft', 'merge'] as PrMode[])
+          {(['create', 'draft'] as PrMode[])
             .filter((m) => m !== mode)
             .map((m) => (
               <PopoverClose key={m} asChild>
@@ -224,14 +222,12 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const [isStagingAll, setIsStagingAll] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [showPushAfterCommit, setShowPushAfterCommit] = useState(false);
-  const [isMergingToMain, setIsMergingToMain] = useState(false);
-  const [showMergeConfirm, setShowMergeConfirm] = useState(false);
   const [showForcePushConfirm, setShowForcePushConfirm] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
   const [prMode, setPrMode] = useState<PrMode>(() => {
     try {
       const stored = localStorage.getItem('emdash:prMode');
-      if (stored === 'create' || stored === 'draft' || stored === 'merge') return stored;
+      if (stored === 'create' || stored === 'draft') return stored;
       // Migrate from old boolean key
       if (localStorage.getItem('emdash:createPrAsDraft') === 'true') return 'draft';
       return 'create';
@@ -289,7 +285,6 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
   // Reset action loading states when task changes
   useEffect(() => {
-    setIsMergingToMain(false);
     setCommitMessage('');
     setShowPushAfterCommit(false);
     setStagingFiles(new Set());
@@ -588,64 +583,24 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     }
   };
 
-  const handleMergeToMain = async () => {
-    setIsMergingToMain(true);
-    try {
-      const result = await window.electronAPI.mergeToMain({
-        taskPath: safeTaskPath,
-        taskId: resolvedTaskId,
-      });
-      if (result.success) {
-        toast({
-          title: 'Merged to Main',
-          description: 'Changes have been merged to main.',
-        });
+  const handlePrAction = async () => {
+    void (async () => {
+      const { captureTelemetry } = await import('../lib/telemetryClient');
+      captureTelemetry('pr_created');
+    })();
+
+    await createPR({
+      taskPath: safeTaskPath,
+      prOptions: prMode === 'draft' ? { draft: true } : undefined,
+      onSuccess: async () => {
         await refreshChanges();
         try {
           await refreshPr();
         } catch {
           // PR refresh is best-effort
         }
-      } else {
-        toast({
-          title: 'Merge Failed',
-          description: result.error || 'Failed to merge to main.',
-          variant: 'destructive',
-        });
-      }
-    } catch (_error) {
-      toast({
-        title: 'Merge Failed',
-        description: 'An unexpected error occurred.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsMergingToMain(false);
-    }
-  };
-
-  const handlePrAction = async () => {
-    if (prMode === 'merge') {
-      setShowMergeConfirm(true);
-      return;
-    } else {
-      void (async () => {
-        const { captureTelemetry } = await import('../lib/telemetryClient');
-        captureTelemetry('pr_created');
-      })();
-      await createPR({
-        taskPath: safeTaskPath,
-        prOptions: prMode === 'draft' ? { draft: true } : undefined,
-        onSuccess: async () => {
-          await refreshChanges();
-          try {
-            await refreshPr();
-          } catch {
-            // PR refresh is best-effort
-          }
-        },
-      });
-    }
+      },
+    });
   };
 
   const renderPath = (p: string, status?: FileChange['status']) => {
@@ -703,7 +658,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     return null;
   }
 
-  const isPrActionLoading = isCreatingForTaskPath(safeTaskPath) || isMergingToMain;
+  const isPrActionLoading = isCreatingForTaskPath(safeTaskPath);
   const isPrActionDisabled = isPrActionLoading || isLocked;
   const hasDisplayChanges = displayChanges.length > 0;
   const pushCount = Math.max(branchAhead ?? 0, showPushAfterCommit ? 1 : 0);
@@ -1419,33 +1374,6 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
               className="bg-destructive px-4 py-2 text-destructive-foreground hover:bg-destructive/90"
             >
               Force Push
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={showMergeConfirm} onOpenChange={setShowMergeConfirm}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3">
-              <AlertDialogTitle className="text-lg">Merge into main?</AlertDialogTitle>
-            </div>
-          </AlertDialogHeader>
-          <div className="space-y-4">
-            <AlertDialogDescription className="text-sm">
-              This will merge your branch into main. This action may be difficult to reverse.
-            </AlertDialogDescription>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowMergeConfirm(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowMergeConfirm(false);
-                void handleMergeToMain();
-              }}
-              className="bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
-            >
-              <GitMerge className="mr-2 h-4 w-4" />
-              Merge into Main
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

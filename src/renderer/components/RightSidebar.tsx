@@ -199,56 +199,49 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
 
   const handleDeleteWorktree = async (variant: typeof variants[number]) => {
     if (!task || !projectPath) return;
-    try {
-      const projectId = task.projectId || '';
+    const projectId = task.projectId || '';
+    const label = getVariantDisplayLabel(variant);
 
-      // Kill the pty for this variant
-      try {
-        window.electronAPI.ptyKill(`${variant.worktreeId}-main`);
-      } catch {}
+    // Immediately remove the variant from the UI
+    const currentVariants = task.metadata?.multiAgent?.variants || [];
+    const updatedVariants = currentVariants.filter(
+      (v: any) => v.worktreeId !== variant.worktreeId
+    );
+    await rpc.db.saveTask({
+      ...task,
+      projectId,
+      metadata: {
+        ...task.metadata,
+        multiAgent: {
+          ...task.metadata?.multiAgent,
+          variants: updatedVariants,
+        },
+      },
+    });
+    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+    setConfirmDelete(null);
 
-      // Remove the worktree from disk
+    // Clean up pty and worktree in the background
+    (async () => {
       try {
+        try {
+          window.electronAPI.ptyKill(`${variant.worktreeId}-main`);
+        } catch {}
+
         await window.electronAPI.worktreeRemove({
           projectPath,
           worktreeId: variant.worktreeId || '',
           worktreePath: variant.path,
           branch: variant.branch,
         });
-      } catch (err) {
-        console.error(`Failed to remove worktree ${variant.name}:`, err);
+      } catch (err: any) {
+        toast({
+          title: 'Failed to clean up worktree',
+          description: `${label}: ${err.message || 'Unknown error'}`,
+          variant: 'destructive',
+        });
       }
-
-      // Remove this variant from the parent multi-agent task
-      const currentVariants = task.metadata?.multiAgent?.variants || [];
-      const updatedVariants = currentVariants.filter(
-        (v: any) => v.worktreeId !== variant.worktreeId
-      );
-      await rpc.db.saveTask({
-        ...task,
-        projectId,
-        metadata: {
-          ...task.metadata,
-          multiAgent: {
-            ...task.metadata?.multiAgent,
-            variants: updatedVariants,
-          },
-        },
-      });
-
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-      setConfirmDelete(null);
-      toast({
-        title: 'Worktree deleted',
-        description: `${getVariantDisplayLabel(variant)} has been removed`,
-      });
-    } catch (err: any) {
-      toast({
-        title: 'Failed to delete',
-        description: err.message || 'Unknown error',
-        variant: 'destructive',
-      });
-    }
+    })();
   };
 
   return (

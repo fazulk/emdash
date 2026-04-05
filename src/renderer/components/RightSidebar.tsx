@@ -26,6 +26,7 @@ import {
 import { useWorkspaceConnection } from '../hooks/useWorkspaceConnection';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
 import { RIGHT_SIDEBAR_VERTICAL_STORAGE_KEY } from '@/constants/layout';
+import { useTaskManagementContext } from '@/contexts/TaskManagementContext';
 
 export interface RightSidebarTask {
   id: string;
@@ -66,6 +67,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const [confirmDelete, setConfirmDelete] = useState<{ agent: Agent; name: string; path: string; worktreeId?: string; branch?: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { handleSelectTask } = useTaskManagementContext();
 
   // For workspace tasks, use the workspace connection instead of project-level
   const { connectionId: wsConnectionId, remotePath: wsRemotePath } = useWorkspaceConnection(task);
@@ -148,46 +150,110 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
     return `${baseName} #${instanceNum}`;
   };
 
+  const buildStandaloneTaskFromVariant = (variant: typeof variants[number]) => ({
+    id: variant.worktreeId || variant.path,
+    projectId: task?.projectId || '',
+    name: variant.name || task?.name || 'Task',
+    branch: variant.branch || task?.branch || '',
+    path: variant.path,
+    status: 'idle' as const,
+    agentId: variant.agent,
+    useWorktree: true,
+    metadata: {
+      ...(task?.metadata || {}),
+      movedFromMultiAgent: task?.id,
+      multiAgent: null,
+    },
+  });
+
+  const syncTasksCache = (
+    projectId: string,
+    updater: (tasks: RightSidebarTask[]) => RightSidebarTask[]
+  ) => {
+    queryClient.setQueryData<RightSidebarTask[]>(['tasks', projectId], (existing = []) =>
+      updater(existing)
+    );
+  };
+
   const handleMoveToSidebar = async (variant: typeof variants[number]) => {
     if (!task || !variant.worktreeId) return;
     try {
       const projectId = task.projectId || '';
-      // Create standalone task from the variant
-      await rpc.db.saveTask({
-        id: variant.worktreeId,
-        projectId,
-        name: variant.name,
-        branch: variant.branch || '',
-        path: variant.path,
-        status: 'idle',
-        useWorktree: true,
-        metadata: {
-          movedFromMultiAgent: task.id,
-        },
-      });
+      const movedTask = buildStandaloneTaskFromVariant(variant);
+      await rpc.db.saveTask(movedTask);
 
-      // Remove this variant from the parent multi-agent task
       const currentVariants = task.metadata?.multiAgent?.variants || [];
       const updatedVariants = currentVariants.filter(
         (v: any) => v.worktreeId !== variant.worktreeId
       );
-      await rpc.db.saveTask({
-        ...task,
-        projectId,
-        metadata: {
-          ...task.metadata,
-          multiAgent: {
-            ...task.metadata?.multiAgent,
-            variants: updatedVariants,
+
+      if (updatedVariants.length === 1) {
+        const remainingRaw = updatedVariants[0];
+        const remainingVariant =
+          variants.find((v) => v.worktreeId === remainingRaw?.worktreeId) ||
+          ({
+            agent: remainingRaw?.agent as Agent,
+            name: remainingRaw?.name || task.name,
+            path: remainingRaw?.path || task.path,
+            worktreeId: remainingRaw?.worktreeId,
+            branch: remainingRaw?.branch || task.branch,
+          } as (typeof variants)[number]);
+        const remainingTask = buildStandaloneTaskFromVariant(remainingVariant);
+
+        await rpc.db.saveTask(remainingTask);
+        await rpc.db.deleteTask(task.id);
+
+        syncTasksCache(projectId, (existing) => {
+          const filtered = existing.filter(
+            (candidate) =>
+              candidate.id !== task.id &&
+              candidate.id !== movedTask.id &&
+              candidate.id !== remainingTask.id
+          );
+          return [remainingTask as RightSidebarTask, movedTask as RightSidebarTask, ...filtered];
+        });
+        handleSelectTask(remainingTask as any);
+        toast({
+          title: 'Moved to sidebar',
+          description: `${getVariantDisplayLabel(remainingVariant)} is now a standalone task`,
+        });
+      } else {
+        await rpc.db.saveTask({
+          ...task,
+          projectId,
+          metadata: {
+            ...task.metadata,
+            multiAgent: {
+              ...task.metadata?.multiAgent,
+              variants: updatedVariants,
+            },
           },
-        },
-      });
+        });
+
+        syncTasksCache(projectId, (existing) => {
+          const filtered = existing.filter((candidate) => candidate.id !== movedTask.id);
+          return filtered.map((candidate) =>
+            candidate.id === task.id
+              ? {
+                  ...candidate,
+                  metadata: {
+                    ...candidate.metadata,
+                    multiAgent: {
+                      ...candidate.metadata?.multiAgent,
+                      variants: updatedVariants,
+                    },
+                  },
+                }
+              : candidate
+          ).concat(movedTask as RightSidebarTask);
+        });
+        toast({
+          title: 'Moved to sidebar',
+          description: `${getVariantDisplayLabel(variant)} is now a standalone task`,
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-      toast({
-        title: 'Moved to sidebar',
-        description: `${getVariantDisplayLabel(variant)} is now a standalone task`,
-      });
     } catch (err: any) {
       toast({
         title: 'Failed to move',
@@ -202,22 +268,69 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
     const projectId = task.projectId || '';
     const label = getVariantDisplayLabel(variant);
 
-    // Immediately remove the variant from the UI
     const currentVariants = task.metadata?.multiAgent?.variants || [];
     const updatedVariants = currentVariants.filter(
       (v: any) => v.worktreeId !== variant.worktreeId
     );
-    await rpc.db.saveTask({
-      ...task,
-      projectId,
-      metadata: {
-        ...task.metadata,
-        multiAgent: {
-          ...task.metadata?.multiAgent,
-          variants: updatedVariants,
+
+    if (updatedVariants.length === 1) {
+      const remainingRaw = updatedVariants[0];
+      const remainingVariant =
+        variants.find((v) => v.worktreeId === remainingRaw?.worktreeId) ||
+        ({
+          agent: remainingRaw?.agent as Agent,
+          name: remainingRaw?.name || task.name,
+          path: remainingRaw?.path || task.path,
+          worktreeId: remainingRaw?.worktreeId,
+          branch: remainingRaw?.branch || task.branch,
+        } as (typeof variants)[number]);
+      const remainingTask = buildStandaloneTaskFromVariant(remainingVariant);
+
+      await rpc.db.saveTask(remainingTask);
+      await rpc.db.deleteTask(task.id);
+
+      syncTasksCache(projectId, (existing) => {
+        const filtered = existing.filter(
+          (candidate) => candidate.id !== task.id && candidate.id !== remainingTask.id
+        );
+        return [remainingTask as RightSidebarTask, ...filtered];
+      });
+      handleSelectTask(remainingTask as any);
+      toast({
+        title: 'Moved to sidebar',
+        description: `${getVariantDisplayLabel(remainingVariant)} is now a standalone task`,
+      });
+    } else {
+      await rpc.db.saveTask({
+        ...task,
+        projectId,
+        metadata: {
+          ...task.metadata,
+          multiAgent: {
+            ...task.metadata?.multiAgent,
+            variants: updatedVariants,
+          },
         },
-      },
-    });
+      });
+
+      syncTasksCache(projectId, (existing) =>
+        existing.map((candidate) =>
+          candidate.id === task.id
+            ? {
+                ...candidate,
+                metadata: {
+                  ...candidate.metadata,
+                  multiAgent: {
+                    ...candidate.metadata?.multiAgent,
+                    variants: updatedVariants,
+                  },
+                },
+              }
+            : candidate
+        )
+      );
+    }
+
     queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
     setConfirmDelete(null);
 

@@ -24,6 +24,7 @@ import { getTaskEnvVars } from '@shared/task/envVars';
 
 import ExpandedTerminalModal from './ExpandedTerminalModal';
 import { lifecycleTerminalId } from '../lib/lifecycleTerminals';
+import { getExpandableTerminalInfo, scriptTerminalId } from '../lib/taskTerminalUi';
 
 /**
  * Hook that fetches custom scripts from .emdash.json for a project.
@@ -86,13 +87,6 @@ function useLifecycleScripts(projectPath: string | undefined): Record<'setup' | 
   }, [projectPath]);
 
   return scripts;
-}
-
-/**
- * Generates a stable terminal ID for a script based on the task key.
- */
-function scriptTerminalId(taskKey: string, scriptName: string): string {
-  return `${taskKey}::script::${scriptName}`;
 }
 
 interface Task {
@@ -176,15 +170,39 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
     }
   }, []);
 
+  const expandableTerminal = useMemo(
+    () =>
+      getExpandableTerminalInfo({
+        taskId: task?.id ?? null,
+        taskName: task?.name ?? null,
+        taskKey,
+        projectPath,
+        parsedMode: selection.parsed?.mode ?? null,
+        activeTerminalId: selection.activeTerminalId,
+        selectedLifecycle: selection.selectedLifecycle,
+        selectedScript: selection.selectedScript,
+      }),
+    [
+      task?.id,
+      task?.name,
+      taskKey,
+      projectPath,
+      selection.parsed?.mode,
+      selection.activeTerminalId,
+      selection.selectedLifecycle,
+      selection.selectedScript,
+    ]
+  );
+
   // Small delay to ensure the terminal pane has rendered after visibility change
   useEffect(() => {
-    const id = selection.activeTerminalId;
+    const id = expandableTerminal.terminalId;
     if (!id) return;
     const timer = setTimeout(() => {
       terminalRefs.current.get(id)?.focus();
     }, 50);
     return () => clearTimeout(timer);
-  }, [selection.activeTerminalId]);
+  }, [expandableTerminal.terminalId]);
 
   const [runActionBusy, setRunActionBusy] = useState(false);
   const [phaseStatuses, setPhaseStatuses] = useState<Record<'setup' | 'run' | 'teardown', LifecyclePhaseStatus>>({
@@ -662,25 +680,30 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
         )}
 
         {/* Expand terminal to full-screen modal */}
-        {selection.activeTerminalId && !selection.selectedLifecycle && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setExpandedTerminalId(selection.activeTerminalId)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p className="text-xs">Expand terminal</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  if (expandableTerminal.terminalId) {
+                    setExpandedTerminalId(expandableTerminal.terminalId);
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                disabled={!expandableTerminal.terminalId}
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p className="text-xs">
+                {expandableTerminal.terminalId ? 'Expand terminal' : 'No terminal to expand'}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {(() => {
           const canDelete =
@@ -889,6 +912,8 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
                   )}
                 >
                   <TerminalPane
+                    key={`${termId}${reattachId === termId ? `::${reattachCounter.current}` : ''}`}
+                    ref={(r) => setTerminalRef(termId, r)}
                     id={termId}
                     cwd={task?.path || projectPath}
                     env={taskEnv}
@@ -1020,13 +1045,7 @@ const TaskTerminalPanelComponent: React.FC<Props> = ({
       {expandedTerminalId && (
         <ExpandedTerminalModal
           terminalId={expandedTerminalId}
-          title={
-            selection.parsed?.mode === 'task'
-              ? `${task?.name || 'Task'} — Terminal`
-              : selection.parsed?.mode === 'global'
-                ? 'Project Terminal'
-                : 'Terminal'
-          }
+          title={expandableTerminal.title}
           onClose={handleCloseExpandedTerminal}
           variant={effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray' ? 'dark' : 'light'}
         />

@@ -584,7 +584,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   };
 
   const handlePrAction = async () => {
-    if (isLocked || branchStatusLoading || isPrActionLoading) return;
+    if (isLocked || isPrActionLoading) return;
 
     void (async () => {
       const { captureTelemetry } = await import('../lib/telemetryClient');
@@ -661,7 +661,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   }
 
   const isPrActionLoading = isCreatingForTaskPath(safeTaskPath);
-  const isPrActionDisabled = isPrActionLoading || branchStatusLoading;
+  const isPrActionDisabled = isPrActionLoading;
   const shouldShowPrStatusSpinner = isPrLoading && Boolean(pr);
   const hasDisplayChanges = displayChanges.length > 0;
   const pushCount = Math.max(branchAhead ?? 0, showPushAfterCommit ? 1 : 0);

@@ -135,7 +135,7 @@ export function Toaster() {
   }, [toasts.length]);
 
   return (
-    <ToastProvider>
+    <ToastProvider duration={4000}>
       {toasts.map(function ({
         id,
         title,

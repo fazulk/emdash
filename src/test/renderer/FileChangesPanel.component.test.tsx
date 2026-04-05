@@ -342,6 +342,46 @@ describe('FileChangesPanel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeEnabled());
   });
 
+  it('keeps the Create PR button enabled while branch status refresh runs after commit', async () => {
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: true,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    getBranchStatusMock
+      .mockResolvedValueOnce({
+        success: true,
+        branch: 'main',
+        ahead: 0,
+        behind: 0,
+      })
+      .mockImplementationOnce(() => new Promise(() => {}));
+
+    render(
+      <GitWorkspaceBusyProvider>
+        <FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />
+      </GitWorkspaceBusyProvider>
+    );
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => expect(gitCommitMock).toHaveBeenCalled());
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeEnabled());
+  });
+
   it('keeps the Create PR button visible while PR status refresh runs after commit', async () => {
     useFileChangesMock.mockReturnValue({
       fileChanges: [

@@ -27,6 +27,7 @@ import { useWorkspaceConnection } from '../hooks/useWorkspaceConnection';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
 import { RIGHT_SIDEBAR_VERTICAL_STORAGE_KEY } from '@/constants/layout';
 import { useTaskManagementContext } from '@/contexts/TaskManagementContext';
+import { getMultiAgentMainPtyId } from '@/lib/multiAgentPty';
 
 export interface RightSidebarTask {
   id: string;
@@ -338,7 +339,14 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
     (async () => {
       try {
         try {
-          window.electronAPI.ptyKill(`${variant.worktreeId}-main`);
+          const ptyId = getMultiAgentMainPtyId({
+            agent: variant.agent,
+            worktreeId: variant.worktreeId || '',
+            path: variant.path,
+          });
+          if (ptyId) {
+            window.electronAPI.ptyKill(ptyId);
+          }
         } catch {}
 
         await window.electronAPI.worktreeRemove({

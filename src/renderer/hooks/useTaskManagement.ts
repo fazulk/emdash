@@ -6,6 +6,7 @@ import { makePtyId } from '@shared/ptyId';
 import type { ProviderId } from '@shared/providers/registry';
 import { saveActiveIds } from '../constants/layout';
 import { getAgentForTask } from '../lib/getAgentForTask';
+import { getMultiAgentMainPtyId } from '../lib/multiAgentPty';
 import { disposeTaskTerminals } from '../lib/taskTerminalsStore';
 import { terminalSessionRegistry } from '../terminal/SessionRegistry';
 import type { Agent } from '../types';
@@ -141,7 +142,8 @@ const cleanupPtyResources = async (task: Task): Promise<void> => {
     const mainSessionIds: string[] = [];
     if (variants.length > 0) {
       for (const v of variants) {
-        const id = `${v.worktreeId}-main`;
+        const id = getMultiAgentMainPtyId(v);
+        if (!id) continue;
         mainSessionIds.push(id);
       }
     } else {
@@ -665,7 +667,8 @@ export function useTaskManagement() {
       const mainSessionIds: string[] = [];
       if (variants.length > 0) {
         for (const v of variants) {
-          const id = `${v.worktreeId}-main`;
+          const id = getMultiAgentMainPtyId(v);
+          if (!id) continue;
           mainSessionIds.push(id);
         }
       } else {

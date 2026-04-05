@@ -662,6 +662,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
 
   const isPrActionLoading = isCreatingForTaskPath(safeTaskPath);
   const isPrActionDisabled = isPrActionLoading || branchStatusLoading;
+  const shouldShowPrStatusSpinner = isPrLoading && Boolean(pr);
   const hasDisplayChanges = displayChanges.length > 0;
   const pushCount = Math.max(branchAhead ?? 0, showPushAfterCommit ? 1 : 0);
 
@@ -795,7 +796,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     </ButtonContentWithSpinner>
                   </Button>
                 )}
-                {isPrLoading ? (
+                {shouldShowPrStatusSpinner ? (
                   <div className="flex items-center justify-center p-1">
                     <Spinner size="sm" className="h-3.5 w-3.5 [animation-duration:0.25s]" />
                   </div>
@@ -959,7 +960,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     Changes
                   </Button>
                 )}
-                {isPrLoading ? (
+                {shouldShowPrStatusSpinner ? (
                   <div className="flex items-center justify-center p-1">
                     <Spinner size="sm" className="h-3.5 w-3.5 [animation-duration:0.25s]" />
                   </div>

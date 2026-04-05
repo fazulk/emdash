@@ -342,6 +342,49 @@ describe('FileChangesPanel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeEnabled());
   });
 
+  it('keeps the Create PR button visible while PR status refresh runs after commit', async () => {
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: true,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    usePrStatusMock.mockImplementation(() => {
+      const [isLoading, setIsLoading] = React.useState(false);
+
+      return {
+        pr: null,
+        isLoading,
+        refresh: async () => {
+          setIsLoading(true);
+          return null;
+        },
+      };
+    });
+
+    render(
+      <GitWorkspaceBusyProvider>
+        <FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />
+      </GitWorkspaceBusyProvider>
+    );
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => expect(gitCommitMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeInTheDocument());
+  });
+
   it('keeps the Draft PR action idle while commit is in progress', async () => {
     localStorage.setItem('emdash:prMode', 'draft');
 

@@ -795,6 +795,7 @@ const MultiAgentTask: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
     </TaskScopeProvider>
   );
 };

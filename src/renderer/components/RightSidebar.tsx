@@ -8,13 +8,28 @@ import { agentMeta } from '@/providers/meta';
 import AgentLogo from './AgentLogo';
 import type { Agent } from '../types';
 import { TaskScopeProvider, useTaskScope } from './TaskScopeContext';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, PanelLeft, Trash2 } from 'lucide-react';
+import { rpc } from '@/lib/rpc';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { useWorkspaceConnection } from '../hooks/useWorkspaceConnection';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './ui/resizable';
 import { RIGHT_SIDEBAR_VERTICAL_STORAGE_KEY } from '@/constants/layout';
 
 export interface RightSidebarTask {
   id: string;
+  projectId?: string;
   name: string;
   branch: string;
   path: string;
@@ -48,6 +63,9 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   const asideRef = useRef<HTMLElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [collapsedVariants, setCollapsedVariants] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<{ agent: Agent; name: string; path: string; worktreeId?: string; branch?: string } | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // For workspace tasks, use the workspace connection instead of project-level
   const { connectionId: wsConnectionId, remotePath: wsRemotePath } = useWorkspaceConnection(task);
@@ -88,7 +106,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   }, [collapsed]);
 
   // Detect multi-agent variants in task metadata
-  const variants: Array<{ agent: Agent; name: string; path: string; worktreeId?: string }> =
+  const variants: Array<{ agent: Agent; name: string; path: string; worktreeId?: string; branch?: string }> =
     (() => {
       try {
         const v = task?.metadata?.multiAgent?.variants || [];
@@ -99,6 +117,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
               name: x?.name,
               path: x?.path,
               worktreeId: x?.worktreeId,
+              branch: x?.branch as string | undefined,
             }))
             .filter((x) => x?.path);
       } catch {}
@@ -127,6 +146,109 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
       : String(agentVariants.findIndex((v) => v.name === variant.name) + 1);
 
     return `${baseName} #${instanceNum}`;
+  };
+
+  const handleMoveToSidebar = async (variant: typeof variants[number]) => {
+    if (!task || !variant.worktreeId) return;
+    try {
+      const projectId = task.projectId || '';
+      // Create standalone task from the variant
+      await rpc.db.saveTask({
+        id: variant.worktreeId,
+        projectId,
+        name: variant.name,
+        branch: variant.branch || '',
+        path: variant.path,
+        status: 'idle',
+        useWorktree: true,
+        metadata: {
+          movedFromMultiAgent: task.id,
+        },
+      });
+
+      // Remove this variant from the parent multi-agent task
+      const currentVariants = task.metadata?.multiAgent?.variants || [];
+      const updatedVariants = currentVariants.filter(
+        (v: any) => v.worktreeId !== variant.worktreeId
+      );
+      await rpc.db.saveTask({
+        ...task,
+        projectId,
+        metadata: {
+          ...task.metadata,
+          multiAgent: {
+            ...task.metadata?.multiAgent,
+            variants: updatedVariants,
+          },
+        },
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      toast({
+        title: 'Moved to sidebar',
+        description: `${getVariantDisplayLabel(variant)} is now a standalone task`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to move',
+        description: err.message || 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteWorktree = async (variant: typeof variants[number]) => {
+    if (!task || !projectPath) return;
+    try {
+      const projectId = task.projectId || '';
+
+      // Kill the pty for this variant
+      try {
+        window.electronAPI.ptyKill(`${variant.worktreeId}-main`);
+      } catch {}
+
+      // Remove the worktree from disk
+      try {
+        await window.electronAPI.worktreeRemove({
+          projectPath,
+          worktreeId: variant.worktreeId || '',
+          worktreePath: variant.path,
+          branch: variant.branch,
+        });
+      } catch (err) {
+        console.error(`Failed to remove worktree ${variant.name}:`, err);
+      }
+
+      // Remove this variant from the parent multi-agent task
+      const currentVariants = task.metadata?.multiAgent?.variants || [];
+      const updatedVariants = currentVariants.filter(
+        (v: any) => v.worktreeId !== variant.worktreeId
+      );
+      await rpc.db.saveTask({
+        ...task,
+        projectId,
+        metadata: {
+          ...task.metadata,
+          multiAgent: {
+            ...task.metadata?.multiAgent,
+            variants: updatedVariants,
+          },
+        },
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      setConfirmDelete(null);
+      toast({
+        title: 'Worktree deleted',
+        description: `${getVariantDisplayLabel(variant)} has been removed`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to delete',
+        description: err.message || 'Unknown error',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -181,12 +303,12 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                         key={variantKey}
                         className="mb-2 border-b border-border last:mb-0 last:border-b-0"
                       >
-                        <button
-                          type="button"
-                          onClick={() => toggleVariantCollapsed(variantKey)}
-                          className="flex w-full min-w-0 cursor-pointer items-center justify-between bg-muted px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/80 dark:bg-background dark:hover:bg-muted/20"
-                        >
-                          <span className="inline-flex min-w-0 items-center gap-2">
+                        <div className="flex w-full min-w-0 items-center justify-between bg-muted px-3 py-2 text-xs font-medium text-foreground dark:bg-background">
+                          <button
+                            type="button"
+                            onClick={() => toggleVariantCollapsed(variantKey)}
+                            className="inline-flex min-w-0 cursor-pointer items-center gap-2 hover:opacity-80"
+                          >
                             {isCollapsed ? (
                               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                             ) : (
@@ -215,8 +337,48 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                             <span className="truncate" title={v.name}>
                               {v.name}
                             </span>
-                          </span>
-                        </button>
+                          </button>
+                          <TooltipProvider delayDuration={300}>
+                            <div className="ml-2 flex shrink-0 items-center gap-0.5">
+                              {v.worktreeId && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleMoveToSidebar(v);
+                                      }}
+                                      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-background/60 hover:text-foreground dark:hover:bg-muted/30"
+                                    >
+                                      <PanelLeft className="h-3.5 w-3.5" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left">
+                                    <p>Move to sidebar</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmDelete(v);
+                                    }}
+                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left">
+                                  <p>Delete worktree</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TooltipProvider>
+                        </div>
                         {!isCollapsed && (
                           <TaskScopeProvider
                             value={{ taskId: task.id, taskPath: v.path, projectPath }}
@@ -350,6 +512,30 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
           )}
         </div>
       </TaskScopeProvider>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete worktree?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{confirmDelete && getVariantDisplayLabel(confirmDelete)}</strong>&apos;s
+              worktree and all its uncommitted changes. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmDelete) void handleDeleteWorktree(confirmDelete);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   );
 };

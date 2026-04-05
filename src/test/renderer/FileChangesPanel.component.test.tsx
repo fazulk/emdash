@@ -87,6 +87,7 @@ vi.mock('../../renderer/components/TaskScopeContext', () => ({
 
 describe('FileChangesPanel', () => {
   beforeEach(() => {
+    localStorage.clear();
     toastMock.mockReset();
     refreshChangesMock.mockReset();
     refreshPrMock.mockReset();
@@ -307,7 +308,7 @@ describe('FileChangesPanel', () => {
     );
   });
 
-  it('keeps the Create PR label visible while commit is in progress', async () => {
+  it('keeps the Create PR action idle while commit is in progress', async () => {
     useFileChangesMock.mockReturnValue({
       fileChanges: [
         {
@@ -338,7 +339,43 @@ describe('FileChangesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
 
     await waitFor(() => expect(gitCommitMock).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create PR' })).toBeEnabled());
+  });
+
+  it('keeps the Draft PR action idle while commit is in progress', async () => {
+    localStorage.setItem('emdash:prMode', 'draft');
+
+    useFileChangesMock.mockReturnValue({
+      fileChanges: [
+        {
+          path: 'src/file.ts',
+          status: 'modified',
+          isStaged: true,
+          additions: 5,
+          deletions: 2,
+        },
+      ],
+      isLoading: false,
+      refreshChanges: refreshChangesMock,
+    });
+
+    gitCommitMock.mockImplementation(
+      () => new Promise(() => {}) as ReturnType<typeof gitCommitMock>
+    );
+
+    render(
+      <GitWorkspaceBusyProvider>
+        <FileChangesPanel taskId="task-1" taskPath="/tmp/repo" />
+      </GitWorkspaceBusyProvider>
+    );
+
+    await waitFor(() => expect(getBranchStatusMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Draft PR' })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+
+    await waitFor(() => expect(gitCommitMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Draft PR' })).toBeEnabled());
   });
 
   it('shows a readable, copyable commit message toast after commit and push', async () => {

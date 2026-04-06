@@ -1,11 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from '@/hooks/useTheme';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 import { cn } from '@/lib/utils';
 
 type Variant = 'full' | 'compact';
@@ -20,238 +15,209 @@ interface MarkdownRendererProps {
   fileDir?: string;
 }
 
-/** Sanitize schema that also allows data: URIs on images */
-const sanitizeSchema = {
-  ...defaultSchema,
-  protocols: {
-    ...defaultSchema.protocols,
-    src: [...(defaultSchema.protocols?.src || []), 'data'],
-  },
-};
+const fullVariantClasses = [
+  '[&_h1]:mb-4',
+  '[&_h1]:mt-6',
+  '[&_h1]:border-b',
+  '[&_h1]:border-border',
+  '[&_h1]:pb-2',
+  '[&_h1]:text-2xl',
+  '[&_h1]:font-semibold',
+  '[&_h1]:text-foreground',
+  '[&_h2]:mb-3',
+  '[&_h2]:mt-6',
+  '[&_h2]:border-b',
+  '[&_h2]:border-border',
+  '[&_h2]:pb-2',
+  '[&_h2]:text-xl',
+  '[&_h2]:font-semibold',
+  '[&_h2]:text-foreground',
+  '[&_h3]:mb-2',
+  '[&_h3]:mt-4',
+  '[&_h3]:text-lg',
+  '[&_h3]:font-semibold',
+  '[&_h3]:text-foreground',
+  '[&_h4]:mb-2',
+  '[&_h4]:mt-4',
+  '[&_h4]:text-base',
+  '[&_h4]:font-semibold',
+  '[&_h4]:text-foreground',
+  '[&_h5]:mb-1',
+  '[&_h5]:mt-3',
+  '[&_h5]:text-sm',
+  '[&_h5]:font-semibold',
+  '[&_h5]:text-foreground',
+  '[&_h6]:mb-1',
+  '[&_h6]:mt-3',
+  '[&_h6]:text-sm',
+  '[&_h6]:font-semibold',
+  '[&_h6]:text-muted-foreground',
+  '[&_p]:mb-3',
+  '[&_p]:text-sm',
+  '[&_p]:leading-relaxed',
+  '[&_p]:text-foreground',
+  '[&_ul]:mb-3',
+  '[&_ul]:ml-6',
+  '[&_ul]:list-disc',
+  '[&_ul]:space-y-1',
+  '[&_ul]:text-sm',
+  '[&_ul]:text-foreground',
+  '[&_ol]:mb-3',
+  '[&_ol]:ml-6',
+  '[&_ol]:list-decimal',
+  '[&_ol]:space-y-1',
+  '[&_ol]:text-sm',
+  '[&_ol]:text-foreground',
+  '[&_li]:leading-relaxed',
+  '[&_a]:text-primary',
+  '[&_a]:underline',
+  '[&_a]:decoration-primary/50',
+  '[&_a:hover]:decoration-primary',
+  '[&_blockquote]:mb-3',
+  '[&_blockquote]:border-l-4',
+  '[&_blockquote]:border-border',
+  '[&_blockquote]:bg-muted/30',
+  '[&_blockquote]:py-1',
+  '[&_blockquote]:pl-4',
+  '[&_blockquote]:text-sm',
+  '[&_blockquote]:italic',
+  '[&_blockquote]:text-muted-foreground',
+  '[&_table]:mb-3',
+  '[&_table]:w-full',
+  '[&_table]:border-collapse',
+  '[&_table]:text-sm',
+  '[&_thead]:border-b',
+  '[&_thead]:border-border',
+  '[&_thead]:bg-muted/30',
+  '[&_th]:px-3',
+  '[&_th]:py-2',
+  '[&_th]:text-left',
+  '[&_th]:font-semibold',
+  '[&_th]:text-foreground',
+  '[&_td]:border-t',
+  '[&_td]:border-border',
+  '[&_td]:px-3',
+  '[&_td]:py-2',
+  '[&_td]:text-foreground',
+  '[&_hr]:my-6',
+  '[&_hr]:border-border',
+  '[&_img]:my-3',
+  '[&_img]:max-w-full',
+  '[&_img]:rounded',
+  '[&_pre]:mb-3',
+  '[&_pre]:overflow-x-auto',
+  '[&_pre]:rounded-md',
+  '[&_pre]:border',
+  '[&_pre]:border-border',
+  '[&_pre]:bg-muted/50',
+  '[&_pre]:p-3',
+  '[&_pre]:text-xs',
+  '[&_pre]:text-foreground',
+  '[&_code]:font-mono',
+  '[&_code]:rounded',
+  '[&_code]:bg-muted',
+  '[&_code]:px-1.5',
+  '[&_code]:py-0.5',
+  '[&_code]:text-xs',
+  '[&_strong]:font-semibold',
+  '[&_strong]:text-foreground',
+  '[&_input[type=checkbox]]:mr-2',
+  '[&_input[type=checkbox]]:align-middle',
+].join(' ');
 
-/** Resolves a local image src via fsReadImage and renders as base64 data URI */
-const ResolvedImage: React.FC<{ src: string; alt: string; rootPath: string; fileDir: string }> = ({
-  src,
-  alt,
-  rootPath,
-  fileDir,
-}) => {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+const compactVariantClasses = [
+  '[&_h1]:mb-1',
+  '[&_h1]:mt-3',
+  '[&_h1]:text-sm',
+  '[&_h1]:font-semibold',
+  '[&_h1]:text-foreground',
+  '[&_h2]:mb-1',
+  '[&_h2]:mt-3',
+  '[&_h2]:text-sm',
+  '[&_h2]:font-semibold',
+  '[&_h2]:text-foreground',
+  '[&_h3]:mb-1',
+  '[&_h3]:mt-2',
+  '[&_h3]:text-xs',
+  '[&_h3]:font-semibold',
+  '[&_h3]:text-foreground',
+  '[&_p]:mb-2',
+  '[&_p]:leading-relaxed',
+  '[&_ul]:mb-2',
+  '[&_ul]:ml-4',
+  '[&_ul]:list-disc',
+  '[&_ul]:space-y-0.5',
+  '[&_ol]:mb-2',
+  '[&_ol]:ml-4',
+  '[&_ol]:list-decimal',
+  '[&_ol]:space-y-0.5',
+  '[&_li]:leading-relaxed',
+  '[&_a]:text-primary',
+  '[&_a]:underline',
+  '[&_pre]:mb-2',
+  '[&_pre]:overflow-x-auto',
+  '[&_pre]:rounded',
+  '[&_pre]:bg-muted/60',
+  '[&_pre]:p-2',
+  '[&_pre]:text-[11px]',
+  '[&_code]:font-mono',
+  '[&_code]:rounded',
+  '[&_code]:bg-muted/60',
+  '[&_code]:px-1',
+  '[&_code]:py-0.5',
+  '[&_code]:text-[11px]',
+  '[&_strong]:font-semibold',
+  '[&_strong]:text-foreground',
+].join(' ');
 
-  useEffect(() => {
-    let cancelled = false;
-    const relPath = fileDir ? `${fileDir}/${src}` : src;
-    window.electronAPI
-      .fsReadImage(rootPath, relPath)
-      .then((result: any) => {
-        if (cancelled) return;
-        if (result.success && result.dataUrl) {
-          setDataUrl(result.dataUrl);
-        } else {
-          setError(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [src, rootPath, fileDir]);
-
-  if (error) {
-    return (
-      <span className="my-3 inline-block text-xs text-muted-foreground">
-        [Image not found: {src}]
-      </span>
-    );
-  }
-  if (!dataUrl) {
-    return (
-      <span className="my-3 inline-block text-xs text-muted-foreground">Loading image...</span>
-    );
-  }
-  return <img src={dataUrl} alt={alt} className="my-3 max-w-full rounded" />;
-};
-
-function useFullComponents(isDark: boolean, rootPath?: string, fileDir?: string) {
-  return useMemo(
-    () => ({
-      h1: ({ children }: any) => (
-        <h1 className="mb-4 mt-6 border-b border-border pb-2 text-2xl font-semibold text-foreground first:mt-0">
-          {children}
-        </h1>
-      ),
-      h2: ({ children }: any) => (
-        <h2 className="mb-3 mt-6 border-b border-border pb-2 text-xl font-semibold text-foreground first:mt-0">
-          {children}
-        </h2>
-      ),
-      h3: ({ children }: any) => (
-        <h3 className="mb-2 mt-4 text-lg font-semibold text-foreground">{children}</h3>
-      ),
-      h4: ({ children }: any) => (
-        <h4 className="mb-2 mt-4 text-base font-semibold text-foreground">{children}</h4>
-      ),
-      h5: ({ children }: any) => (
-        <h5 className="mb-1 mt-3 text-sm font-semibold text-foreground">{children}</h5>
-      ),
-      h6: ({ children }: any) => (
-        <h6 className="mb-1 mt-3 text-sm font-semibold text-muted-foreground">{children}</h6>
-      ),
-      p: ({ children }: any) => (
-        <p className="mb-3 text-sm leading-relaxed text-foreground">{children}</p>
-      ),
-      ul: ({ children }: any) => (
-        <ul className="mb-3 ml-6 list-disc space-y-1 text-sm text-foreground">{children}</ul>
-      ),
-      ol: ({ children }: any) => (
-        <ol className="mb-3 ml-6 list-decimal space-y-1 text-sm text-foreground">{children}</ol>
-      ),
-      li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
-      code: ({ children, className }: any) => {
-        const match = /language-(\w+)/.exec(className || '');
-        const language = match ? match[1] : '';
-        const isBlock = className?.includes('language-');
-
-        if (isBlock) {
-          return (
-            <SyntaxHighlighter
-              style={isDark ? oneDark : oneLight}
-              language={language}
-              PreTag="div"
-              className="!my-0 !rounded-md !text-xs"
-            >
-              {String(children).replace(/\n$/, '')}
-            </SyntaxHighlighter>
-          );
-        }
-
-        return <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{children}</code>;
-      },
-      pre: ({ children }: any) => (
-        <pre className="mb-3 overflow-x-auto rounded-md border border-border">{children}</pre>
-      ),
-      a: ({ href, children }: any) => {
-        const isHttp = typeof href === 'string' && /^https?:\/\//i.test(href);
-        const handleClick = (e: React.MouseEvent) => {
-          if (isHttp && typeof window !== 'undefined' && window.electronAPI?.openExternal) {
-            e.preventDefault();
-            window.electronAPI.openExternal(href).catch(() => {});
-          }
-        };
-        return (
-          <a
-            href={href}
-            className="text-primary underline decoration-primary/50 hover:decoration-primary"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleClick}
-          >
-            {children}
-          </a>
-        );
-      },
-      blockquote: ({ children }: any) => (
-        <blockquote className="mb-3 border-l-4 border-border bg-muted/30 py-1 pl-4 text-sm italic text-muted-foreground">
-          {children}
-        </blockquote>
-      ),
-      table: ({ children }: any) => (
-        <div className="mb-3 overflow-x-auto">
-          <table className="w-full border-collapse text-sm">{children}</table>
-        </div>
-      ),
-      thead: ({ children }: any) => (
-        <thead className="border-b border-border bg-muted/30">{children}</thead>
-      ),
-      th: ({ children }: any) => (
-        <th className="px-3 py-2 text-left font-semibold text-foreground">{children}</th>
-      ),
-      td: ({ children }: any) => (
-        <td className="border-t border-border px-3 py-2 text-foreground">{children}</td>
-      ),
-      hr: () => <hr className="my-6 border-border" />,
-      img: ({ src, alt }: any) => {
-        const isExternal = typeof src === 'string' && /^https?:\/\//i.test(src);
-        if (!isExternal && rootPath && src) {
-          return (
-            <ResolvedImage src={src} alt={alt || ''} rootPath={rootPath} fileDir={fileDir || ''} />
-          );
-        }
-        return <img src={src} alt={alt || ''} className="my-3 max-w-full rounded" />;
-      },
-      strong: ({ children }: any) => (
-        <strong className="font-semibold text-foreground">{children}</strong>
-      ),
-      input: ({ checked, ...props }: any) => (
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled
-          className="mr-2 align-middle"
-          {...props}
-        />
-      ),
-    }),
-    [isDark, rootPath, fileDir]
-  );
+function resolveRelativePath(fileDir: string, src: string): string {
+  return fileDir ? `${fileDir}/${src}` : src;
 }
 
-function useCompactComponents() {
-  return useMemo(
-    () => ({
-      h1: ({ children }: any) => (
-        <h2 className="mb-1 mt-3 text-sm font-semibold text-foreground first:mt-0">{children}</h2>
-      ),
-      h2: ({ children }: any) => (
-        <h3 className="mb-1 mt-3 text-sm font-semibold text-foreground first:mt-0">{children}</h3>
-      ),
-      h3: ({ children }: any) => (
-        <h4 className="mb-1 mt-2 text-xs font-semibold text-foreground">{children}</h4>
-      ),
-      p: ({ children }: any) => <p className="mb-2 leading-relaxed">{children}</p>,
-      ul: ({ children }: any) => <ul className="mb-2 ml-4 list-disc space-y-0.5">{children}</ul>,
-      ol: ({ children }: any) => <ol className="mb-2 ml-4 list-decimal space-y-0.5">{children}</ol>,
-      li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
-      code: ({ children, className }: any) => {
-        const isBlock = className?.includes('language-');
-        return isBlock ? (
-          <code className="block overflow-x-auto rounded bg-muted/60 p-2 text-[11px]">
-            {children}
-          </code>
-        ) : (
-          <code className="rounded bg-muted/60 px-1 py-0.5 text-[11px]">{children}</code>
-        );
-      },
-      pre: ({ children }: any) => <pre className="mb-2 overflow-x-auto">{children}</pre>,
-      strong: ({ children }: any) => (
-        <strong className="font-semibold text-foreground">{children}</strong>
-      ),
-      a: ({ href, children }: any) => {
-        const isHttp = typeof href === 'string' && /^https?:\/\//i.test(href);
-        const handleClick = (e: React.MouseEvent) => {
-          if (isHttp && typeof window !== 'undefined' && window.electronAPI?.openExternal) {
-            e.preventDefault();
-            window.electronAPI.openExternal(href).catch(() => {});
-          }
-        };
-        return (
-          <a
-            href={href}
-            className="text-primary underline"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleClick}
-          >
-            {children}
-          </a>
-        );
-      },
-    }),
-    []
+function renderMarkdown(content: string): string {
+  return marked.parse(content, { gfm: true }) as string;
+}
+
+async function resolveLocalImages(html: string, rootPath?: string, fileDir?: string): Promise<string> {
+  if (!rootPath || typeof window === 'undefined' || !window.electronAPI?.fsReadImage) {
+    return html;
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(html, 'text/html');
+  const images = Array.from(document.querySelectorAll('img'));
+  const localImages = images.filter((image) => {
+    const src = image.getAttribute('src');
+    return !!src && !/^(?:[a-z]+:)?\/\//i.test(src) && !src.startsWith('data:');
+  });
+
+  if (localImages.length === 0) {
+    return html;
+  }
+
+  await Promise.all(
+    localImages.map(async (image) => {
+      const src = image.getAttribute('src');
+      if (!src) return;
+
+      try {
+        const result = await window.electronAPI.fsReadImage(rootPath, resolveRelativePath(fileDir || '', src));
+        if (result.success && result.dataUrl) {
+          image.setAttribute('src', result.dataUrl);
+          return;
+        }
+      } catch {
+        // Leave a readable placeholder in place of a broken local image.
+      }
+
+      const fallback = document.createElement('span');
+      fallback.className = 'my-3 inline-block text-xs text-muted-foreground';
+      fallback.textContent = `[Image not found: ${src}]`;
+      image.replaceWith(fallback);
+    })
   );
+
+  return document.body.innerHTML;
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
@@ -261,23 +227,53 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   rootPath,
   fileDir,
 }) => {
-  const { effectiveTheme } = useTheme();
-  const isDark = effectiveTheme === 'dark' || effectiveTheme === 'dark-black' || effectiveTheme === 'dark-gray';
+  const [resolvedHtml, setResolvedHtml] = useState('');
 
-  const fullComponents = useFullComponents(isDark, rootPath, fileDir);
-  const compactComponents = useCompactComponents();
+  const sanitizedHtml = useMemo(() => {
+    const renderedHtml = renderMarkdown(content);
+    return DOMPurify.sanitize(renderedHtml, {
+      ADD_ATTR: ['target', 'rel'],
+    });
+  }, [content]);
 
-  const components = variant === 'full' ? fullComponents : compactComponents;
-  const rehypePlugins =
-    variant === 'full'
-      ? [rehypeRaw, [rehypeSanitize, sanitizeSchema] as any]
-      : [[rehypeSanitize, sanitizeSchema] as any];
+  useEffect(() => {
+    let cancelled = false;
+
+    void resolveLocalImages(sanitizedHtml, rootPath, fileDir).then((nextHtml) => {
+      if (!cancelled) {
+        setResolvedHtml(nextHtml);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileDir, rootPath, sanitizedHtml]);
+
+  const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const anchor = target.closest('a');
+    if (!(anchor instanceof HTMLAnchorElement)) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || !/^https?:\/\//i.test(href) || !window.electronAPI?.openExternal) {
+      return;
+    }
+
+    event.preventDefault();
+    window.electronAPI.openExternal(href).catch(() => {});
+  }, []);
 
   return (
-    <div className={cn(className)}>
-      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins} components={components}>
-        {content}
-      </Markdown>
-    </div>
+    <div
+      className={cn(
+        variant === 'full' ? fullVariantClasses : compactVariantClasses,
+        className
+      )}
+      onClick={handleClick}
+      dangerouslySetInnerHTML={{ __html: resolvedHtml }}
+    />
   );
 };

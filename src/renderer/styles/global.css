@@ -13,9 +13,6 @@ body {
   overflow: hidden;
 }
 
-/* Streamdown styles for rich markdown rendering */
-@source "../node_modules/streamdown/dist/index.js";
-
 #root {
   height: 100vh;
   width: 100vw;

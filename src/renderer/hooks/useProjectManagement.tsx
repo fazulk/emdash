@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { pickDefaultBranch } from '../components/BranchSelect';
 import { ToastAction } from '../components/ui/toast';
 import { getStoredActiveIds, saveActiveIds } from '../constants/layout';
@@ -21,6 +20,7 @@ import { rpc } from '../lib/rpc';
 import { useModalContext } from '../contexts/ModalProvider';
 import { useAppContext } from '../contexts/AppContextProvider';
 import { useGithubContext } from '../contexts/GithubContextProvider';
+import { useWorkspaceLocation, useWorkspaceNavigate } from './useWorkspaceRouter';
 import { useToast } from './use-toast';
 import { useFeatureFlag } from './useFeatureFlag';
 
@@ -102,8 +102,8 @@ export const useProjectManagement = () => {
   const { toast } = useToast();
   const { showModal } = useModalContext();
   const queryClient = useQueryClient();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location = useWorkspaceLocation();
+  const navigate = useWorkspaceNavigate();
 
   // Trigger counters — incremented to signal task management to reset active task / auto-open modal
   const [resetTaskTrigger, setResetTaskTrigger] = useState(0);

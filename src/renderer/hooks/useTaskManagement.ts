@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { TERMINAL_PROVIDER_IDS } from '../constants/agents';
 import { makePtyId } from '@shared/ptyId';
 import type { ProviderId } from '@shared/providers/registry';
@@ -26,6 +25,7 @@ import { dispatchFileChangeEvent } from '../lib/fileChangeEvents';
 import { useProjectManagementContext } from '../contexts/ProjectManagementProvider';
 import { useToast } from './use-toast';
 import { useModalContext } from '../contexts/ModalProvider';
+import { useWorkspaceLocation, useWorkspaceNavigate } from './useWorkspaceRouter';
 import {
   clearLifecycleTask,
   lifecycleTerminalId,
@@ -207,8 +207,8 @@ export function useTaskManagement() {
   const { toast } = useToast();
   const { showModal } = useModalContext();
   const queryClient = useQueryClient();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location = useWorkspaceLocation();
+  const navigate = useWorkspaceNavigate();
 
   // ---------------------------------------------------------------------------
   // Task queries — one per project via useQueries

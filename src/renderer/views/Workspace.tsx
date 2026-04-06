@@ -35,6 +35,7 @@ import { useProjectManagementContext } from '@/contexts/ProjectManagementProvide
 import { useTheme } from '@/hooks/useTheme';
 import useUpdateNotifier from '@/hooks/useUpdateNotifier';
 import { useAutomationTrigger } from '@/hooks/useAutomationTrigger';
+import { useWorkspaceLocation, useWorkspaceNavigate } from '@/hooks/useWorkspaceRouter';
 import {
   buildWorkspaceHref,
   parseWorkspaceRoute,
@@ -48,7 +49,6 @@ import { soundPlayer } from '@/lib/soundPlayer';
 import BrowserProvider, { useBrowser } from '@/providers/BrowserProvider';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { SettingsPageTab } from '@/components/SettingsPage';
-import { useLocation, useNavigate } from 'react-router-dom';
 const PANEL_RESIZE_DRAGGING_EVENT = 'emdash:panel-resize-dragging';
 type ResizeHandleId = 'left' | 'right';
 
@@ -91,8 +91,8 @@ export function Workspace() {
   useTheme(); // Initialize theme on app startup
   const { showModal } = useModalContext();
   const { settings } = useAppSettings();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location = useWorkspaceLocation();
+  const navigate = useWorkspaceNavigate();
   const route = useMemo(
     () => parseWorkspaceRoute(location.pathname, location.search),
     [location.pathname, location.search]

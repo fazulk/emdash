@@ -1,4 +1,3 @@
-import { generatePath, matchPath } from 'react-router-dom';
 import type { SettingsPageTab } from '../types/settings';
 import { SETTINGS_PAGE_TABS } from '../types/settings';
 
@@ -54,6 +53,50 @@ interface WorkspaceSearchOptions {
   diffTaskPath?: string | null;
 }
 
+interface MatchedPath {
+  params: Record<string, string>;
+}
+
+function buildPath(
+  pattern: string,
+  params: Record<string, string | number | undefined>
+): string {
+  return pattern.replace(/:([A-Za-z0-9_]+)/g, (_, key: string) => {
+    const value = params[key];
+    return encodeURIComponent(value == null ? '' : String(value));
+  });
+}
+
+function matchWorkspacePath(pattern: string, pathname: string): MatchedPath | null {
+  const normalizeSegments = (value: string) =>
+    value.split('/').filter((segment) => segment.length > 0);
+
+  const patternSegments = normalizeSegments(pattern);
+  const pathSegments = normalizeSegments(pathname);
+
+  if (patternSegments.length !== pathSegments.length) {
+    return null;
+  }
+
+  const params: Record<string, string> = {};
+
+  for (let index = 0; index < patternSegments.length; index += 1) {
+    const patternSegment = patternSegments[index];
+    const pathSegment = pathSegments[index];
+
+    if (patternSegment.startsWith(':')) {
+      params[patternSegment.slice(1)] = decodeURIComponent(pathSegment);
+      continue;
+    }
+
+    if (patternSegment !== pathSegment) {
+      return null;
+    }
+  }
+
+  return { params };
+}
+
 function normalizePathname(pathname: string): string {
   if (!pathname) return '/';
   if (pathname === '/') return pathname;
@@ -78,7 +121,7 @@ export function parseWorkspaceRoute(pathname: string, search = ''): WorkspaceRou
     diffTaskPath: null,
   };
 
-  const diffMatch = matchPath(WORKSPACE_ROUTE_PATHS.diff, normalizedPathname);
+  const diffMatch = matchWorkspacePath(WORKSPACE_ROUTE_PATHS.diff, normalizedPathname);
   if (diffMatch) {
     return {
       kind: 'diff',
@@ -90,7 +133,7 @@ export function parseWorkspaceRoute(pathname: string, search = ''): WorkspaceRou
     };
   }
 
-  const editorMatch = matchPath(WORKSPACE_ROUTE_PATHS.editor, normalizedPathname);
+  const editorMatch = matchWorkspacePath(WORKSPACE_ROUTE_PATHS.editor, normalizedPathname);
   if (editorMatch) {
     return {
       kind: 'editor',
@@ -100,7 +143,7 @@ export function parseWorkspaceRoute(pathname: string, search = ''): WorkspaceRou
     };
   }
 
-  const taskMatch = matchPath(WORKSPACE_ROUTE_PATHS.task, normalizedPathname);
+  const taskMatch = matchWorkspacePath(WORKSPACE_ROUTE_PATHS.task, normalizedPathname);
   if (taskMatch) {
     return {
       kind: 'task',
@@ -110,7 +153,7 @@ export function parseWorkspaceRoute(pathname: string, search = ''): WorkspaceRou
     };
   }
 
-  const kanbanMatch = matchPath(WORKSPACE_ROUTE_PATHS.kanban, normalizedPathname);
+  const kanbanMatch = matchWorkspacePath(WORKSPACE_ROUTE_PATHS.kanban, normalizedPathname);
   if (kanbanMatch) {
     return {
       kind: 'kanban',
@@ -120,7 +163,7 @@ export function parseWorkspaceRoute(pathname: string, search = ''): WorkspaceRou
     };
   }
 
-  const projectMatch = matchPath(WORKSPACE_ROUTE_PATHS.project, normalizedPathname);
+  const projectMatch = matchWorkspacePath(WORKSPACE_ROUTE_PATHS.project, normalizedPathname);
   if (projectMatch) {
     return {
       kind: 'project',
@@ -157,25 +200,25 @@ export function buildWorkspacePath(target: WorkspaceRouteTarget): string {
     case 'automations':
       return WORKSPACE_ROUTE_PATHS.automations;
     case 'project':
-      return generatePath(WORKSPACE_ROUTE_PATHS.project, {
+      return buildPath(WORKSPACE_ROUTE_PATHS.project, {
         projectId: target.projectId ?? '',
       });
     case 'kanban':
-      return generatePath(WORKSPACE_ROUTE_PATHS.kanban, {
+      return buildPath(WORKSPACE_ROUTE_PATHS.kanban, {
         projectId: target.projectId ?? '',
       });
     case 'task':
-      return generatePath(WORKSPACE_ROUTE_PATHS.task, {
+      return buildPath(WORKSPACE_ROUTE_PATHS.task, {
         projectId: target.projectId ?? '',
         taskId: target.taskId ?? '',
       });
     case 'editor':
-      return generatePath(WORKSPACE_ROUTE_PATHS.editor, {
+      return buildPath(WORKSPACE_ROUTE_PATHS.editor, {
         projectId: target.projectId ?? '',
         taskId: target.taskId ?? '',
       });
     case 'diff':
-      return generatePath(WORKSPACE_ROUTE_PATHS.diff, {
+      return buildPath(WORKSPACE_ROUTE_PATHS.diff, {
         projectId: target.projectId ?? '',
         taskId: target.taskId ?? '',
       });

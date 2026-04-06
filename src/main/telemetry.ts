@@ -1,60 +1,37 @@
 import { app } from 'electron';
-// Optional build-time defaults for distribution bundles
-// Resolve robustly across dev and packaged layouts.
-let appConfig: { posthogHost?: string; posthogKey?: string } = {};
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-
-function loadAppConfig(): { posthogHost?: string; posthogKey?: string } {
-  try {
-    const dir = __dirname; // e.g., dist/main/main in dev builds
-    const candidates = [
-      join(dir, 'appConfig.json'), // dist/main/main/appConfig.json
-      join(dir, '..', 'appConfig.json'), // dist/main/appConfig.json (CI injection path)
-    ];
-    for (const p of candidates) {
-      if (existsSync(p)) {
-        const raw = readFileSync(p, 'utf8');
-        return JSON.parse(raw);
-      }
-    }
-  } catch {
-    // fall through
-  }
-  return {};
-}
-appConfig = loadAppConfig();
 
 type TelemetryEvent =
   // App lifecycle
   | 'app_started'
   | 'app_closed'
-  | 'app_window_focused' // when a user return back to the app after being away
-  | 'github_connection_triggered' // when a user presses the GitHub connection button in the app (with state if gh cli already installed or not)
-  | 'github_connected' // when a user connects to their GitHub account
+  | 'app_window_focused'
+  | 'github_connection_triggered'
+  | 'github_connected'
   // Project management
-  | 'project_add_clicked' // left sidebar button to add projects
-  | 'project_open_clicked' // button in the center to open Projects (Home View)
-  | 'project_create_clicked' // button in the center to create a new project (Home View)
-  | 'project_clone_clicked' // button in the center to clone a project from GitHub (Home View)
-  | 'project_create_success' // when a project is successfully created from the homepage
-  | 'project_clone_success' // when a project is successfully cloned from the homepage
-  | 'project_added_success' // when a project is added successfully (both entrypoint buttons)
+  | 'project_add_clicked'
+  | 'project_open_clicked'
+  | 'project_create_clicked'
+  | 'project_clone_clicked'
+  | 'project_create_success'
+  | 'project_clone_success'
+  | 'project_added_success'
   | 'project_deleted'
-  | 'project_view_opened' // when a user opens a project and see the Task overview in main screen (not the sidebar)
+  | 'project_view_opened'
   // Task management
-  | 'task_created' // when a new task is created (track) (with all attributes, if initial prompt is used (but dont store the initial prompt itself))
-  | 'task_deleted' // when a task is deleted
-  | 'task_provider_switched' // when a task is switched to a different provider
-  | 'task_custom_named' // when a task is given a custom name instead of the default generated one
-  | 'task_advanced_options_opened' // when task advanced options are opened
+  | 'task_created'
+  | 'task_deleted'
+  | 'task_provider_switched'
+  | 'task_custom_named'
+  | 'task_advanced_options_opened'
   // Terminal (Right Sidebar)
-  | 'terminal_entered' //when a user enters the terminal (right sidebar) with his mouse
-  | 'terminal_command_executed' //when a user executes a command in the terminal
+  | 'terminal_entered'
+  | 'terminal_command_executed'
   | 'terminal_new_terminal_created'
   | 'terminal_deleted'
   // Changes (Right Sidebar)
-  | 'changes_viewed' // when a user clicks on one file to view their changes
+  | 'changes_viewed'
   // Plan mode
   | 'plan_mode_enabled'
   | 'plan_mode_disabled'
@@ -65,8 +42,8 @@ type TelemetryEvent =
   // Linear integration
   | 'linear_connected'
   | 'linear_disconnected'
-  | 'linear_issues_searched' // when creating a new task and the Linear issue search is opened
-  | 'linear_issue_selected' // when a user selects a Linear issue to create a new task (no need to send task, just selecting issue)
+  | 'linear_issues_searched'
+  | 'linear_issue_selected'
   // Jira integration
   | 'jira_connected'
   | 'jira_disconnected'
@@ -85,23 +62,23 @@ type TelemetryEvent =
   | 'container_connect_success'
   | 'container_connect_failed'
   // ToolBar Section
-  | 'toolbar_feedback_clicked' // when a user clicks on the feedback button in the toolbar
-  | 'toolbar_left_sidebar_clicked' // when a user clicks on the left sidebar button in the toolbar (attribute for new state (open or closed))
-  | 'toolbar_right_sidebar_clicked' // when a user clicks on the right sidebar button in the toolbar (attribute for new state (open or closed))
-  | 'toolbar_settings_clicked' // when a user clicks on the settings button in the toolbar
-  | 'toolbar_open_in_menu_clicked' // when a user clicks on the "Open in" menu button (attribute for new state (open or closed))
-  | 'toolbar_open_in_selected' // when a user selects an app from the "Open in" menu (attribute: OpenInAppId)
-  | 'toolbar_kanban_toggled' // when a user toggles the Kanban view (attribute for new state (open or closed))
+  | 'toolbar_feedback_clicked'
+  | 'toolbar_left_sidebar_clicked'
+  | 'toolbar_right_sidebar_clicked'
+  | 'toolbar_settings_clicked'
+  | 'toolbar_open_in_menu_clicked'
+  | 'toolbar_open_in_selected'
+  | 'toolbar_kanban_toggled'
   // Browser Preview
   | 'browser_preview_opened'
   | 'browser_preview_closed'
-  | 'browser_preview_url_navigated' // when a user navigates to a new URL in the browser preview
+  | 'browser_preview_url_navigated'
   // Settings & Preferences
-  | 'settings_tab_viewed' // when a user opens the settings (Settings View) (attribute for which tab is opened)
+  | 'settings_tab_viewed'
   | 'theme_changed'
   | 'telemetry_toggled'
   | 'notification_settings_changed'
-  | 'default_provider_changed' // attribute for which provider is selected
+  | 'default_provider_changed'
   // Skills
   | 'skills_view_opened'
   | 'skill_installed'
@@ -163,25 +140,11 @@ interface InitOptions {
 }
 
 let enabled = true;
-let apiKey: string | undefined;
-let host: string | undefined;
 let instanceId: string | undefined;
-let installSource: string | undefined;
 let userOptOut: boolean | undefined;
-let onboardingSeen: boolean = false;
-let sessionStartMs: number = Date.now();
+let onboardingSeen = false;
+let sessionStartMs = Date.now();
 let lastActiveDate: string | undefined;
-let cachedGithubUsername: string | null = null;
-
-const libName = 'emdash';
-
-function getVersionSafe(): string {
-  try {
-    return app.getVersion();
-  } catch {
-    return 'unknown';
-  }
-}
 
 function getInstanceIdPath(): string {
   const dir = app.getPath('userData');
@@ -231,263 +194,43 @@ function cryptoRandomId(): string {
     const { randomUUID } = require('crypto');
     return randomUUID();
   } catch {
-    // Very old Node fallback; not expected in Electron 28+
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 }
 
 function isEnabled(): boolean {
-  return (
-    enabled === true &&
-    userOptOut !== true &&
-    !!apiKey &&
-    !!host &&
-    typeof instanceId === 'string' &&
-    instanceId.length > 0
-  );
-}
-
-function getBaseProps() {
-  return {
-    app_version: getVersionSafe(),
-    electron_version: process.versions.electron,
-    platform: process.platform,
-    arch: process.arch,
-    is_dev: !app.isPackaged,
-    install_source: installSource ?? (app.isPackaged ? 'dmg' : 'dev'),
-    $lib: libName,
-    ...(cachedGithubUsername ? { github_username: cachedGithubUsername } : {}),
-  };
-}
-
-/**
- * Sanitize event properties to prevent PII leakage.
- * Simple allowlist approach: only allow safe property names and primitive types.
- */
-function sanitizeEventAndProps(event: TelemetryEvent, props: Record<string, any> | undefined) {
-  const sanitized: Record<string, any> = {};
-
-  // Simple allowlist of safe properties
-  const allowedProps = new Set([
-    'provider',
-    'source',
-    'tab',
-    'theme',
-    'trigger',
-    'has_initial_prompt',
-    'custom_name',
-    'state',
-    'success',
-    'error_type',
-    'gh_cli_installed',
-    'github_username',
-    'feature',
-    'type',
-    'enabled',
-    'sound',
-    'app',
-    'duration_ms',
-    'session_duration_ms',
-    'outcome',
-    'applied_migrations',
-    'applied_migrations_bucket',
-    'recovered',
-    'task_count',
-    'task_count_bucket',
-    'project_count',
-    'project_count_bucket',
-    'date',
-    'timezone',
-    'scope',
-  ]);
-
-  if (props) {
-    for (const [key, value] of Object.entries(props)) {
-      // Only process allowed property names
-      if (!allowedProps.has(key)) continue;
-
-      // Only allow primitive types
-      if (typeof value === 'string') {
-        // Trim and limit string length to prevent abuse
-        sanitized[key] = value.trim().slice(0, 100);
-      } else if (typeof value === 'number') {
-        // Clamp numbers to reasonable range
-        sanitized[key] = Math.max(0, Math.min(value, 1000000));
-      } else if (typeof value === 'boolean') {
-        sanitized[key] = value;
-      }
-    }
-  }
-
-  return sanitized;
-}
-
-/**
- * Fetch the current GitHub username if the user is authenticated.
- * Returns null if not authenticated or if there's an error.
- */
-async function getGithubUsername(): Promise<string | null> {
-  try {
-    // Lazy import to avoid circular dependencies
-    const { githubService } = require('./services/GitHubService');
-    const user = await githubService.getCurrentUser();
-    return user?.login || null;
-  } catch {
-    // Silently fail if GitHub is not authenticated or there's an error
-    return null;
-  }
-}
-
-async function posthogCapture(
-  event: TelemetryEvent,
-  properties?: Record<string, any>
-): Promise<void> {
-  if (!isEnabled()) return;
-  try {
-    // Use global fetch if available (Node 18+/Electron 28+)
-    const f: any = (globalThis as any).fetch;
-    if (!f) return;
-    const u = (host || '').replace(/\/$/, '') + '/capture/';
-    const body = {
-      api_key: apiKey,
-      event,
-      properties: {
-        distinct_id: instanceId,
-        ...getBaseProps(),
-        ...sanitizeEventAndProps(event, properties),
-      },
-    };
-    await f(u, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).catch(() => undefined);
-  } catch {
-    // swallow errors; telemetry must never crash the app
-  }
-}
-
-/**
- * PostHog identify call to associate the instanceId with GitHub username.
- * This creates a user profile in PostHog.
- */
-async function posthogIdentify(username: string): Promise<void> {
-  if (!isEnabled() || !username) return;
-  try {
-    const f: any = (globalThis as any).fetch;
-    if (!f) return;
-    const u = (host || '').replace(/\/$/, '') + '/capture/';
-    const body = {
-      api_key: apiKey,
-      event: '$identify',
-      properties: {
-        distinct_id: instanceId,
-        $set: {
-          github_username: username,
-          ...getBaseProps(),
-        },
-      },
-    };
-    await f(u, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).catch(() => undefined);
-  } catch {
-    // swallow errors; telemetry must never crash the app
-  }
+  return false;
 }
 
 export async function init(options?: InitOptions) {
   const env = process.env;
-  const enabledEnv = (env.TELEMETRY_ENABLED ?? 'true').toString().toLowerCase();
-  enabled = enabledEnv !== 'false' && enabledEnv !== '0' && enabledEnv !== 'no';
-  apiKey =
-    env.POSTHOG_PROJECT_API_KEY || (appConfig?.posthogKey as string | undefined) || undefined;
-  host = normalizeHost(
-    env.POSTHOG_HOST || (appConfig?.posthogHost as string | undefined) || undefined
-  );
-  installSource = options?.installSource || env.INSTALL_SOURCE || undefined;
+  enabled = !['false', '0', 'no'].includes((env.TELEMETRY_ENABLED ?? 'true').toString().toLowerCase());
+  void options;
 
   const state = loadOrCreateState();
   instanceId = state.instanceId;
   sessionStartMs = Date.now();
-  // If enabledOverride is explicitly false, user opted out; otherwise leave undefined
   userOptOut =
     typeof state.enabledOverride === 'boolean' ? state.enabledOverride === false : undefined;
   onboardingSeen = state.onboardingSeen === true;
   lastActiveDate = state.lastActiveDate;
-
-  // Fetch GitHub username if available and cache for all future events
-  cachedGithubUsername = await getGithubUsername();
-
-  // If we have a GitHub username, identify the user in PostHog
-  if (cachedGithubUsername) {
-    void posthogIdentify(cachedGithubUsername);
-  }
-
-  // Fire lifecycle start (github_username is now included via getBaseProps)
-  void posthogCapture('app_started');
-
-  // Check for daily active user (fires event if it's a new day)
-  checkDailyActiveUser();
 }
 
-/**
- * Refresh the cached GitHub username. Call this when the user connects
- * their GitHub account so all subsequent events include the username.
- */
-export async function refreshGithubUsername(): Promise<void> {
-  cachedGithubUsername = await getGithubUsername();
-  if (cachedGithubUsername) {
-    void posthogIdentify(cachedGithubUsername);
-  }
+export async function refreshGithubUsername(): Promise<void> {}
+
+export function capture(_event: TelemetryEvent, _properties?: Record<string, any>) {
+  return;
 }
 
-export function capture(event: TelemetryEvent, properties?: Record<string, any>) {
-  if (event === 'app_session') {
-    const dur = Math.max(0, Date.now() - (sessionStartMs || Date.now()));
-    void posthogCapture(event, { session_duration_ms: dur });
-    return;
-  }
-  void posthogCapture(event, properties);
-}
-
-/**
- * Capture an exception for PostHog error tracking.
- * This sends a properly formatted $exception event as required by PostHog.
- *
- * @param error - The error object or error message
- * @param additionalProperties - Additional context properties
- */
 export function captureException(
-  error: Error | unknown,
-  additionalProperties?: Record<string, any>
+  _error: Error | unknown,
+  _additionalProperties?: Record<string, any>
 ) {
-  if (!isEnabled()) return;
-
-  // Build error object
-  const errorObj = error instanceof Error ? error : new Error(String(error));
-  const errorMessage = errorObj.message || 'Unknown error';
-  const errorStack = errorObj.stack || '';
-
-  // Build PostHog $exception event properties
-  const properties: Record<string, any> = {
-    // Required fields for PostHog error tracking
-    $exception_message: errorMessage,
-    $exception_type: errorObj.name || 'Error',
-    $exception_stack_trace_raw: errorStack,
-
-    // Merge additional properties
-    ...additionalProperties,
-  };
-
-  // Send as $exception event (required for PostHog error tracking)
-  void posthogCapture('$exception' as any, properties);
+  return;
 }
 
 export function shutdown() {
-  // No-op for now (no batching). Left for future posthog-node integration.
+  return;
 }
 
 export function isTelemetryEnabled(): boolean {
@@ -499,16 +242,13 @@ export function getTelemetryStatus() {
     enabled: isEnabled(),
     envDisabled: !enabled,
     userOptOut: userOptOut === true,
-    hasKeyAndHost: !!apiKey && !!host,
+    hasKeyAndHost: false,
     onboardingSeen,
-    posthogKey: apiKey,
-    posthogHost: host,
   };
 }
 
 export function setTelemetryEnabledViaUser(enabledFlag: boolean) {
   userOptOut = !enabledFlag;
-  // Persist alongside instanceId
   try {
     const file = getInstanceIdPath();
     let state: any = {};
@@ -520,7 +260,7 @@ export function setTelemetryEnabledViaUser(enabledFlag: boolean) {
       }
     }
     state.instanceId = instanceId || state.instanceId || cryptoRandomId();
-    state.enabled = enabledFlag; // store explicit preference
+    state.enabled = enabledFlag;
     state.updatedAt = new Date().toISOString();
     writeFileSync(file, JSON.stringify(state, null, 2), 'utf8');
   } catch {
@@ -556,57 +296,19 @@ function persistState(state: {
   }
 }
 
-function normalizeHost(h: string | undefined): string | undefined {
-  if (!h) return undefined;
-  let s = String(h).trim();
-  if (!/^https?:\/\//i.test(s)) {
-    s = 'https://' + s;
-  }
-  return s.replace(/\/+$/, '');
-}
-
-/**
- * Check if this is a new day of activity and fire daily_active_user event if so.
- * This ensures we accurately track DAU even when the app stays open for extended periods.
- */
 async function checkDailyActiveUser(): Promise<void> {
-  // Skip if telemetry is disabled
-  if (!isEnabled()) return;
-
-  try {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-
-    // If we haven't tracked a date yet or it's a new day, fire the event
-    if (!lastActiveDate || lastActiveDate !== today) {
-      // Refresh cached GitHub username (user may have connected since init)
-      cachedGithubUsername = await getGithubUsername();
-
-      // Fire the daily active user event (github_username included via getBaseProps)
-      void posthogCapture('daily_active_user', {
-        date: today,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
-      });
-
-      // Update the last active date in memory
-      lastActiveDate = today;
-
-      // Persist the new date to storage
-      persistState({
-        instanceId: instanceId || cryptoRandomId(),
-        enabledOverride: userOptOut === undefined ? undefined : !userOptOut,
-        onboardingSeen,
-        lastActiveDate: today,
-      });
-    }
-  } catch (error) {
-    // Never let telemetry errors crash the app
-    // Optionally log for debugging: console.error('DAU tracking error:', error);
-  }
+  if (!instanceId) return;
+  const today = new Date().toISOString().split('T')[0];
+  if (lastActiveDate === today) return;
+  lastActiveDate = today;
+  persistState({
+    instanceId,
+    enabledOverride: userOptOut === undefined ? undefined : !userOptOut,
+    onboardingSeen,
+    lastActiveDate: today,
+  });
 }
 
-/**
- * Export for use in window focus events
- */
 export async function checkAndReportDailyActiveUser(): Promise<void> {
   return checkDailyActiveUser();
 }

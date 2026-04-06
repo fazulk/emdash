@@ -13,7 +13,7 @@ import {
 // github_connected, task_snapshot, app_session, agent_run_start, agent_run_finish) should NOT be here
 const RENDERER_ALLOWED_EVENTS = new Set([
   // Error tracking
-  '$exception', // PostHog error tracking format
+  '$exception',
   // Legacy
   'feature_used',
   'error',
@@ -117,7 +117,7 @@ export function registerTelemetryIpc() {
       const props =
         args?.properties && typeof args.properties === 'object' ? args.properties : undefined;
 
-      // Handle $exception events specially for PostHog error tracking
+      // Handle structured exception events specially.
       if (ev === '$exception') {
         // Extract error details from properties
         const errorMessage = props?.$exception_message || 'Unknown error';
@@ -125,10 +125,8 @@ export function registerTelemetryIpc() {
         error.stack = props?.$exception_stack_trace_raw || '';
         error.name = props?.$exception_type || 'Error';
 
-        // Call captureException with the error and additional properties
         captureException(error, props);
       } else {
-        // Regular telemetry events
         capture(ev, props);
       }
 

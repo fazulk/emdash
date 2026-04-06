@@ -48,9 +48,8 @@ class RendererErrorTracking {
       // Determine severity if not provided
       const severity = context?.severity || this.determineSeverity(errorMessage, context);
 
-      // Build error properties following PostHog's $exception format
+      // Build error properties using the structured exception payload.
       const properties: Record<string, any> = {
-        // PostHog required fields for error tracking
         $exception_message: errorMessage.slice(0, 500),
         $exception_type: context?.error_type || this.classifyError(errorMessage),
         $exception_stack_trace_raw: errorStack.slice(0, 2000),
@@ -90,7 +89,6 @@ class RendererErrorTracking {
         Object.entries(properties).filter(([_, v]) => v !== undefined && v !== null)
       );
 
-      // Send to main process as $exception event (required for PostHog error tracking)
       this.sendToMainProcess('$exception', cleanProperties);
 
       // Also log to console for debugging

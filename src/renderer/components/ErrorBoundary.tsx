@@ -23,7 +23,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     try {
-      // Track error with PostHog
+      // Track the error through the app telemetry pipeline.
       captureComponentError(error, this.props.componentName || 'App', {
         component_stack: info.componentStack,
         error_boundary: true,

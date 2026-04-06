@@ -218,16 +218,6 @@ export const catalogData: Record<string, CatalogEntryDef> = {
     docsUrl: 'https://docs.exa.ai/reference/exa-mcp',
     credentialKeys: [{ key: 'EXA_API_KEY', required: true }],
   },
-  posthog: {
-    config: {
-      type: 'http',
-      url: 'https://mcp.posthog.com/mcp',
-    },
-    name: 'PostHog',
-    description: 'Query, analyze, and manage your PostHog insights',
-    docsUrl: 'https://posthog.com/docs/model-context-protocol',
-    credentialKeys: [],
-  },
   honeycomb: {
     config: {
       type: 'http',

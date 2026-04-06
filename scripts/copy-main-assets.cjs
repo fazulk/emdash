@@ -10,10 +10,6 @@ function copyFile(src, dest) {
 
 const assets = [
   {
-    src: path.join(repoRoot, 'src', 'main', 'appConfig.json'),
-    dest: path.join(repoRoot, 'dist', 'main', 'appConfig.json'),
-  },
-  {
     src: path.join(repoRoot, 'src', 'main', 'services', 'skills', 'bundled-catalog.json'),
     dest: path.join(repoRoot, 'dist', 'main', 'main', 'services', 'skills', 'bundled-catalog.json'),
   },

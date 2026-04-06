@@ -3,7 +3,7 @@ import * as telemetry from './telemetry';
 import { log } from './lib/logger';
 
 /**
- * Error tracking module for comprehensive error reporting with PostHog.
+ * Error tracking module for comprehensive error reporting.
  */
 
 interface ErrorContext {
@@ -78,12 +78,11 @@ class ErrorTracking {
       // Determine severity if not provided
       const severity = context?.severity || this.determineSeverity(errorMessage, context);
 
-      // Build comprehensive error properties following PostHog's $exception format
+      // Build comprehensive error properties using the structured exception payload.
       const properties: Record<string, any> = {
-        // PostHog required fields for error tracking
-        $exception_message: errorMessage.slice(0, 500), // Required by PostHog
-        $exception_type: context?.error_type || this.classifyError(errorMessage), // Required
-        $exception_stack_trace_raw: errorStack.slice(0, 2000), // Required for stack traces
+        $exception_message: errorMessage.slice(0, 500),
+        $exception_type: context?.error_type || this.classifyError(errorMessage),
+        $exception_stack_trace_raw: errorStack.slice(0, 2000),
         $exception_fingerprint: `${context?.service || 'unknown'}_${context?.operation || 'unknown'}_${context?.error_type || this.classifyError(errorMessage)}`, // For grouping
 
         // Additional context
@@ -131,7 +130,6 @@ class ErrorTracking {
         Object.entries(properties).filter(([_, v]) => v !== undefined && v !== null)
       );
 
-      // Send to PostHog using proper exception tracking
       telemetry.captureException(errorObj, cleanProperties);
 
       // Also log locally for debugging

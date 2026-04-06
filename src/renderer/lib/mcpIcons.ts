@@ -15,7 +15,6 @@ import notionSvg from '../../assets/images/mcp/notion.svg?raw';
 import clerkSvg from '../../assets/images/mcp/clerk.svg?raw';
 import planetscaleSvg from '../../assets/images/mcp/planetscale.svg?raw';
 import huggingFaceSvg from '../../assets/images/mcp/hugging_face.svg?raw';
-import posthogSvg from '../../assets/images/mcp/posthog.svg?raw';
 import graphosSvg from '../../assets/images/mcp/graphos.svg?raw';
 import sanitySvg from '../../assets/images/mcp/sanity.svg?raw';
 import asanaSvg from '../../assets/images/mcp/asana.svg?raw';
@@ -76,7 +75,6 @@ export const mcpIconMap: Record<string, McpIconDef> = {
   planetscale: { type: 'svg', data: planetscaleSvg, color: '000000' },
   bigquery: { type: 'svg', data: bigquerySvg, color: '669DF6' },
   hugging_face: { type: 'svg', data: huggingFaceSvg, color: 'FFD21E' },
-  posthog: { type: 'svg', data: posthogSvg, color: 'F9BD2B' },
   honeycomb: { type: 'png', data: honeycombPng, color: 'F6A61F' },
   graphos: { type: 'svg', data: graphosSvg, color: '311C87' },
   sanity: { type: 'svg', data: sanitySvg, color: 'F03E2F' },

@@ -1,9 +1,11 @@
-import { useFeatureFlagEnabled } from 'posthog-js/react';
+const FEATURE_FLAGS: Readonly<Record<string, boolean>> = {
+  automations: true,
+  'workspace-provider': false,
+};
 
 /**
- * Returns `true` only when the named PostHog feature flag is explicitly enabled.
- * While loading, uninitialized, or when the flag is off, returns `false`.
+ * Returns `true` only when the named local feature flag is explicitly enabled.
  */
 export function useFeatureFlag(flag: string): boolean {
-  return useFeatureFlagEnabled(flag) === true;
+  return FEATURE_FLAGS[flag] === true;
 }

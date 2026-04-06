@@ -121,19 +121,9 @@ Contributions welcome! See the [Contributing Guide](CONTRIBUTING.md) to get star
 <details>
 <summary><b>What telemetry do you collect and can I disable it?</b></summary>
 
-> We send **anonymous, allow‑listed events** (app start/close, feature usage names, app/platform versions) to PostHog.  
-> We **do not** send code, file paths, repo names, prompts, or PII.
+> Current builds do not send product telemetry.
 >
-> **Disable telemetry:**
->
-> - In the app: **Settings → General → Privacy & Telemetry** (toggle off)
-> - Or via env var before launch:
->
-> ```bash
-> TELEMETRY_ENABLED=false
-> ```
->
-> Full details: see `docs/telemetry.md`.
+> The **Privacy & Telemetry** setting remains in the app, but telemetry is inactive in this build.
 </details>
 
 <details>

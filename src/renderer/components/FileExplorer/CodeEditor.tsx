@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import Editor from '@monaco-editor/react';
+import type * as monaco from 'monaco-editor';
 import { cn } from '@/lib/utils';
 import { getMonacoLanguageId } from '@/lib/diffUtils';
 import { buildMonacoModelPath } from '@/lib/monacoModelPath';
 import { registerActiveCodeEditor } from '@/lib/activeCodeEditor';
+import { MonacoEditor } from '@/components/monaco/MonacoEditor';
 import { useTheme } from '@/hooks/useTheme';
 import { useRightSidebar } from '../ui/right-sidebar';
 import { useFileManager } from '@/hooks/useFileManager';
@@ -14,6 +15,7 @@ import {
   configureMonacoEditor,
   addMonacoKeyboardShortcuts,
 } from '@/lib/monaco-config';
+import { initializeMonaco } from '@/lib/monaco';
 import { defineMonacoThemes, getMonacoTheme } from '@/lib/monaco-themes';
 import {
   DEFAULT_EXCLUDE_PATTERNS,
@@ -59,8 +61,8 @@ export default function CodeEditor({
     collapsed: rightSidebarCollapsed,
     setCollapsed: setRightSidebarCollapsed,
   } = useRightSidebar();
-  const monacoRef = useRef<any>(null);
-  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<typeof monaco | null>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const editorRegistrationCleanupRef = useRef<(() => void) | null>(null);
   const rightSidebarWasCollapsedRef = useRef<boolean>(false);
 
@@ -178,24 +180,19 @@ export default function CodeEditor({
     prevIsSaving.current = isSaving;
   }, [isSaving, editorReady, refreshDecorations]);
 
-  // Initialize Monaco once when first loaded
   useEffect(() => {
-    const initMonaco = async () => {
-      const { loader } = await import('@monaco-editor/react');
-      loader.init().then((monaco) => {
-        if (!monacoRef.current) {
-          monacoRef.current = monaco;
-          configureMonacoTypeScript(monaco);
-          defineMonacoThemes(monaco);
-        }
-      });
-    };
-    initMonaco();
+    void initializeMonaco().then((monacoInstance) => {
+      if (!monacoRef.current) {
+        monacoRef.current = monacoInstance;
+        configureMonacoTypeScript(monacoInstance);
+        defineMonacoThemes(monacoInstance);
+      }
+    });
   }, []);
 
   // Handle editor mount
   const handleEditorMount = useCallback(
-    (editor: any, monaco: any) => {
+    (editor: monaco.editor.IStandaloneCodeEditor, monacoInstance: typeof monaco) => {
       // Store editor reference
       editorRef.current = editor;
       editorRegistrationCleanupRef.current?.();
@@ -203,15 +200,15 @@ export default function CodeEditor({
 
       // Configure Monaco if not already done
       if (!monacoRef.current) {
-        monacoRef.current = monaco;
-        configureMonacoTypeScript(monaco);
+        monacoRef.current = monacoInstance;
+        configureMonacoTypeScript(monacoInstance);
       }
 
       // Register custom themes
-      defineMonacoThemes(monaco);
+      defineMonacoThemes(monacoInstance);
 
       // Configure editor options
-      configureMonacoEditor(editor, monaco);
+      configureMonacoEditor(editor, monacoInstance);
 
       // Enable glyph margin for diff indicators
       editor.updateOptions({
@@ -219,7 +216,7 @@ export default function CodeEditor({
       });
 
       // Add keyboard shortcuts
-      addMonacoKeyboardShortcuts(editor, monaco, {
+      addMonacoKeyboardShortcuts(editor, monacoInstance, {
         onSave: async () => {
           await saveFile();
           // Refresh decorations after save with cache invalidation
@@ -446,7 +443,10 @@ const ResizeHandle: React.FC<{
 interface EditorContentProps {
   activeFile: any;
   effectiveTheme: string;
-  onEditorMount: (editor: any, monaco: any) => void;
+  onEditorMount: (
+    editor: monaco.editor.IStandaloneCodeEditor,
+    monacoInstance: typeof monaco
+  ) => void;
   onEditorChange: (value: string | undefined) => void;
   isPreviewActive: boolean;
   modelRootPath: string;
@@ -483,14 +483,13 @@ const EditorContent: React.FC<EditorContentProps> = ({
 
   return (
     <div className="flex-1">
-      <Editor
-        height="100%"
+      <MonacoEditor
+        className="h-full w-full"
         language={getMonacoLanguageId(activeFile.path)}
         path={buildMonacoModelPath(modelRootPath, activeFile.path)}
         keepCurrentModel={true}
         value={activeFile.content}
         onChange={onEditorChange}
-        beforeMount={defineMonacoThemes}
         onMount={onEditorMount}
         theme={getMonacoTheme(effectiveTheme)}
         options={DEFAULT_EDITOR_OPTIONS}

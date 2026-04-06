@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DiffEditor, loader } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 import type { DiffWarning } from '@shared/diff/types';
+import { MonacoDiffEditor } from '@/components/monaco/MonacoDiffEditor';
+import { initializeMonaco } from '@/lib/monaco';
 import { convertDiffLinesToMonacoFormat, getMonacoLanguageId } from '../../lib/diffUtils';
 import { configureDiffEditorDiagnostics, resetDiagnosticOptions } from '../../lib/monacoDiffConfig';
 import { registerDiffThemes, getDiffThemeName } from '../../lib/monacoDiffThemes';
@@ -125,26 +126,22 @@ export const CommitFileDiffView: React.FC<CommitFileDiffViewProps> = ({
 
   // Register and apply Monaco diff themes
   useEffect(() => {
-    let cancelled = false;
-    registerDiffThemes()
-      .then(async () => {
-        if (!cancelled) {
-          const monacoInstance = await loader.init();
-          monacoInstance.editor.setTheme(getDiffThemeName(effectiveTheme));
-        }
+    void initializeMonaco()
+      .then((monacoInstance) => {
+        registerDiffThemes(monacoInstance);
+        monacoInstance.editor.setTheme(getDiffThemeName(effectiveTheme));
       })
       .catch((err: unknown) => console.warn('Failed to register diff themes:', err));
-    return () => {
-      cancelled = true;
-    };
   }, [effectiveTheme]);
 
   // Editor mount handler
-  const handleEditorDidMount = async (editor: monaco.editor.IStandaloneDiffEditor) => {
+  const handleEditorDidMount = async (
+    editor: monaco.editor.IStandaloneDiffEditor,
+    monacoInstance: typeof monaco
+  ) => {
     editorRef.current = editor;
 
     try {
-      const monacoInstance = await loader.init();
       configureDiffEditorDiagnostics(editor, monacoInstance, {
         disableAllValidation: true,
         suppressSpecificErrors: false,
@@ -164,8 +161,7 @@ export const CommitFileDiffView: React.FC<CommitFileDiffViewProps> = ({
       }
       editorRef.current = null;
 
-      loader
-        .init()
+      void initializeMonaco()
         .then((m) => resetDiagnosticOptions(m))
         .catch(() => {});
     };
@@ -224,8 +220,8 @@ export const CommitFileDiffView: React.FC<CommitFileDiffViewProps> = ({
     <div className="flex h-full min-h-0 flex-col">
       <DiffWarnings warnings={data.warnings} />
       <div className="min-h-0 flex-1">
-        <DiffEditor
-          height="100%"
+        <MonacoDiffEditor
+          className="h-full w-full"
           language={data.language}
           original={data.original}
           modified={data.modified}

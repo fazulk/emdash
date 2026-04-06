@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DiffEditor, loader } from '@monaco-editor/react';
 import type * as monaco from 'monaco-editor';
 import type { DiffWarning } from '@shared/diff/types';
+import { MonacoDiffEditor } from '@/components/monaco/MonacoDiffEditor';
+import { initializeMonaco } from '@/lib/monaco';
 import type { DiffLine } from '../../hooks/useFileDiff';
 import { convertDiffLinesToMonacoFormat, getMonacoLanguageId } from '../../lib/diffUtils';
 import { configureDiffEditorDiagnostics, resetDiagnosticOptions } from '../../lib/monacoDiffConfig';
@@ -239,18 +240,12 @@ export const FileDiffView: React.FC<FileDiffViewProps> = ({
 
   // Register and apply Monaco diff themes
   useEffect(() => {
-    let cancelled = false;
-    registerDiffThemes()
-      .then(async () => {
-        if (!cancelled) {
-          const monacoInstance = await loader.init();
-          monacoInstance.editor.setTheme(getDiffThemeName(effectiveTheme));
-        }
+    void initializeMonaco()
+      .then((monacoInstance) => {
+        registerDiffThemes(monacoInstance);
+        monacoInstance.editor.setTheme(getDiffThemeName(effectiveTheme));
       })
       .catch((err: unknown) => console.warn('Failed to register diff themes:', err));
-    return () => {
-      cancelled = true;
-    };
   }, [effectiveTheme]);
 
   // Save handler
@@ -280,7 +275,10 @@ export const FileDiffView: React.FC<FileDiffViewProps> = ({
   });
 
   // Editor mount handler
-  const handleEditorDidMount = async (editor: monaco.editor.IStandaloneDiffEditor) => {
+  const handleEditorDidMount = async (
+    editor: monaco.editor.IStandaloneDiffEditor,
+    monacoInstance: typeof monaco
+  ) => {
     editorRef.current = editor;
     setEditorInstance(editor);
 
@@ -292,8 +290,6 @@ export const FileDiffView: React.FC<FileDiffViewProps> = ({
     activeEditorCleanupRef.current = registerActiveCodeEditor(editor.getModifiedEditor());
 
     try {
-      const monacoInstance = await loader.init();
-
       editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, () => {
         handleSaveRef.current();
       });
@@ -362,8 +358,7 @@ export const FileDiffView: React.FC<FileDiffViewProps> = ({
       }
       activeEditorCleanupRef.current = null;
 
-      loader
-        .init()
+      void initializeMonaco()
         .then((m) => resetDiagnosticOptions(m))
         .catch(() => {});
     };
@@ -414,8 +409,8 @@ export const FileDiffView: React.FC<FileDiffViewProps> = ({
     <div className="flex h-full min-h-0 flex-col">
       <DiffWarnings warnings={fileData.warnings} />
       <div className="min-h-0 flex-1">
-        <DiffEditor
-          height="100%"
+        <MonacoDiffEditor
+          className="h-full w-full"
           language={fileData.language}
           original={fileData.original}
           modified={modifiedDraft}

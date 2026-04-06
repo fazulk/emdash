@@ -3,7 +3,9 @@
  * Centralized theme definitions for all Monaco instances in the app
  */
 
-import type { Monaco } from '@monaco-editor/react';
+import type * as monaco from 'monaco-editor';
+
+type MonacoNamespace = typeof monaco;
 
 // Track registration per Monaco instance. Some views initialize Monaco independently.
 const registeredMonacoInstances = new WeakSet<object>();
@@ -12,7 +14,7 @@ const registeredMonacoInstances = new WeakSet<object>();
  * Define custom themes for Monaco editor
  * This function is idempotent - calling it multiple times is safe
  */
-export function defineMonacoThemes(monaco: Monaco): void {
+export function defineMonacoThemes(monaco: MonacoNamespace): void {
   if (registeredMonacoInstances.has(monaco as object)) return;
 
   // Dark theme matching app's dark mode
@@ -95,7 +97,7 @@ export function getMonacoTheme(effectiveTheme: string): string {
  * Configure Monaco editor with themes and return theme name
  * Convenience function that combines theme definition and selection
  */
-export function setupMonacoTheme(monaco: Monaco, effectiveTheme: string): string {
+export function setupMonacoTheme(monaco: MonacoNamespace, effectiveTheme: string): string {
   defineMonacoThemes(monaco);
   return getMonacoTheme(effectiveTheme);
 }

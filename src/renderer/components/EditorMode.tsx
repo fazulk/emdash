@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type * as monaco from 'monaco-editor';
 import {
   X,
   RefreshCw,
@@ -10,7 +11,7 @@ import {
   Eye,
   EyeOff,
 } from '@/components/icons/lucide';
-import Editor from '@monaco-editor/react';
+import { MonacoEditor } from '@/components/monaco/MonacoEditor';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { getMonacoLanguageId } from '@/lib/diffUtils';
@@ -304,11 +305,14 @@ export default function EditorMode({ taskPath, taskName, onClose }: EditorModePr
   };
 
   // Handle keyboard shortcut for save
-  const handleEditorMount = (editor: any, monaco: any) => {
+  const handleEditorMount = (
+    editor: monaco.editor.IStandaloneCodeEditor,
+    monacoInstance: typeof monaco
+  ) => {
     editorRegistrationCleanupRef.current?.();
     editorRegistrationCleanupRef.current = registerActiveCodeEditor(editor);
 
-    addMonacoKeyboardShortcuts(editor, monaco, {
+    addMonacoKeyboardShortcuts(editor, monacoInstance, {
       onSave: () => {
         void saveFile();
       },
@@ -547,8 +551,8 @@ export default function EditorMode({ taskPath, taskName, onClose }: EditorModePr
                 </span>
               </div>
               <div className="flex-1">
-                <Editor
-                  height="100%"
+                <MonacoEditor
+                  className="h-full w-full"
                   language={getMonacoLanguageId(selectedFile)}
                   path={buildMonacoModelPath(taskPath, selectedFile)}
                   keepCurrentModel={true}

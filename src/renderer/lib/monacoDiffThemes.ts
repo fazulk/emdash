@@ -1,12 +1,10 @@
-import { loader } from '@monaco-editor/react';
+import type * as monaco from 'monaco-editor';
 import { MONACO_DIFF_COLORS } from './monacoDiffColors';
 
 let themesRegistered = false;
 
-export async function registerDiffThemes(): Promise<void> {
+export function registerDiffThemes(monacoInstance: typeof monaco): void {
   if (themesRegistered) return;
-
-  const monacoInstance = await loader.init();
 
   monacoInstance.editor.defineTheme('custom-diff-dark', {
     base: 'vs-dark',

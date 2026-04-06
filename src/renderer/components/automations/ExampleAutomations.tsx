@@ -11,7 +11,7 @@ import {
   GitMerge,
   Ticket,
   Headphones,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Separator } from '../ui/separator';
 import type { TriggerType, AutomationMode } from '@shared/automations/types';

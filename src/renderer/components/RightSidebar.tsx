@@ -8,7 +8,7 @@ import { agentMeta } from '@/providers/meta';
 import AgentLogo from './AgentLogo';
 import type { Agent } from '../types';
 import { TaskScopeProvider, useTaskScope } from './TaskScopeContext';
-import { ChevronDown, ChevronRight, PanelLeft, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, PanelLeft, Trash2 } from '@/components/icons/lucide';
 import { rpc } from '@/lib/rpc';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../hooks/use-toast';

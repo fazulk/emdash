@@ -3,7 +3,7 @@ import type { Project, Task } from '../../types/app';
 import KanbanColumn from './KanbanColumn';
 import KanbanCard from './KanbanCard';
 import { Button } from '../ui/button';
-import { Inbox, Plus } from 'lucide-react';
+import { Inbox, Plus } from '@/components/icons/lucide';
 import { getAll, setStatus, type KanbanStatus } from '../../lib/kanbanStore';
 import { subscribeDerivedStatus, watchTaskPty, watchTaskActivity } from '../../lib/taskStatus';
 import { activityStore } from '../../lib/activityStore';

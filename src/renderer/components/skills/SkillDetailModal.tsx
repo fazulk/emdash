@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { MarkdownRenderer } from '../ui/markdown-renderer';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
-import { Check, FolderOpen, Trash2 } from 'lucide-react';
+import { Check, FolderOpen, Trash2 } from '@/components/icons/lucide';
 import type { CatalogSkill } from '@shared/skills/types';
 import { parseFrontmatter } from '@shared/skills/validation';
 import { skillSourceIcons } from '../../lib/skillIcons';

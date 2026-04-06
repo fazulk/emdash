@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, MessageCircle, Clock, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageCircle, Clock, Eye } from '@/components/icons/lucide';
 import { Badge } from './ui/badge';
 import type { PrStatus, PrReviewer } from '../lib/prStatus';
 

@@ -1,5 +1,5 @@
 import { useEmdashAccount } from '@/contexts/EmdashAccountProvider';
-import { User, LogOut, LogIn, AlertCircle } from 'lucide-react';
+import { User, LogOut, LogIn, AlertCircle } from '@/components/icons/lucide';
 import { useState, useEffect } from 'react';
 
 function ServerUnavailableMessage() {

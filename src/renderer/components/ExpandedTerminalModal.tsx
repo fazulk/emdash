@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Minimize2 } from 'lucide-react';
+import { Minimize2 } from '@/components/icons/lucide';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { TITLEBAR_HEIGHT } from '../constants/layout';

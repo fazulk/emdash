@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Settings2, Sparkles } from 'lucide-react';
+import { Settings2, Sparkles } from '@/components/icons/lucide';
 import IntegrationRow from './IntegrationRow';
 import CustomCommandModal from './CustomCommandModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';

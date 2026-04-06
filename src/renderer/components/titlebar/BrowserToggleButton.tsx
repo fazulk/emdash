@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Globe } from 'lucide-react';
+import { Globe } from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useBrowser } from '@/providers/BrowserProvider';

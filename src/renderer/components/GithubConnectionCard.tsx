@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, ButtonContentWithSpinner } from './ui/button';
-import { RefreshCcw, LogOut, ExternalLink } from 'lucide-react';
+import { RefreshCcw, LogOut, ExternalLink } from '@/components/icons/lucide';
 import { useGithubContext } from '../contexts/GithubContextProvider';
 
 type GithubConnectionStatus = 'connected' | 'disconnected' | 'missing';

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { TerminalPane } from './TerminalPane';
-import { Plus, Play, RotateCw, Square, X, Maximize2 } from 'lucide-react';
+import { Plus, Play, RotateCw, Square, X, Maximize2 } from '@/components/icons/lucide';
 import { useTheme } from '../hooks/useTheme';
 import { useTaskTerminals } from '@/lib/taskTerminalsStore';
 import { useTerminalSelection } from '../hooks/useTerminalSelection';

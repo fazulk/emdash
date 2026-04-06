@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
-import { Check, Copy, ExternalLink, AlertCircle, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, AlertCircle, X } from '@/components/icons/lucide';
 import { useToast } from '../hooks/use-toast';
 import emdashLogo from '../../assets/images/emdash/emdash_logo_white.svg';
 import type { BaseModalProps } from '@/contexts/ModalProvider';

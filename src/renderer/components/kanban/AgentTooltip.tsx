@@ -3,7 +3,7 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '../ui/
 import { agentAssets } from '../../providers/assets';
 import { agentMeta, type UiAgent } from '../../providers/meta';
 import AgentLogo from '../AgentLogo';
-import { GitBranch } from 'lucide-react';
+import { GitBranch } from '@/components/icons/lucide';
 
 type AgentTooltipProps = {
   agents: UiAgent[];

@@ -14,7 +14,7 @@ import { activityStore } from '@/lib/activityStore';
 import { getMultiAgentMainPtyId, getMultiAgentVariantKey } from '@/lib/multiAgentPty';
 import { Spinner } from './ui/spinner';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
-import { CornerDownLeft } from 'lucide-react';
+import { CornerDownLeft } from '@/components/icons/lucide';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { useAutoScrollOnTaskSwitch } from '@/hooks/useAutoScrollOnTaskSwitch';
 import { useTerminalViewportWheelForwarding } from '@/hooks/useTerminalViewportWheelForwarding';

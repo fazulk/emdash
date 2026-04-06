@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatChangelogPublishedAt } from '@/lib/changelogDate';
 import { cn } from '@/lib/utils';
 import type { ChangelogEntry } from '@shared/changelog';
-import { ArrowRight, X } from 'lucide-react';
+import { ArrowRight, X } from '@/components/icons/lucide';
 import { useEmdashAccount } from '@/contexts/EmdashAccountProvider';
 import { Button } from '@/components/ui/button';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ArrowLeft, ArrowRight, ExternalLink, RotateCw } from 'lucide-react';
+import { X, ArrowLeft, ArrowRight, ExternalLink, RotateCw } from '@/components/icons/lucide';
 import { useBrowser } from '@/providers/BrowserProvider';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';

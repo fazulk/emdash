@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Workflow, ArrowUpRight, Check, Copy } from 'lucide-react';
+import { Workflow, ArrowUpRight, Check, Copy } from '@/components/icons/lucide';
 import { Button } from './ui/button';
 import { getInstallCommandForProvider } from '@shared/providers/registry';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, AlertTriangle, Globe } from 'lucide-react';
+import { ExternalLink, AlertTriangle, Globe } from '@/components/icons/lucide';
 import {
   AlertDialog,
   AlertDialogAction,

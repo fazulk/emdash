@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ExternalLink, User, Folder, Tag } from 'lucide-react';
+import { ExternalLink, User, Folder, Tag } from '@/components/icons/lucide';
 import gitlabLogoSvg from '../../assets/images/GitLab.svg?raw';
 import type { GitLabIssueSummary } from '../types/gitlab';
 import AgentLogo from './AgentLogo';

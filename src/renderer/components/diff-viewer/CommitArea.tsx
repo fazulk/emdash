@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowUp, ArrowDown, Undo2, Loader2, GitBranchPlus, ChevronDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Undo2, Loader2, GitBranchPlus, ChevronDown } from '@/components/icons/lucide';
 import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import { useToast } from '../../hooks/use-toast';
 import type { FileChange } from '../../hooks/useFileChanges';

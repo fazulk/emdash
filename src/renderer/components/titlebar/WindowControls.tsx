@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Minus, Square, X, Copy } from 'lucide-react';
+import { Minus, Square, X, Copy } from '@/components/icons/lucide';
 
 const WindowControls: React.FC = () => {
   const [isMaximized, setIsMaximized] = useState(false);

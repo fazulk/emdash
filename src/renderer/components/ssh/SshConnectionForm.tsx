@@ -4,7 +4,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Eye, EyeOff, Server, User, Lock, Key, Shield, Download } from 'lucide-react';
+import { FolderOpen, Eye, EyeOff, Server, User, Lock, Key, Shield, Download } from '@/components/icons/lucide';
 import { useSshConnections } from '../../hooks/useSshConnections';
 import type { SshConfig, SshConfigHost } from '@shared/ssh/types';
 

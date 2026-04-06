@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Globe, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Globe, AlertCircle, RefreshCw, Loader2 } from '@/components/icons/lucide';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { cn } from '../../lib/utils';
 

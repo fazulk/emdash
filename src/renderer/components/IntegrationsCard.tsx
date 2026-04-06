@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, Plus, Loader2 } from 'lucide-react';
+import { Check, Plus, Loader2 } from '@/components/icons/lucide';
 import { useGithubContext } from '../contexts/GithubContextProvider';
 import { useEmdashAccount } from '../contexts/EmdashAccountProvider';
 import { useTheme } from '../hooks/useTheme';

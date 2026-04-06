@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { SshConnectionList, SshConnection } from './SshConnectionList';
 import { SshConnectionForm, SshConnectionConfig } from './SshConnectionForm';
-import { Plus, Server, ChevronLeft, KeyRound } from 'lucide-react';
+import { Plus, Server, ChevronLeft, KeyRound } from '@/components/icons/lucide';
 import { useSshConnections } from '../../hooks/useSshConnections';
 
 interface Props {

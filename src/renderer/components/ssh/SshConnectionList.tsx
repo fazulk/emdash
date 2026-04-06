@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Spinner } from '../ui/spinner';
 import { cn } from '@/lib/utils';
-import { Edit2, Trash2, Play, Server, Plus, Monitor, Globe } from 'lucide-react';
+import { Edit2, Trash2, Play, Server, Plus, Monitor, Globe } from '@/components/icons/lucide';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
 import type { ConnectionState } from './ConnectionStatusBadge';
 

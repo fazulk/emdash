@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Pencil, ExternalLink, Globe, Terminal } from 'lucide-react';
+import { Plus, Pencil, ExternalLink, Globe, Terminal } from '@/components/icons/lucide';
 import type { McpServer, McpCatalogEntry } from '@shared/mcp/types';
 import AgentLogo from '../AgentLogo';
 import { agentConfig } from '../../lib/agentConfig';

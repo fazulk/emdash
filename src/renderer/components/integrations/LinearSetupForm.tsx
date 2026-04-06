@@ -1,6 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/input';
-import { Info } from 'lucide-react';
+import { Info } from '@/components/icons/lucide';
 import linearLogo from '../../../assets/images/linear-icon.png';
 
 interface Props {

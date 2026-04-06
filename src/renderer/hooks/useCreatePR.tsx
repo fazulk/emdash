@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useToast } from './use-toast';
 import { ToastAction } from '../components/ui/toast';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from '@/components/icons/lucide';
 import githubLogo from '../../assets/images/github.png';
 
 type CreatePROptions = {

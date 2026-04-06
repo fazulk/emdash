@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2 } from '@/components/icons/lucide';
 import { DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button, ButtonContentWithSpinner } from '../ui/button';

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Trash, Folder } from 'lucide-react';
+import { Trash, Folder } from '@/components/icons/lucide';
 import { Checkbox } from './ui/checkbox';
 import { Spinner } from './ui/spinner';
 import {

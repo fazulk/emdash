@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from './ui/select';
-import { Search } from 'lucide-react';
+import { Search } from '@/components/icons/lucide';
 import forgejoLogoSvg from '../../assets/images/Forgejo.svg?raw';
 import { type ForgejoIssueSummary } from '../types/forgejo';
 import { Separator } from './ui/separator';

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import Icons from 'unplugin-icons/vite';
 import { resolve } from 'path';
 
 const alias = {
@@ -11,7 +12,7 @@ const alias = {
 export default defineConfig(({ command }) => ({
   // Use relative asset paths in production so file:// loads work from DMG/app bundle
   base: command === 'build' ? './' : '/',
-  plugins: [react()],
+  plugins: [react(), Icons({ compiler: 'jsx', jsx: 'react' })],
   root: './src/renderer',
   test: {
     projects: [
@@ -25,7 +26,7 @@ export default defineConfig(({ command }) => ({
         resolve: { alias },
       },
       {
-        plugins: [react()],
+        plugins: [react(), Icons({ compiler: 'jsx', jsx: 'react' })],
         test: {
           name: 'jsdom',
           dir: '.',

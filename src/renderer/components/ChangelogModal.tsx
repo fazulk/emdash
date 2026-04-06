@@ -4,7 +4,7 @@ import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { DialogContent } from '@/components/ui/dialog';
 import { formatChangelogPublishedAt } from '@/lib/changelogDate';
 import { EMDASH_CHANGELOG_URL, type ChangelogEntry } from '@shared/changelog';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink } from '@/components/icons/lucide';
 
 interface ChangelogModalProps {
   entry: ChangelogEntry;

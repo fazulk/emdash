@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Pencil, Download } from 'lucide-react';
+import { Plus, Pencil, Download } from '@/components/icons/lucide';
 import type { CatalogSkill } from '@shared/skills/types';
 import SkillIconRenderer from './SkillIconRenderer';
 

@@ -1,4 +1,4 @@
-import { FolderOpen, FolderPlus, Github, Plus, Server } from 'lucide-react';
+import { FolderOpen, FolderPlus, Github, Plus, Server } from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { SidebarGroupLabel } from '../ui/sidebar';

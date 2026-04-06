@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from './ui/select';
-import { Search } from 'lucide-react';
+import { Search } from '@/components/icons/lucide';
 import githubLogo from '../../assets/images/github.png';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';

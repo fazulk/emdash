@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FolderOpen, Server } from 'lucide-react';
+import { FolderOpen, Server } from '@/components/icons/lucide';
 import { Button, ButtonContentWithSpinner } from './ui/button';
 import {
   DialogContent,

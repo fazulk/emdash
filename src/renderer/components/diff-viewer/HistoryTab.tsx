@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check } from '@/components/icons/lucide';
 import { CommitList } from './CommitList';
 import type { CommitInfo } from './CommitList';
 import { CommitFileList } from './CommitFileList';

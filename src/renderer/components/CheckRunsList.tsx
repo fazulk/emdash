@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, Loader2, MinusCircle, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, MinusCircle, ExternalLink } from '@/components/icons/lucide';
 import type { CheckRunsStatus, CheckRun, CheckRunBucket } from '../lib/checkRunStatus';
 import { formatCheckDuration } from '../lib/checkRunStatus';
 import { Badge } from './ui/badge';

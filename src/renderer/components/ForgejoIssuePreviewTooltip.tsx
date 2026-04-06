@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ExternalLink, User, Tag } from 'lucide-react';
+import { ExternalLink, User, Tag } from '@/components/icons/lucide';
 import forgejoLogoSvg from '../../assets/images/Forgejo.svg?raw';
 import type { ForgejoIssueSummary } from '../types/forgejo';
 import AgentLogo from './AgentLogo';

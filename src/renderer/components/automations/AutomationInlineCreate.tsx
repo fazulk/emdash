@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GitBranch, FolderGit2, Clock, Github, FolderOpen, Zap } from 'lucide-react';
+import { GitBranch, FolderGit2, Clock, Github, FolderOpen, Zap } from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';

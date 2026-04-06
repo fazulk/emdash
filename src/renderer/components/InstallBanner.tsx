@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Check, Copy, Play } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, Play } from '@/components/icons/lucide';
 import { Button } from './ui/button';
 import { agentMeta, type UiAgent } from '../providers/meta';
 import { getDocUrlForProvider, getInstallCommandForProvider } from '@shared/providers/registry';

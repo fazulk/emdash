@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
-import { ArrowUp, Loader2, Tag, Undo2 } from 'lucide-react';
+import { ArrowUp, Loader2, Tag, Undo2 } from '@/components/icons/lucide';
 import { useToast } from '../../hooks/use-toast';
 import {
   ContextMenu,

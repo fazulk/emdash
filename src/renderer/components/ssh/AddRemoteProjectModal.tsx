@@ -38,7 +38,7 @@ import {
   GitBranch,
   Download,
   Copy,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 
 type WizardStep = 'connection' | 'auth' | 'path' | 'confirm';
 type AuthType = 'password' | 'key' | 'agent';

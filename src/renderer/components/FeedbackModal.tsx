@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CornerDownLeft, Paperclip, X } from 'lucide-react';
+import { CornerDownLeft, Paperclip, X } from '@/components/icons/lucide';
 import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';

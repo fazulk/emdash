@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTheme } from '../hooks/useTheme';
-import { Sun, Moon, Monitor, Circle, CircleDot } from 'lucide-react';
+import { Sun, Moon, Monitor, Circle, CircleDot } from '@/components/icons/lucide';
 
 const ThemeCard: React.FC = () => {
   const { theme, setTheme } = useTheme();

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { X, Edit2 } from 'lucide-react';
+import { X, Edit2 } from '@/components/icons/lucide';
 import { cn } from '@/lib/utils';
 import { agentConfig } from '../lib/agentConfig';
 import AgentLogo from './AgentLogo';

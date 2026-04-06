@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, Timer, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, Timer, XCircle } from '@/components/icons/lucide';
 import type { PrStatus } from '../lib/prStatus';
 import { useToast } from '../hooks/use-toast';
 import { Badge } from './ui/badge';

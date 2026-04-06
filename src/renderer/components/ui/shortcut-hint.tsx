@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowBigUp, Command } from 'lucide-react';
+import { ArrowBigUp, Command } from '@/components/icons/lucide';
 import { useKeyboardSettings } from '../../contexts/KeyboardSettingsContext';
 import { normalizeShortcutKey } from '../../hooks/useKeyboardShortcuts';
 import type { ShortcutSettingsKey } from '../../hooks/useKeyboardShortcuts';

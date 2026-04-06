@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Repo, Run } from '../types';
 import RunLauncher from './RunLauncher';
 import RunList from './RunList';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen } from '@/components/icons/lucide';
 
 interface MainContentProps {
   selectedRepo: Repo | null;

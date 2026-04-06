@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { AlertCircle, Archive, GitBranchPlus, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { AlertCircle, Archive, GitBranchPlus, Pencil, Pin, PinOff, Trash2 } from '@/components/icons/lucide';
 import { WorktreeIcon } from './icons/WorktreeIcon';
 
 import { useTaskChanges } from '../hooks/useTaskChanges';

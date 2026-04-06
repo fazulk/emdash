@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Search, Plus, Loader2 } from 'lucide-react';
+import { RefreshCw, Search, Plus, Loader2 } from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import {

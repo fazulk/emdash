@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ExternalLink, Users, Tag } from 'lucide-react';
+import { ExternalLink, Users, Tag } from '@/components/icons/lucide';
 import githubLogo from '../../assets/images/github.png';
 import type { GitHubIssueSummary } from '../types/github';
 

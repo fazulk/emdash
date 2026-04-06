@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown } from '@/components/icons/lucide';
 import { cn } from '@/lib/utils';
 import { FileIcon } from './FileIcons';
 import { useContentSearch } from '@/hooks/useContentSearch';

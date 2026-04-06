@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Undo2 } from 'lucide-react';
+import { Undo2 } from '@/components/icons/lucide';
 import { Checkbox } from '../ui/checkbox';
 import {
   AlertDialog,

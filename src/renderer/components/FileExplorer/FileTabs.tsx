@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Eye, Pencil } from 'lucide-react';
+import { X, Eye, Pencil } from '@/components/icons/lucide';
 import { cn } from '@/lib/utils';
 import type { ManagedFile } from '@/hooks/useFileManager';
 import { FileIcon } from './FileIcons';

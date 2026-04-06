@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { type UiAgent } from '@/providers/meta';
 import { agentAssets } from '@/providers/assets';
 import AgentLogo from './AgentLogo';
-import { ArrowUpRight, Check, Copy } from 'lucide-react';
+import { ArrowUpRight, Check, Copy } from '@/components/icons/lucide';
 import { Button } from './ui/button';
 import { getDocUrlForProvider, getInstallCommandForProvider } from '@shared/providers/registry';
 

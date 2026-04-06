@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, RotateCcw, Info, Plus, Trash2 } from 'lucide-react';
+import { X, RotateCcw, Info, Plus, Trash2 } from '@/components/icons/lucide';
 import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';

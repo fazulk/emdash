@@ -24,7 +24,7 @@ import {
   ChevronRight,
   ArrowUpDown,
   Check,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import SidebarEmptyState from '../SidebarEmptyState';
 import { TaskItem } from '../TaskItem';
 import { RemoteProjectIndicator } from '../ssh/RemoteProjectIndicator';

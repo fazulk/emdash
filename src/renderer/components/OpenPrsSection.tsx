@@ -27,7 +27,7 @@ import {
   MessageSquare,
   Search,
   XCircle,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import type { Task } from '../types/app';
 
 interface OpenPrsSectionProps {

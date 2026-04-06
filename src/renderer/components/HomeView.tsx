@@ -1,4 +1,4 @@
-import { FolderOpen, Github, Plus, Server } from 'lucide-react';
+import { FolderOpen, Github, Plus, Server } from '@/components/icons/lucide';
 import React from 'react';
 import emdashLogo from '../../assets/images/emdash/emdash_logo.svg';
 import emdashLogoWhite from '../../assets/images/emdash/emdash_logo_white.svg';

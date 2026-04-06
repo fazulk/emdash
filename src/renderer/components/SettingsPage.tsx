@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink, X } from '@/components/icons/lucide';
 import { Separator } from './ui/separator';
 import type { CliAgentStatus } from '../types/connections';
 import { BASE_CLI_AGENTS, CliAgentsList } from './CliAgentsList';

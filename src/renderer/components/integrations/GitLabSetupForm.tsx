@@ -1,6 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/input';
-import { Info } from 'lucide-react';
+import { Info } from '@/components/icons/lucide';
 import gitlabLogoSvg from '../../../assets/images/GitLab.svg?raw';
 import AgentLogo from '../AgentLogo';
 

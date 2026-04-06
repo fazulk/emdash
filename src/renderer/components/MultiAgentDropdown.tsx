@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
-import { Info, ExternalLink } from 'lucide-react';
+import { Info, ExternalLink } from '@/components/icons/lucide';
 import { type Agent } from '../types';
 import { type AgentRun } from '../types/chat';
 import { agentConfig } from '../lib/agentConfig';

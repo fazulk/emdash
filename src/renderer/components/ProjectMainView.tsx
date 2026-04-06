@@ -14,7 +14,7 @@ import {
   Trash2,
   Check,
   ListFilter,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import { Separator } from './ui/separator';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { usePrStatus } from '../hooks/usePrStatus';

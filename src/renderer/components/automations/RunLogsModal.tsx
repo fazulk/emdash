@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, Loader2, Clock, Timer } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Clock, Timer } from '@/components/icons/lucide';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Separator } from '../ui/separator';
 import type { Automation, AutomationRunLog } from '@shared/automations/types';

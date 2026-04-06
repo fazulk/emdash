@@ -10,7 +10,7 @@ import {
   CircleDot,
   AlertTriangle,
   Bug,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { Spinner } from '../ui/spinner';

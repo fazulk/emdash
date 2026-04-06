@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ExternalLink, Settings } from 'lucide-react';
+import { ExternalLink, Settings } from '@/components/icons/lucide';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';

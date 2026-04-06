@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Square, Trash2 } from 'lucide-react';
+import { Square, Trash2 } from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import { Spinner } from '../ui/spinner';
 import {

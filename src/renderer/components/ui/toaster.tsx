@@ -10,7 +10,7 @@ import {
   ToastViewport,
 } from './toast';
 import { useToast } from '../../hooks/use-toast';
-import { AlertCircle, Copy, Check } from 'lucide-react';
+import { AlertCircle, Copy, Check } from '@/components/icons/lucide';
 
 function ToastWithCopy({
   id,

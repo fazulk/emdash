@@ -18,7 +18,7 @@ import {
   VscTable,
   VscSymbolMisc,
   VscError,
-} from 'react-icons/vsc';
+} from '@/components/icons/file-types/vsc';
 import {
   SiTypescript,
   SiJavascript,
@@ -57,9 +57,9 @@ import {
   SiStorybook,
   SiTailwindcss,
   SiBabel,
-} from 'react-icons/si';
-import { DiCoffeescript } from 'react-icons/di';
-import { FaFileImage } from 'react-icons/fa';
+} from '@/components/icons/file-types/si';
+import { DiCoffeescript } from '@/components/icons/file-types/di';
+import { FaFileImage } from '@/components/icons/file-types/fa';
 
 // Icon mapping configuration
 const SPECIAL_FILES: Record<string, { icon: React.ElementType; color: string; label: string }> = {

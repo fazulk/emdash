@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ExternalLink, User, Tag, Folder } from 'lucide-react';
+import { ExternalLink, User, Tag, Folder } from '@/components/icons/lucide';
 import linearLogoSvg from '../../assets/images/Linear.svg?raw';
 import type { LinearIssueSummary } from '../types/linear';
 import AgentLogo from './AgentLogo';

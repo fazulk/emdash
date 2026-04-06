@@ -33,7 +33,7 @@ import {
   XCircle,
   Check,
   Copy,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import {
   AlertDialog,
   AlertDialogAction,

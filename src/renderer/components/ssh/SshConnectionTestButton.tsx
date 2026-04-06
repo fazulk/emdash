@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Button, ButtonContentWithSpinner } from '../ui/button';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible';
 import { cn } from '@/lib/utils';
-import { Play, CheckCircle2, XCircle, Zap, ChevronDown, Copy, Check } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, Zap, ChevronDown, Copy, Check } from '@/components/icons/lucide';
 import type { ConnectionTestResult } from '@shared/ssh/types';
 
 type TestState = 'idle' | 'testing' | 'success' | 'error';

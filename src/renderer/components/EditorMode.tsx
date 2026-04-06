@@ -9,7 +9,7 @@ import {
   PanelRight,
   Eye,
   EyeOff,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import Editor from '@monaco-editor/react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';

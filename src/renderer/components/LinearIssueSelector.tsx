@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from './ui/select';
-import { Search } from 'lucide-react';
+import { Search } from '@/components/icons/lucide';
 import linearLogoSvg from '../../assets/images/Linear.svg?raw';
 import { type LinearIssueSummary } from '../types/linear';
 import { Separator } from './ui/separator';

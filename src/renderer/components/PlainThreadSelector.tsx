@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from './ui/select';
-import { Search } from 'lucide-react';
+import { Search } from '@/components/icons/lucide';
 import plainLogoSvg from '../../assets/images/Plain.svg?raw';
 import { type PlainThreadSummary } from '../types/plain';
 import { Separator } from './ui/separator';

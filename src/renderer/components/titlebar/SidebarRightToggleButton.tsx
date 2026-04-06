@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '../ui/button';
-import { PanelRight } from 'lucide-react';
+import { PanelRight } from '@/components/icons/lucide';
 import { useRightSidebar } from '../ui/right-sidebar';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../ui/tooltip';
 import { ShortcutHint } from '../ui/shortcut-hint';

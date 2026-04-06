@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, AlertCircle, Loader2, XCircle, Circle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, XCircle, Circle } from '@/components/icons/lucide';
 
 export type ConnectionState =
   | 'connected'

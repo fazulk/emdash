@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CornerDownLeft, ExternalLink, MessageSquare, X } from 'lucide-react';
+import { CornerDownLeft, ExternalLink, MessageSquare, X } from '@/components/icons/lucide';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useEmdashAccount } from '../contexts/EmdashAccountProvider';
 import { useGithubContext } from '../contexts/GithubContextProvider';

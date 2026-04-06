@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ExternalLink, User, Folder } from 'lucide-react';
+import { ExternalLink, User, Folder } from '@/components/icons/lucide';
 import jiraLogo from '../../assets/images/jira.png';
 import type { JiraIssueSummary } from '../types/jira';
 

@@ -13,7 +13,7 @@ import {
   RefreshCw,
   AlertCircle,
   Loader2,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import { useUpdater } from '@/hooks/useUpdater';
 import { BaseModalProps } from '@/contexts/ModalProvider';
 import { EMDASH_CHANGELOG_URL } from '@shared/changelog';

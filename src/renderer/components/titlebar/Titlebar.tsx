@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '@/components/icons/lucide';
 import {
   ArrowLeft,
   Command,
@@ -7,7 +7,7 @@ import {
   Settings as SettingsIcon,
   KanbanSquare,
   Code2,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import { ShortcutHint } from '../ui/shortcut-hint';
 import SidebarLeftToggleButton from './SidebarLeftToggleButton';
 import SidebarRightToggleButton from './SidebarRightToggleButton';

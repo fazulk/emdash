@@ -17,7 +17,7 @@ import {
   Command as CommandIcon,
   Option,
   Palette,
-} from 'lucide-react';
+} from '@/components/icons/lucide';
 import {
   APP_SHORTCUTS,
   normalizeShortcutKey,

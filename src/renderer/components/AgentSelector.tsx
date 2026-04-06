@@ -3,7 +3,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import AgentTooltipRow from './AgentTooltipRow';
 import RoutingInfoCard from './RoutingInfoCard';
-import { Workflow } from 'lucide-react';
+import { Workflow } from '@/components/icons/lucide';
 import { Badge } from './ui/badge';
 import type { UiAgent } from '@/providers/meta';
 import { type Agent } from '../types';

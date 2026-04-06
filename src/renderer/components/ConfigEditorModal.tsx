@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Spinner } from './ui/spinner';
 import { Textarea } from './ui/textarea';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from '@/components/icons/lucide';
 
 type LifecycleScripts = {
   setup: string;

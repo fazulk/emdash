@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown } from '@/components/icons/lucide';
 import { List } from 'react-window';
 import type { RowComponentProps } from 'react-window';
 import { Checkbox } from '../ui/checkbox';

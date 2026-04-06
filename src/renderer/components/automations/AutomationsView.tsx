@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Loader2, X, LayoutGrid } from 'lucide-react';
+import { Plus, Loader2, X, LayoutGrid } from '@/components/icons/lucide';
 import { Button } from '../ui/button';
 import {
   AlertDialog,

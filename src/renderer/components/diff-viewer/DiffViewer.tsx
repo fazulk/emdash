@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X } from '@/components/icons/lucide';
 import { useFileChanges, type FileChange } from '../../hooks/useFileChanges';
 import { useTaskScope } from '../TaskScopeContext';
 import { fetchPrBaseDiff, parseDiffToFileChanges } from '../../lib/parsePrDiff';

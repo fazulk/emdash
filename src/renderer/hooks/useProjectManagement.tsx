@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ToastAction } from '@radix-ui/react-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { pickDefaultBranch } from '../components/BranchSelect';
+import { ToastAction } from '../components/ui/toast';
 import { getStoredActiveIds, saveActiveIds } from '../constants/layout';
 import {
   computeBaseRef,

@@ -17,8 +17,7 @@ import { PrReviewStatus, ReviewDecisionBadge } from './PrReviewStatus';
 import MergePrSection from './MergePrSection';
 import { FileIcon } from './FileExplorer/FileIcons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Close as PopoverClose } from '@radix-ui/react-popover';
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from './ui/popover';
 import {
   Plus,
   Minus,

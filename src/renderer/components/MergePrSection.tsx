@@ -4,10 +4,9 @@ import type { PrStatus } from '../lib/prStatus';
 import { useToast } from '../hooks/use-toast';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Spinner } from './ui/spinner';
-import { Close as PopoverClose } from '@radix-ui/react-popover';
 
 type MergeUiStateKind = 'merged' | 'ready' | 'draft' | 'conflicts' | 'blocked' | 'unknown';
 

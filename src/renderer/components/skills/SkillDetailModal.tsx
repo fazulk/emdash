@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { MarkdownRenderer } from '../ui/markdown-renderer';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
@@ -143,6 +150,9 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
             <SkillIconRenderer skill={skill} size="md" />
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-base">{skill.displayName}</DialogTitle>
+              <DialogDescription className="sr-only">
+                Review this skill and install, uninstall, or open its local files.
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>

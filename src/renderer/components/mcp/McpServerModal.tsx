@@ -1,6 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { X, Trash2 } from '@/components/icons/lucide';
-import { DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import {
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button, ButtonContentWithSpinner } from '../ui/button';
 import { Input } from '../ui/input';
@@ -118,6 +124,9 @@ export const McpServerModal: React.FC<McpServerModalProps> = ({
         <DialogTitle>
           {isEdit ? 'Edit MCP Server' : isCatalog ? `Add ${name}` : 'Add Custom MCP Server'}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          Configure the server connection, credentials, and provider availability.
+        </DialogDescription>
       </DialogHeader>
 
       {isCatalog && mode.entry.description && (

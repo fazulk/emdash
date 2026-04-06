@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Button, ButtonContentWithSpinner } from './ui/button';
-import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { SlugInput } from './ui/slug-input';
 import { Label } from './ui/label';
@@ -174,6 +174,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose, onSuc
     >
       <DialogHeader>
         <DialogTitle>New Project</DialogTitle>
+        <DialogDescription className="sr-only">
+          Create a new GitHub repository and add it as a project in Emdash.
+        </DialogDescription>
       </DialogHeader>
 
       <Separator />

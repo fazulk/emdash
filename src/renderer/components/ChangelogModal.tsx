@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { BaseModalProps } from '@/contexts/ModalProvider';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
-import { DialogContent } from '@/components/ui/dialog';
+import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { formatChangelogPublishedAt } from '@/lib/changelogDate';
 import { EMDASH_CHANGELOG_URL, type ChangelogEntry } from '@shared/changelog';
 import { ExternalLink } from '@/components/icons/lucide';
@@ -78,6 +78,10 @@ function ChangelogModal({ entry }: ChangelogModalProps): JSX.Element {
 
   return (
     <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0 focus:outline-none">
+      <DialogTitle className="sr-only">{entry.title}</DialogTitle>
+      <DialogDescription className="sr-only">
+        Review the latest product changes included in this release.
+      </DialogDescription>
       <div className="border-b border-border px-6 py-4 pr-14">
         <button
           type="button"

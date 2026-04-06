@@ -103,6 +103,16 @@ class RendererErrorTracking {
     }
   }
 
+  shouldIgnoreError(error: Error | unknown): boolean {
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const errorMessage = errorObj.message || '';
+
+    return (
+      errorMessage.includes('ResizeObserver loop completed with undelivered notifications') ||
+      errorMessage.includes('ResizeObserver loop limit exceeded')
+    );
+  }
+
   /**
    * Capture a critical error that might affect app stability
    */
@@ -313,7 +323,12 @@ export function captureComponentError(
 if (typeof window !== 'undefined') {
   // Catch unhandled errors
   window.addEventListener('error', (event) => {
-    errorTracking.captureException(event.error || new Error(event.message), {
+    const error = event.error || new Error(event.message);
+    if (errorTracking.shouldIgnoreError(error)) {
+      return;
+    }
+
+    errorTracking.captureException(error, {
       error_type: 'unhandled_error',
       severity: 'critical',
       component: 'global',
@@ -325,7 +340,12 @@ if (typeof window !== 'undefined') {
 
   // Catch unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
-    errorTracking.captureException(event.reason || new Error('Unhandled Promise Rejection'), {
+    const error = event.reason || new Error('Unhandled Promise Rejection');
+    if (errorTracking.shouldIgnoreError(error)) {
+      return;
+    }
+
+    errorTracking.captureException(error, {
       error_type: 'unhandled_rejection',
       severity: 'high',
       component: 'global',

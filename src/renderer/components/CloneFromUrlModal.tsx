@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, ButtonContentWithSpinner } from './ui/button';
-import { DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Spinner } from './ui/spinner';
@@ -173,6 +173,9 @@ export const CloneFromUrlModal: React.FC<CloneFromUrlModalProps> = ({ onClose, o
     >
       <DialogHeader>
         <DialogTitle>Clone from URL</DialogTitle>
+        <DialogDescription className="sr-only">
+          Clone a Git repository into your local projects directory.
+        </DialogDescription>
       </DialogHeader>
 
       <Separator />

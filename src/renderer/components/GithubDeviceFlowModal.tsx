@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DialogContent } from './ui/dialog';
+import { DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { Check, Copy, ExternalLink, AlertCircle, X } from '@/components/icons/lucide';
@@ -243,6 +243,10 @@ export function GithubDeviceFlowModal({ onClose, onSuccess, onError }: GithubDev
       onInteractOutside={() => handleClose()}
       onEscapeKeyDown={() => handleClose()}
     >
+      <DialogTitle className="sr-only">Connect to GitHub</DialogTitle>
+      <DialogDescription className="sr-only">
+        Use GitHub device flow to authorize Emdash with your GitHub account.
+      </DialogDescription>
       <button
         onClick={handleClose}
         className="absolute right-4 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"

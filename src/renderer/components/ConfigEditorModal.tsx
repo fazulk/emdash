@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, ButtonContentWithSpinner } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Spinner } from './ui/spinner';
@@ -404,6 +404,9 @@ export const ConfigEditorModal: React.FC<ConfigEditorModalProps> = ({
       <DialogContent className="flex max-h-[88vh] max-w-3xl flex-col">
         <DialogHeader>
           <DialogTitle>Project config</DialogTitle>
+          <DialogDescription className="sr-only">
+            Review and update project-specific configuration for this workspace.
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (

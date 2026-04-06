@@ -1,7 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronRight, ChevronDown } from '@/components/icons/lucide';
-import { List } from 'react-window';
-import type { RowComponentProps } from 'react-window';
 import { Checkbox } from '../ui/checkbox';
 import { useGitWorkspaceBusyForTask } from '../../contexts/GitWorkspaceBusyContext';
 import type { FileChange } from '../../hooks/useFileChanges';
@@ -21,10 +19,7 @@ interface StackedDiffViewProps {
 const LARGE_DIFF_LINE_THRESHOLD = 1200;
 const LARGE_DIFF_PLACEHOLDER_HEIGHT = 120;
 const MIN_EDITOR_HEIGHT = 100;
-const ROW_HEADER_HEIGHT = 37;
 const DEFAULT_COLLAPSED_FILE_COUNT = 40;
-const VIRTUALIZED_FILE_COUNT = 120;
-const VIRTUAL_OVERSCAN_COUNT = 8;
 
 interface FileSectionProps {
   file: FileChange;
@@ -150,80 +145,6 @@ const FileSection: React.FC<FileSectionProps> = ({
   );
 };
 
-function rowHeightForFile(args: {
-  file: FileChange;
-  expanded: boolean;
-  forceLoad: boolean;
-  contentHeight: number | null;
-}): number {
-  const { file, expanded, forceLoad, contentHeight } = args;
-  if (!expanded) return ROW_HEADER_HEIGHT;
-
-  const totalDiffLines = getTotalDiffLines(file.additions, file.deletions);
-  const isLarge = totalDiffLines !== null && totalDiffLines > LARGE_DIFF_LINE_THRESHOLD;
-  if (isLarge && !forceLoad) {
-    return ROW_HEADER_HEIGHT + LARGE_DIFF_PLACEHOLDER_HEIGHT;
-  }
-
-  const editorHeight =
-    contentHeight != null ? Math.max(contentHeight, MIN_EDITOR_HEIGHT) : MIN_EDITOR_HEIGHT;
-  return ROW_HEADER_HEIGHT + editorHeight;
-}
-
-type VirtualRowProps = {
-  files: FileChange[];
-  expandedPaths: Set<string>;
-  forceLoadedPaths: Set<string>;
-  contentHeights: Record<string, number>;
-  onToggleExpanded: (filePath: string) => void;
-  onForceLoad: (filePath: string) => void;
-  onContentHeightChange: (filePath: string, height: number) => void;
-  taskPath?: string;
-  taskId?: string;
-  diffStyle: 'unified' | 'split';
-  onRefreshChanges?: () => Promise<void> | void;
-  baseRef?: string;
-};
-
-function VirtualFileRow({
-  index,
-  style,
-  files,
-  expandedPaths,
-  forceLoadedPaths,
-  contentHeights,
-  onToggleExpanded,
-  onForceLoad,
-  onContentHeightChange,
-  taskPath,
-  taskId,
-  diffStyle,
-  onRefreshChanges,
-  baseRef,
-}: RowComponentProps<VirtualRowProps>): React.JSX.Element | null {
-  const file = files[index];
-  if (!file) return null;
-
-  return (
-    <div style={style}>
-      <FileSection
-        file={file}
-        expanded={expandedPaths.has(file.path)}
-        forceLoad={forceLoadedPaths.has(file.path)}
-        contentHeight={contentHeights[file.path] ?? null}
-        onToggleExpanded={onToggleExpanded}
-        onForceLoad={onForceLoad}
-        onContentHeightChange={onContentHeightChange}
-        taskPath={taskPath}
-        taskId={taskId}
-        diffStyle={diffStyle}
-        onRefreshChanges={onRefreshChanges}
-        baseRef={baseRef}
-      />
-    </div>
-  );
-}
-
 export const StackedDiffView: React.FC<StackedDiffViewProps> = ({
   taskPath,
   taskId,
@@ -299,70 +220,10 @@ export const StackedDiffView: React.FC<StackedDiffViewProps> = ({
     });
   }, []);
 
-  const useVirtualizedList = fileChanges.length >= VIRTUALIZED_FILE_COUNT;
-
-  const getRowHeight = useCallback(
-    (file: FileChange): number => {
-      return rowHeightForFile({
-        file,
-        expanded: expandedPaths.has(file.path),
-        forceLoad: forceLoadedPaths.has(file.path),
-        contentHeight: contentHeights[file.path] ?? null,
-      });
-    },
-    [contentHeights, expandedPaths, forceLoadedPaths]
-  );
-
-  const virtualRowProps = useMemo<VirtualRowProps>(
-    () => ({
-      files: fileChanges,
-      expandedPaths,
-      forceLoadedPaths,
-      contentHeights,
-      onToggleExpanded,
-      onForceLoad,
-      onContentHeightChange,
-      taskPath,
-      taskId,
-      diffStyle,
-      onRefreshChanges,
-      baseRef,
-    }),
-    [
-      fileChanges,
-      expandedPaths,
-      forceLoadedPaths,
-      contentHeights,
-      onToggleExpanded,
-      onForceLoad,
-      onContentHeightChange,
-      taskPath,
-      taskId,
-      diffStyle,
-      onRefreshChanges,
-      baseRef,
-    ]
-  );
-
   if (fileChanges.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         No changes to display
-      </div>
-    );
-  }
-
-  if (useVirtualizedList) {
-    return (
-      <div className="h-full">
-        <List
-          rowCount={fileChanges.length}
-          rowHeight={(index, props: VirtualRowProps) => getRowHeight(props.files[index])}
-          rowComponent={VirtualFileRow}
-          rowProps={virtualRowProps}
-          overscanCount={VIRTUAL_OVERSCAN_COUNT}
-          style={{ height: '100%', width: '100%' }}
-        />
       </div>
     );
   }

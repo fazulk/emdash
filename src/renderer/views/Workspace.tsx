@@ -460,7 +460,6 @@ export function Workspace() {
                     />
                   </ResizablePanel>
                   <ResizableHandle
-                    withHandle
                     onDragging={(dragging) => handlePanelResizeDragging('left', dragging)}
                     className="hidden cursor-col-resize items-center justify-center transition-colors hover:bg-border/80 lg:flex"
                   />
@@ -497,7 +496,6 @@ export function Workspace() {
                     </div>
                   </ResizablePanel>
                   <ResizableHandle
-                    withHandle
                     onDragging={(dragging) => handlePanelResizeDragging('right', dragging)}
                     className="hidden cursor-col-resize items-center justify-center transition-colors hover:bg-border/80 sm:flex"
                   />

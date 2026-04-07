@@ -62,7 +62,6 @@ type TelemetryEvent =
   | 'container_connect_success'
   | 'container_connect_failed'
   // ToolBar Section
-  | 'toolbar_feedback_clicked'
   | 'toolbar_left_sidebar_clicked'
   | 'toolbar_right_sidebar_clicked'
   | 'toolbar_settings_clicked'

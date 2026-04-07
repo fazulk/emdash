@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from '@/components/icons/lucide';
 import {
   ArrowLeft,
-  Command,
-  MessageSquare,
   Settings as SettingsIcon,
   KanbanSquare,
   Code2,
@@ -14,14 +12,12 @@ import SidebarRightToggleButton from './SidebarRightToggleButton';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import OpenInMenu from './OpenInMenu';
-import FeedbackModal from '../FeedbackModal';
 import TitlebarContext from './TitlebarContext';
 import WindowControls from './WindowControls';
 import TitlebarMenu from './TitlebarMenu';
 import PerformanceChip from './PerformanceChip';
 import { useProjectManagementContext } from '../../contexts/ProjectManagementProvider';
 import { useTaskManagementContext } from '../../contexts/TaskManagementContext';
-import { useGithubContext } from '../../contexts/GithubContextProvider';
 import { useAppSettings } from '@/contexts/AppSettingsProvider';
 
 const isMacOS = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
@@ -111,7 +107,6 @@ const Titlebar: React.FC<TitlebarProps> = ({
     handleSelectTask: onSelectTask,
     tasksByProjectId,
   } = useTaskManagementContext();
-  const { user: githubUser } = useGithubContext();
   const { settings } = useAppSettings();
   const showResourceMonitor = settings?.interface?.showResourceMonitor ?? false;
 
@@ -126,62 +121,8 @@ const Titlebar: React.FC<TitlebarProps> = ({
   const projectPath = selectedProject?.path || null;
   const kanbanAvailable = Boolean(selectedProject);
   const showEditorButton = Boolean(activeTask);
-  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
-  const feedbackButtonRef = useRef<HTMLButtonElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
-
-  const handleOpenFeedback = useCallback(async () => {
-    void import('../../lib/telemetryClient').then(({ captureTelemetry }) => {
-      captureTelemetry('toolbar_feedback_clicked');
-    });
-    setIsFeedbackOpen(true);
-  }, []);
-
-  const handleCloseFeedback = useCallback(() => {
-    setIsFeedbackOpen(false);
-    feedbackButtonRef.current?.blur();
-  }, []);
-
-  // Broadcast overlay state so the preview pane can hide while feedback is open
-  useEffect(() => {
-    try {
-      const open = Boolean(isFeedbackOpen);
-      window.dispatchEvent(new CustomEvent('emdash:overlay:changed', { detail: { open } }));
-    } catch {}
-  }, [isFeedbackOpen]);
-
-  useEffect(() => {
-    const handleGlobalShortcut = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) {
-        return;
-      }
-
-      const target = event.target as HTMLElement | null;
-      if (target) {
-        const tagName = target.tagName;
-        const isEditable =
-          target.getAttribute('contenteditable') === 'true' ||
-          tagName === 'INPUT' ||
-          tagName === 'TEXTAREA' ||
-          tagName === 'SELECT';
-        if (isEditable) {
-          return;
-        }
-      }
-
-      const isMeta = event.metaKey || event.ctrlKey;
-      if (isMeta && event.shiftKey && event.key.toLowerCase() === 'f') {
-        event.preventDefault();
-        handleOpenFeedback();
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalShortcut);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalShortcut);
-    };
-  }, [handleOpenFeedback]);
 
   // Track mouse position to show/hide center content on header hover.
   // CSS :hover doesn't work on -webkit-app-region:drag elements in Electron.
@@ -299,33 +240,6 @@ const Titlebar: React.FC<TitlebarProps> = ({
               }
             />
           ) : null}
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Open feedback"
-                  onClick={handleOpenFeedback}
-                  ref={feedbackButtonRef}
-                  className="h-8 w-8 text-muted-foreground transition-colors [-webkit-app-region:no-drag] hover:bg-transparent hover:text-foreground"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs font-medium">
-                <div className="flex flex-col gap-1">
-                  <span>Open feedback</span>
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Command className="h-3 w-3" aria-hidden="true" />
-                    <span>⇧</span>
-                    <span>F</span>
-                  </span>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           <SidebarLeftToggleButton isDisabled={isEditorOpen} />
           <SidebarRightToggleButton />
           <TooltipProvider delayDuration={200}>
@@ -360,11 +274,6 @@ const Titlebar: React.FC<TitlebarProps> = ({
         {/* Right: window controls (Windows/Linux only) */}
         {!isMacOS && <WindowControls />}
       </header>
-      <FeedbackModal
-        isOpen={isFeedbackOpen}
-        onClose={handleCloseFeedback}
-        githubUser={githubUser}
-      />
     </>
   );
 };

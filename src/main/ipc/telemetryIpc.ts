@@ -65,10 +65,6 @@ const RENDERER_ALLOWED_EVENTS = new Set([
   'toolbar_open_in_menu_clicked',
   'toolbar_open_in_selected',
   'toolbar_kanban_toggled',
-  // Browser Preview
-  'browser_preview_opened',
-  'browser_preview_closed',
-  'browser_preview_url_navigated',
   // Skills
   'skills_view_opened',
   'skill_installed',

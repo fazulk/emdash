@@ -22,7 +22,6 @@ import RepositorySettingsCard from './RepositorySettingsCard';
 import ThemeCard from './ThemeCard';
 import KeyboardSettingsCard from './KeyboardSettingsCard';
 import RightSidebarSettingsCard from './RightSidebarSettingsCard';
-import BrowserPreviewSettingsCard from './BrowserPreviewSettingsCard';
 import TaskHoverActionCard from './TaskHoverActionCard';
 import TerminalSettingsCard from './TerminalSettingsCard';
 import HiddenToolsSettingsCard from './HiddenToolsSettingsCard';
@@ -286,7 +285,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ initialTab, onClose 
             <div className="flex flex-col gap-8 rounded-xl border border-muted p-4">
               <ResourceMonitorSettingsCard />
               <RightSidebarSettingsCard />
-              <BrowserPreviewSettingsCard />
               <TaskHoverActionCard />
             </div>
           ),

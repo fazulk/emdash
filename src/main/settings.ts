@@ -96,10 +96,6 @@ export interface AppSettings {
   projectPrep: {
     autoInstallOnOpenInEditor: boolean;
   };
-  browserPreview?: {
-    enabled: boolean;
-    engine: 'chromium';
-  };
   notifications?: {
     enabled: boolean;
     sound: boolean;
@@ -160,10 +156,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   projectPrep: {
     autoInstallOnOpenInEditor: true,
-  },
-  browserPreview: {
-    enabled: true,
-    engine: 'chromium',
   },
   notifications: {
     enabled: true,
@@ -383,10 +375,6 @@ export function normalizeSettings(input: AppSettings): AppSettings {
     projectPrep: {
       autoInstallOnOpenInEditor: DEFAULT_SETTINGS.projectPrep.autoInstallOnOpenInEditor,
     },
-    browserPreview: {
-      enabled: DEFAULT_SETTINGS.browserPreview!.enabled,
-      engine: DEFAULT_SETTINGS.browserPreview!.engine,
-    },
     notifications: {
       enabled: DEFAULT_SETTINGS.notifications!.enabled,
       sound: DEFAULT_SETTINGS.notifications!.sound,
@@ -416,12 +404,6 @@ export function normalizeSettings(input: AppSettings): AppSettings {
   out.projectPrep.autoInstallOnOpenInEditor = Boolean(
     prep?.autoInstallOnOpenInEditor ?? DEFAULT_SETTINGS.projectPrep.autoInstallOnOpenInEditor
   );
-
-  const bp = (input as any)?.browserPreview || {};
-  out.browserPreview = {
-    enabled: Boolean(bp?.enabled ?? DEFAULT_SETTINGS.browserPreview!.enabled),
-    engine: 'chromium',
-  };
 
   const notif = (input as any)?.notifications || {};
   const rawFocusMode = notif?.soundFocusMode;

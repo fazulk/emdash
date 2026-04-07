@@ -17,7 +17,6 @@ import { registerJiraIpc } from './jiraIpc';
 import { registerPlanLockIpc } from '../services/planLockIpc';
 import { appSettingsController } from './settingsIpc';
 import { registerHostPreviewIpc } from './hostPreviewIpc';
-import { registerBrowserIpc } from './browserIpc';
 import { registerNetIpc } from './netIpc';
 import { registerSshIpc } from './sshIpc';
 import { registerSkillsIpc } from './skillsIpc';
@@ -60,7 +59,6 @@ export function registerAllIpc() {
   registerAccountIpc();
   registerGitIpc();
   registerHostPreviewIpc();
-  registerBrowserIpc();
   registerNetIpc();
   // Existing modules
   registerPtyIpc();

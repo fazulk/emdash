@@ -23,9 +23,7 @@ export function createMainWindow(): BrowserWindow {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // Allow using <webview> in renderer for in‑app browser pane.
-      // The webview runs in a separate process; nodeIntegration remains disabled.
-      webviewTag: true,
+      webviewTag: false,
       // __dirname here resolves to dist/main/main/app at runtime (dev)
       // Preload is emitted to dist/main/main/preload.js
       preload: join(__dirname, '..', 'preload.js'),

@@ -9,7 +9,6 @@ import { useTaskManagementContext } from '../contexts/TaskManagementContext';
 export interface AppKeyboardShortcutsProps {
   showCommandPalette: boolean;
   showSettings: boolean;
-  showBrowser: boolean;
   showDiffViewer: boolean;
   showEditor: boolean;
   showKanban: boolean;
@@ -17,7 +16,6 @@ export interface AppKeyboardShortcutsProps {
   handleOpenSettings: () => void;
   handleCloseCommandPalette: () => void;
   handleCloseSettings: () => void;
-  handleCloseBrowser: () => void;
   handleCloseDiffViewer: () => void;
   handleCloseEditor: () => void;
   handleCloseKanban: () => void;
@@ -30,7 +28,6 @@ export interface AppKeyboardShortcutsProps {
 const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
   showCommandPalette,
   showSettings,
-  showBrowser,
   showDiffViewer,
   showEditor,
   showKanban,
@@ -38,7 +35,6 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
   handleOpenSettings,
   handleCloseCommandPalette,
   handleCloseSettings,
-  handleCloseBrowser,
   handleCloseDiffViewer,
   handleCloseEditor,
   handleCloseKanban,
@@ -93,7 +89,6 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
       [
         [showCommandPalette, handleCloseCommandPalette],
         [showSettings, handleCloseSettings],
-        [showBrowser, handleCloseBrowser],
         [showDiffViewer, handleCloseDiffViewer],
         [showEditor, handleCloseEditor],
         [showKanban, handleCloseKanban],
@@ -101,7 +96,6 @@ const AppKeyboardShortcuts: React.FC<AppKeyboardShortcutsProps> = ({
     ).find(([open]) => open)?.[1],
     isCommandPaletteOpen: showCommandPalette,
     isSettingsOpen: showSettings,
-    isBrowserOpen: showBrowser,
     isDiffViewerOpen: showDiffViewer,
     isEditorOpen: showEditor,
     isKanbanOpen: showKanban,

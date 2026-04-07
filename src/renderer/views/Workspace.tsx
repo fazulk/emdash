@@ -1,5 +1,4 @@
 import AppKeyboardShortcuts from '@/components/AppKeyboardShortcuts';
-import BrowserPane from '@/components/BrowserPane';
 import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
 import { DiffViewer } from '@/components/diff-viewer';
 import { TaskScopeProvider } from '@/components/TaskScopeContext';
@@ -46,7 +45,6 @@ import { activityStore } from '@/lib/activityStore';
 import { agentStatusStore } from '@/lib/agentStatusStore';
 import { handleMenuUndo, handleMenuRedo } from '@/lib/menuUndoRedo';
 import { soundPlayer } from '@/lib/soundPlayer';
-import BrowserProvider, { useBrowser } from '@/providers/BrowserProvider';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { SettingsPageTab } from '@/components/SettingsPage';
 const PANEL_RESIZE_DRAGGING_EVENT = 'emdash:panel-resize-dragging';
@@ -72,19 +70,6 @@ const RightSidebarBridge: React.FC<{
   return null;
 };
 
-/** Bridge that reads BrowserProvider context and forwards it to AppKeyboardShortcuts */
-const BrowserAwareShortcuts: React.FC<
-  Omit<React.ComponentProps<typeof AppKeyboardShortcuts>, 'showBrowser' | 'handleCloseBrowser'>
-> = (props) => {
-  const browser = useBrowser();
-  return (
-    <AppKeyboardShortcuts
-      {...props}
-      showBrowser={browser.isOpen}
-      handleCloseBrowser={browser.close}
-    />
-  );
-};
 
 export function Workspace() {
   const automationsEnabled = useFeatureFlag('automations');
@@ -399,7 +384,6 @@ export function Workspace() {
   }, [showSettingsPage, handleCloseSettingsPage, openSettingsPage]);
 
   return (
-    <BrowserProvider>
       <div
         className="flex h-[100dvh] w-full flex-col bg-background text-foreground"
         style={{ '--tb': TITLEBAR_HEIGHT } as React.CSSProperties}
@@ -407,7 +391,7 @@ export function Workspace() {
         <KeyboardSettingsProvider>
           <SidebarProvider>
             <RightSidebarProvider>
-              <BrowserAwareShortcuts
+              <AppKeyboardShortcuts
                 showCommandPalette={showCommandPalette}
                 showSettings={showSettingsPage}
                 showDiffViewer={showDiffViewer}
@@ -568,15 +552,9 @@ export function Workspace() {
 
               <ModalRenderer />
               <Toaster />
-              <BrowserPane
-                taskId={activeTask?.id || null}
-                taskPath={activeTask?.path || null}
-                overlayActive={showSettingsPage || showCommandPalette}
-              />
             </RightSidebarProvider>
           </SidebarProvider>
         </KeyboardSettingsProvider>
       </div>
-    </BrowserProvider>
   );
 }

@@ -65,7 +65,6 @@ function renderShortcuts() {
     <AppKeyboardShortcuts
       showCommandPalette={false}
       showSettings={false}
-      showBrowser={false}
       showDiffViewer={false}
       showEditor={false}
       showKanban={false}
@@ -73,7 +72,6 @@ function renderShortcuts() {
       handleOpenSettings={vi.fn()}
       handleCloseCommandPalette={vi.fn()}
       handleCloseSettings={vi.fn()}
-      handleCloseBrowser={vi.fn()}
       handleCloseDiffViewer={vi.fn()}
       handleCloseEditor={vi.fn()}
       handleCloseKanban={vi.fn()}
@@ -146,7 +144,6 @@ describe('AppKeyboardShortcuts', () => {
       <AppKeyboardShortcuts
         showCommandPalette={false}
         showSettings={false}
-        showBrowser={false}
         showDiffViewer={false}
         showEditor={false}
         showKanban={false}
@@ -154,7 +151,6 @@ describe('AppKeyboardShortcuts', () => {
         handleOpenSettings={vi.fn()}
         handleCloseCommandPalette={vi.fn()}
         handleCloseSettings={vi.fn()}
-        handleCloseBrowser={vi.fn()}
         handleCloseDiffViewer={vi.fn()}
         handleCloseEditor={vi.fn()}
         handleCloseKanban={vi.fn()}

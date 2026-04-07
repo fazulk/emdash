@@ -696,26 +696,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener(channel, wrapped);
   },
 
-  // Main-managed browser (WebContentsView)
-  browserShow: (bounds: { x: number; y: number; width: number; height: number }, url?: string) =>
-    ipcRenderer.invoke('browser:view:show', { ...bounds, url }),
-  browserHide: () => ipcRenderer.invoke('browser:view:hide'),
-  browserSetBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
-    ipcRenderer.invoke('browser:view:setBounds', bounds),
-  browserLoadURL: (url: string, forceReload?: boolean) =>
-    ipcRenderer.invoke('browser:view:loadURL', url, forceReload),
-  browserGoBack: () => ipcRenderer.invoke('browser:view:goBack'),
-  browserGoForward: () => ipcRenderer.invoke('browser:view:goForward'),
-  browserReload: () => ipcRenderer.invoke('browser:view:reload'),
-  browserOpenDevTools: () => ipcRenderer.invoke('browser:view:openDevTools'),
-  browserClear: () => ipcRenderer.invoke('browser:view:clear'),
-  onBrowserViewEvent: (listener: (data: any) => void) => {
-    const channel = 'browser:view:event';
-    const wrapped = (_: Electron.IpcRendererEvent, data: any) => listener(data);
-    ipcRenderer.on(channel, wrapped);
-    return () => ipcRenderer.removeListener(channel, wrapped);
-  },
-
   // Lightweight TCP probe for localhost ports to avoid noisy fetches
   netProbePorts: (host: string, ports: number[], timeoutMs?: number) =>
     ipcRenderer.invoke('net:probePorts', host, ports, timeoutMs),
@@ -1439,25 +1419,6 @@ export interface ElectronAPI {
   onHostPreviewEvent: (
     listener: (data: { type: 'url'; taskId: string; url: string }) => void
   ) => () => void;
-
-  // Main-managed browser (WebContentsView)
-  browserShow: (
-    bounds: { x: number; y: number; width: number; height: number },
-    url?: string
-  ) => Promise<{ ok: boolean }>;
-  browserHide: () => Promise<{ ok: boolean }>;
-  browserSetBounds: (bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }) => Promise<{ ok: boolean }>;
-  browserLoadURL: (url: string) => Promise<{ ok: boolean }>;
-  browserGoBack: () => Promise<{ ok: boolean }>;
-  browserGoForward: () => Promise<{ ok: boolean }>;
-  browserReload: () => Promise<{ ok: boolean }>;
-  browserOpenDevTools: () => Promise<{ ok: boolean }>;
-  onBrowserViewEvent: (listener: (data: any) => void) => () => void;
 
   // TCP probe (no HTTP requests)
   netProbePorts: (

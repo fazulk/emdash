@@ -560,7 +560,6 @@ export function useKeyboardShortcuts(handlers: GlobalShortcutHandlers) {
         const hasClosableView = Boolean(
           handlers.isCommandPaletteOpen ||
             handlers.isSettingsOpen ||
-            handlers.isBrowserOpen ||
             handlers.isDiffViewerOpen ||
             handlers.isEditorOpen ||
             handlers.isKanbanOpen

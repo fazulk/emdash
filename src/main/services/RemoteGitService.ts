@@ -734,6 +734,65 @@ export class RemoteGitService {
     }
   }
 
+  async switchBranch(
+    connectionId: string,
+    worktreePath: string,
+    args: { branchRef: string; remote?: string; branchName?: string }
+  ): Promise<{ branch: string; previousBranch: string }> {
+    const cwd = this.normalizeRemotePath(worktreePath);
+    const branchRef = (args.branchRef || '').trim();
+    const remote = (args.remote || '').trim();
+    const branchName = (args.branchName || '').trim();
+    if (!branchRef) {
+      throw new Error('Branch ref is required');
+    }
+
+    const previousBranch = await this.getCurrentBranch(connectionId, worktreePath);
+    const targetBranch = remote && branchName ? branchName : branchRef;
+    if (previousBranch && targetBranch === previousBranch) {
+      return { branch: previousBranch, previousBranch };
+    }
+
+    const run = async (command: string): Promise<ExecResult> =>
+      this.sshService.executeCommand(connectionId, command, cwd);
+
+    if (remote && branchName) {
+      const localExists = await run(
+        `git show-ref --verify --quiet refs/heads/${quoteShellArg(branchName)}`
+      );
+      const command =
+        localExists.exitCode === 0
+          ? `git switch ${quoteShellArg(branchName)}`
+          : `git switch --track -c ${quoteShellArg(branchName)} ${quoteShellArg(branchRef)}`;
+      let result = await run(command);
+      if (result.exitCode !== 0) {
+        const fallbackCommand =
+          localExists.exitCode === 0
+            ? `git checkout ${quoteShellArg(branchName)}`
+            : `git checkout --track -b ${quoteShellArg(branchName)} ${quoteShellArg(branchRef)}`;
+        result = await run(fallbackCommand);
+      }
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed to switch branch: ${result.stderr || result.stdout || branchRef}`);
+      }
+    } else {
+      let result = await run(`git switch ${quoteShellArg(branchRef)}`);
+      if (result.exitCode !== 0) {
+        result = await run(`git checkout ${quoteShellArg(branchRef)}`);
+      }
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed to switch branch: ${result.stderr || result.stdout || branchRef}`);
+      }
+    }
+
+    const branch = await this.getCurrentBranch(connectionId, worktreePath);
+    if (!branch) {
+      throw new Error('Failed to determine current branch after switch');
+    }
+
+    return { branch, previousBranch };
+  }
+
   async push(
     connectionId: string,
     worktreePath: string,

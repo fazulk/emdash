@@ -640,6 +640,23 @@ declare global {
         aheadOfDefault?: number;
         error?: string;
       }>;
+      listTaskBranches: (args: { taskPath: string; taskId?: string; remote?: string }) => Promise<{
+        success: boolean;
+        branches?: Array<{ ref: string; remote: string; branch: string; label: string }>;
+        error?: string;
+      }>;
+      switchTaskBranch: (args: {
+        taskPath: string;
+        taskId?: string;
+        branchRef: string;
+        remote?: string;
+        branchName?: string;
+      }) => Promise<{
+        success: boolean;
+        branch?: string;
+        previousBranch?: string;
+        error?: string;
+      }>;
       renameBranch: (args: { repoPath: string; oldBranch: string; newBranch: string }) => Promise<{
         success: boolean;
         remotePushed?: boolean;
@@ -1734,6 +1751,23 @@ export interface ElectronAPI {
     aheadCount?: number;
     behindCount?: number;
     path?: string;
+    error?: string;
+  }>;
+  listTaskBranches: (args: { taskPath: string; taskId?: string; remote?: string }) => Promise<{
+    success: boolean;
+    branches?: Array<{ ref: string; remote: string; branch: string; label: string }>;
+    error?: string;
+  }>;
+  switchTaskBranch: (args: {
+    taskPath: string;
+    taskId?: string;
+    branchRef: string;
+    remote?: string;
+    branchName?: string;
+  }) => Promise<{
+    success: boolean;
+    branch?: string;
+    previousBranch?: string;
     error?: string;
   }>;
   listRemoteBranches: (args: { projectPath: string; remote?: string }) => Promise<{

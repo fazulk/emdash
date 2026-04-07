@@ -13,3 +13,4 @@ If the shortcut defaults changed from a previously shipped value, also consider 
 Relevant tests:
 - `src/test/main/settings.test.ts`
 - `src/test/renderer/useKeyboardShortcuts.test.ts`
+This project uses beads for issue tracking.

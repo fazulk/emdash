@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from './ui/badge';
+import BranchSelect, { type BranchOption } from './BranchSelect';
 import { Button, ButtonContentWithSpinner } from './ui/button';
 import { Input } from './ui/input';
 import { Spinner } from './ui/spinner';
@@ -32,6 +33,7 @@ import {
   XCircle,
   Check,
   Copy,
+  GitBranch,
 } from '@/components/icons/lucide';
 import {
   AlertDialog,
@@ -50,7 +52,9 @@ import { formatDiffCount } from '../lib/gitChangePresentation';
 
 type ActiveTab = 'changes' | 'checks';
 type PrMode = 'create' | 'draft';
+type TaskBranchOption = BranchOption & { branch: string; remote: string };
 
+const TASK_BRANCH_CHANGED_EVENT = 'emdash:task-branch-changed';
 const PR_MODE_LABELS: Record<PrMode, string> = {
   create: 'Create PR',
   draft: 'Draft PR',
@@ -280,6 +284,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
   const [branchName, setBranchName] = useState<string | null>(null);
   const [branchAhead, setBranchAhead] = useState<number | null>(null);
   const [branchStatusLoading, setBranchStatusLoading] = useState<boolean>(false);
+  const [taskBranchOptions, setTaskBranchOptions] = useState<TaskBranchOption[]>([]);
+  const [isLoadingTaskBranchOptions, setIsLoadingTaskBranchOptions] = useState(false);
+  const [isSwitchingTaskBranch, setIsSwitchingTaskBranch] = useState(false);
 
   // Reset action loading states when task changes
   useEffect(() => {
@@ -290,6 +297,9 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     setRestoreTarget(null);
     setIsStagingAll(false);
     setBranchName(null);
+    setTaskBranchOptions([]);
+    setIsLoadingTaskBranchOptions(false);
+    setIsSwitchingTaskBranch(false);
   }, [resolvedTaskPath]);
 
   // Default to checks when PR exists but no changes; reset when PR disappears
@@ -445,6 +455,122 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
     [resolvedTaskId]
   );
 
+  const canSwitchTaskBranch =
+    !!safeTaskPath &&
+    typeof window.electronAPI?.listTaskBranches === 'function' &&
+    typeof window.electronAPI?.switchTaskBranch === 'function';
+
+  const loadTaskBranches = useCallback(async () => {
+    if (!canSwitchTaskBranch) return;
+    setIsLoadingTaskBranchOptions(true);
+    try {
+      const result = await window.electronAPI.listTaskBranches({
+        taskPath: safeTaskPath,
+        taskId: resolvedTaskId,
+      });
+      if (taskPathRef.current !== safeTaskPath) return;
+      if (result?.success && Array.isArray(result.branches)) {
+        setTaskBranchOptions(
+          result.branches.map((branch) => ({
+            value: branch.ref,
+            label: branch.label,
+            branch: branch.branch,
+            remote: branch.remote,
+          }))
+        );
+      }
+    } catch {
+      // Ignore branch list loading failures until the user tries to switch.
+    } finally {
+      if (taskPathRef.current === safeTaskPath) {
+        setIsLoadingTaskBranchOptions(false);
+      }
+    }
+  }, [canSwitchTaskBranch, resolvedTaskId, safeTaskPath]);
+
+  const displayedTaskBranchOptions = useMemo<BranchOption[]>(() => {
+    const options = taskBranchOptions.map(({ value, label }) => ({ value, label }));
+    const currentBranch = branchName?.trim();
+    if (currentBranch && !options.some((option) => option.value === currentBranch)) {
+      options.unshift({ value: currentBranch, label: currentBranch });
+    }
+    return options;
+  }, [branchName, taskBranchOptions]);
+
+  const handleTaskBranchChange = useCallback(
+    async (nextValue: string) => {
+      if (!canSwitchTaskBranch || isLocked) return;
+      const selectedOption = taskBranchOptions.find((option) => option.value === nextValue);
+      const nextBranchName = selectedOption?.branch || nextValue;
+      if (!nextBranchName || nextBranchName === branchName) {
+        return;
+      }
+
+      setIsSwitchingTaskBranch(true);
+      try {
+        const result = await window.electronAPI.switchTaskBranch({
+          taskPath: safeTaskPath,
+          taskId: resolvedTaskId,
+          branchRef: nextValue,
+          remote: selectedOption?.remote || undefined,
+          branchName: selectedOption?.branch || undefined,
+        });
+        if (!result?.success) {
+          throw new Error(result?.error || 'Failed to switch branch');
+        }
+
+        const switchedBranch = result.branch?.trim() || nextBranchName;
+        setBranchName(switchedBranch);
+        window.dispatchEvent(
+          new CustomEvent(TASK_BRANCH_CHANGED_EVENT, {
+            detail: {
+              taskId: resolvedTaskId,
+              taskPath: safeTaskPath,
+              branch: switchedBranch,
+            },
+          })
+        );
+
+        toast({
+          title: 'Branch switched',
+          description: result.previousBranch
+            ? `${result.previousBranch} → ${switchedBranch}`
+            : switchedBranch,
+        });
+
+        await Promise.allSettled([
+          refreshChanges(),
+          refreshBranchStatus(safeTaskPath),
+          Promise.resolve(refreshPr()),
+          loadTaskBranches(),
+        ]);
+      } catch (error) {
+        toast({
+          title: 'Failed to switch branch',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        });
+      } finally {
+        if (taskPathRef.current === safeTaskPath) {
+          setIsSwitchingTaskBranch(false);
+        }
+      }
+    },
+    [
+      branchName,
+      canSwitchTaskBranch,
+      isLocked,
+      loadTaskBranches,
+      refreshBranchStatus,
+      refreshChanges,
+      refreshPr,
+      resolvedTaskId,
+      safeTaskPath,
+      taskBranchOptions,
+      toast,
+    ]
+  );
+
   useEffect(() => {
     if (!safeTaskPath || !window.electronAPI.onGitStatusChanged) return;
     return window.electronAPI.onGitStatusChanged((event) => {
@@ -454,6 +580,42 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
       void Promise.resolve(refreshPr()).catch(() => {});
     });
   }, [safeTaskPath, refreshChanges, refreshBranchStatus, refreshPr]);
+
+  const renderBranchControl = () => {
+    if (!branchName) return null;
+
+    if (!canSwitchTaskBranch) {
+      return (
+        <span
+          className="max-w-[180px] shrink-0 truncate rounded bg-muted-foreground/10 px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground"
+          title={branchName}
+        >
+          {branchName}
+        </span>
+      );
+    }
+
+    return (
+      <div className="w-[220px] max-w-[45vw] min-w-[140px] shrink-0">
+        <BranchSelect
+          value={branchName}
+          onValueChange={(value) => {
+            void handleTaskBranchChange(value);
+          }}
+          options={displayedTaskBranchOptions}
+          disabled={isLocked || isSwitchingTaskBranch}
+          isLoading={isLoadingTaskBranchOptions}
+          placeholder={branchName}
+          onOpenChange={(open) => {
+            if (open && !isLoadingTaskBranchOptions) {
+              void loadTaskBranches();
+            }
+          }}
+          icon={<GitBranch className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        />
+      </div>
+    );
+  };
 
   const handleCommit = async (action: 'commit' | 'commitAndPush') => {
     const trimmedMessage = commitMessage.trim();
@@ -745,14 +907,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                     -{formatDiffCount(totalChanges.deletions)}
                   </span>
                 </div>
-                {branchName && (
-                  <span
-                    className="max-w-[180px] shrink-0 truncate rounded bg-muted-foreground/10 px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground"
-                    title={branchName}
-                  >
-                    {branchName}
-                  </span>
-                )}
+                {renderBranchControl()}
                 {hasStagedChanges && (
                   <span className="shrink-0 rounded bg-muted-foreground/10 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                     {stagedCount} staged
@@ -935,14 +1090,7 @@ const FileChangesPanelComponent: React.FC<FileChangesPanelProps> = ({
                   <span className="text-muted-foreground">&middot;</span>
                   <span className="font-medium text-red-600 dark:text-red-400">&mdash;</span>
                 </div>
-                {branchName && (
-                  <span
-                    className="max-w-[180px] shrink-0 truncate rounded bg-muted-foreground/10 px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground"
-                    title={branchName}
-                  >
-                    {branchName}
-                  </span>
-                )}
+                {renderBranchControl()}
               </div>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {onOpenChanges && (

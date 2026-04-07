@@ -69,3 +69,5 @@ worktrees/
 
 .env
 .cursor
+# bd worktree
+burp/

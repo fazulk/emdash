@@ -722,6 +722,141 @@ export function registerGitIpc() {
     return `'${arg.replace(/'/g, "'\\''")}'`;
   }
 
+  async function persistTaskBranchChange(
+    taskPath: string,
+    nextBranch: string,
+    taskId?: string
+  ): Promise<void> {
+    const normalizedBranch = (nextBranch || '').trim();
+    if (!normalizedBranch) return;
+
+    const task = taskId
+      ? await databaseService.getTaskById(taskId)
+      : await databaseService.getTaskByPath(taskPath);
+    if (!task) return;
+
+    let didChangeTask = false;
+    let updatedTask = task;
+
+    if (updatedTask.path === taskPath && updatedTask.branch !== normalizedBranch) {
+      updatedTask = { ...updatedTask, branch: normalizedBranch };
+      didChangeTask = true;
+    }
+
+    const variants = updatedTask.metadata?.multiAgent?.variants;
+    if (Array.isArray(variants) && variants.length > 0) {
+      let variantsChanged = false;
+      const nextVariants = variants.map((variant) => {
+        if (variant?.path !== taskPath || variant.branch === normalizedBranch) {
+          return variant;
+        }
+        variantsChanged = true;
+        return { ...variant, branch: normalizedBranch };
+      });
+      if (variantsChanged) {
+        updatedTask = {
+          ...updatedTask,
+          metadata: {
+            ...updatedTask.metadata,
+            multiAgent: updatedTask.metadata?.multiAgent
+              ? {
+                  ...updatedTask.metadata.multiAgent,
+                  variants: nextVariants,
+                }
+              : updatedTask.metadata?.multiAgent,
+          },
+        };
+        didChangeTask = true;
+      }
+    }
+
+    if (didChangeTask) {
+      await databaseService.saveTask(updatedTask);
+    }
+
+    if (updatedTask.path === taskPath) {
+      const project = await databaseService.getProjectById(updatedTask.projectId);
+      if (project && project.path === taskPath && project.gitInfo?.branch !== normalizedBranch) {
+        await databaseService.saveProject({
+          ...project,
+          gitInfo: {
+            ...project.gitInfo,
+            branch: normalizedBranch,
+          },
+        });
+      }
+    }
+  }
+
+  async function switchLocalBranch(
+    taskPath: string,
+    args: { branchRef: string; remote?: string; branchName?: string }
+  ): Promise<{ branch: string; previousBranch: string }> {
+    const branchRef = (args.branchRef || '').trim();
+    const remote = (args.remote || '').trim();
+    const branchName = (args.branchName || '').trim();
+    if (!branchRef) {
+      throw new Error('Branch ref is required');
+    }
+
+    await execFileAsync(GIT, ['rev-parse', '--is-inside-work-tree'], { cwd: taskPath });
+
+    const { stdout: currentOut } = await execFileAsync(GIT, ['branch', '--show-current'], {
+      cwd: taskPath,
+    });
+    const previousBranch = (currentOut || '').trim();
+    const targetBranch = remote && branchName ? branchName : branchRef;
+    if (previousBranch && previousBranch === targetBranch) {
+      return { branch: previousBranch, previousBranch };
+    }
+
+    if (remote && branchName) {
+      let hasLocalBranch = false;
+      try {
+        await execFileAsync(GIT, ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], {
+          cwd: taskPath,
+        });
+        hasLocalBranch = true;
+      } catch {
+        hasLocalBranch = false;
+      }
+
+      try {
+        if (hasLocalBranch) {
+          await execFileAsync(GIT, ['switch', branchName], { cwd: taskPath });
+        } else {
+          await execFileAsync(GIT, ['switch', '--track', '-c', branchName, branchRef], {
+            cwd: taskPath,
+          });
+        }
+      } catch {
+        if (hasLocalBranch) {
+          await execFileAsync(GIT, ['checkout', branchName], { cwd: taskPath });
+        } else {
+          await execFileAsync(GIT, ['checkout', '--track', '-b', branchName, branchRef], {
+            cwd: taskPath,
+          });
+        }
+      }
+    } else {
+      try {
+        await execFileAsync(GIT, ['switch', branchRef], { cwd: taskPath });
+      } catch {
+        await execFileAsync(GIT, ['checkout', branchRef], { cwd: taskPath });
+      }
+    }
+
+    const { stdout: branchOut } = await execFileAsync(GIT, ['branch', '--show-current'], {
+      cwd: taskPath,
+    });
+    const branch = (branchOut || '').trim();
+    if (!branch) {
+      throw new Error('Failed to determine current branch after switch');
+    }
+
+    return { branch, previousBranch };
+  }
+
   const moveWorkingChangesLocal = async (
     sourceTaskPath: string,
     targetTaskPath: string
@@ -2732,6 +2867,172 @@ export function registerGitIpc() {
       return { success: false, error: (e as { message?: string })?.message || String(e) };
     }
   });
+
+  ipcMain.handle(
+    'git:list-task-branches',
+    async (_, args: { taskPath: string; taskId?: string; remote?: string }) => {
+      const { taskPath, taskId, remote = 'origin' } = args || ({} as {
+        taskPath: string;
+        taskId?: string;
+        remote?: string;
+      });
+      if (!taskPath) {
+        return { success: false, error: 'taskPath is required' };
+      }
+
+      try {
+        const remoteContext = await resolveRemoteContext(taskPath, taskId);
+        if (remoteContext) {
+          const branches = await remoteGitService.listBranches(
+            remoteContext.connectionId,
+            remoteContext.remotePath,
+            remote
+          );
+          return { success: true, branches };
+        }
+
+        const remoteProject = await resolveRemoteProjectForWorktreePath(taskPath);
+        if (remoteProject) {
+          const branches = await remoteGitService.listBranches(
+            remoteProject.sshConnectionId,
+            taskPath,
+            remote
+          );
+          return { success: true, branches };
+        }
+
+        await execFileAsync(GIT, ['rev-parse', '--is-inside-work-tree'], { cwd: taskPath });
+
+        let hasRemote = false;
+        try {
+          await execFileAsync(GIT, ['remote', 'get-url', remote], { cwd: taskPath });
+          hasRemote = true;
+          try {
+            await execFileAsync(GIT, ['fetch', '--prune', remote], { cwd: taskPath });
+          } catch (fetchError) {
+            log.warn('Failed to fetch remote before listing task branches', fetchError);
+          }
+        } catch {
+          log.debug(`Remote '${remote}' not found for task branch listing`);
+        }
+
+        let branches: Array<{ ref: string; remote: string; branch: string; label: string }> = [];
+
+        if (hasRemote) {
+          const { stdout } = await execFileAsync(
+            GIT,
+            ['for-each-ref', '--format=%(refname:short)', `refs/remotes/${remote}`],
+            { cwd: taskPath }
+          );
+          branches =
+            stdout
+              ?.split('\n')
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0)
+              .filter((line) => !line.endsWith('/HEAD'))
+              .map((ref) => {
+                const [remoteAlias, ...rest] = ref.split('/');
+                const branch = rest.join('/') || ref;
+                return {
+                  ref,
+                  remote: remoteAlias || remote,
+                  branch,
+                  label: `${remoteAlias || remote}/${branch}`,
+                };
+              }) ?? [];
+
+          try {
+            const { stdout: localStdout } = await execFileAsync(
+              GIT,
+              ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'],
+              { cwd: taskPath }
+            );
+            const remoteBranchNames = new Set(branches.map((b) => b.branch));
+            const localOnlyBranches =
+              localStdout
+                ?.split('\n')
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0)
+                .filter((branch) => !remoteBranchNames.has(branch))
+                .map((branch) => ({ ref: branch, remote: '', branch, label: branch })) ?? [];
+            branches = [...branches, ...localOnlyBranches];
+          } catch (localBranchError) {
+            log.warn('Failed to list local task branches', localBranchError);
+          }
+        } else {
+          const { stdout } = await execFileAsync(
+            GIT,
+            ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'],
+            { cwd: taskPath }
+          );
+          branches =
+            stdout
+              ?.split('\n')
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0)
+              .map((branch) => ({ ref: branch, remote: '', branch, label: branch })) ?? [];
+        }
+
+        return { success: true, branches };
+      } catch (error) {
+        log.error('Failed to list task branches:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'git:switch-task-branch',
+    async (
+      _,
+      args: {
+        taskPath: string;
+        taskId?: string;
+        branchRef: string;
+        remote?: string;
+        branchName?: string;
+      }
+    ) => {
+      const { taskPath, taskId, branchRef, remote, branchName } = args || ({} as {
+        taskPath: string;
+        taskId?: string;
+        branchRef: string;
+        remote?: string;
+        branchName?: string;
+      });
+      if (!taskPath) {
+        return { success: false, error: 'taskPath is required' };
+      }
+      if (!branchRef?.trim()) {
+        return { success: false, error: 'branchRef is required' };
+      }
+
+      try {
+        const remoteContext = await resolveRemoteContext(taskPath, taskId);
+        const result = remoteContext
+          ? await remoteGitService.switchBranch(remoteContext.connectionId, remoteContext.remotePath, {
+              branchRef,
+              remote,
+              branchName,
+            })
+          : await switchLocalBranch(taskPath, { branchRef, remote, branchName });
+
+        await persistTaskBranchChange(taskPath, result.branch, taskId);
+        broadcastGitStatusChange(taskPath);
+        return { success: true, branch: result.branch, previousBranch: result.previousBranch };
+      } catch (error) {
+        log.error('Failed to switch task branch:', {
+          taskPath,
+          taskId,
+          branchRef,
+          remote,
+          branchName,
+          error,
+        });
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
+  );
 
   // Git: Rename branch (local and optionally remote)
   ipcMain.handle(

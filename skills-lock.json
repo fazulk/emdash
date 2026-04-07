@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "beads": {
+      "source": "boshu2/agentops",
+      "sourceType": "github",
+      "computedHash": "7735258e387367be88c1a793465b9cc1406a4150af3079e797c03c270fa51f77"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",

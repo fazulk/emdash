@@ -472,6 +472,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:get-pr-comments', args),
   getBranchStatus: (args: { taskPath: string; taskId?: string }) =>
     ipcRenderer.invoke('git:get-branch-status', args),
+  listTaskBranches: (args: { taskPath: string; taskId?: string; remote?: string }) =>
+    ipcRenderer.invoke('git:list-task-branches', args),
+  switchTaskBranch: (args: {
+    taskPath: string;
+    taskId?: string;
+    branchRef: string;
+    remote?: string;
+    branchName?: string;
+  }) => ipcRenderer.invoke('git:switch-task-branch', args),
   renameBranch: (args: { repoPath: string; oldBranch: string; newBranch: string }) =>
     ipcRenderer.invoke('git:rename-branch', args),
   listRemoteBranches: (args: { projectPath: string; remote?: string }) =>

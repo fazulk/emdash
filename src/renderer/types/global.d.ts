@@ -332,6 +332,23 @@ declare global {
         movedChanges?: boolean;
         error?: string;
       }>;
+      listTaskBranches: (args: { taskPath: string; taskId?: string; remote?: string }) => Promise<{
+        success: boolean;
+        branches?: Array<{ ref: string; remote: string; branch: string; label: string }>;
+        error?: string;
+      }>;
+      switchTaskBranch: (args: {
+        taskPath: string;
+        taskId?: string;
+        branchRef: string;
+        remote?: string;
+        branchName?: string;
+      }) => Promise<{
+        success: boolean;
+        branch?: string;
+        previousBranch?: string;
+        error?: string;
+      }>;
       listRemoteBranches: (args: { projectPath: string; remote?: string }) => Promise<{
         success: boolean;
         branches?: Array<{ ref: string; remote: string; branch: string; label: string }>;

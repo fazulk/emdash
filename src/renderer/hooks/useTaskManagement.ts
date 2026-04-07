@@ -34,7 +34,9 @@ import {
 } from '../lib/lifecycleTerminals';
 
 const LIFECYCLE_TEARDOWN_TIMEOUT_MS = 15000;
+const TASK_BRANCH_CHANGED_EVENT = 'emdash:task-branch-changed';
 type LifecycleTarget = { taskId: string; taskPath: string; label: string };
+type TaskBranchChangedDetail = { taskId?: string; taskPath: string; branch: string };
 
 const getLifecycleTaskIds = (task: Task): string[] => {
   const ids = new Set<string>([task.id]);
@@ -337,6 +339,66 @@ export function useTaskManagement() {
     },
     [navigate, updateTaskCache]
   );
+
+  useEffect(() => {
+    const handleTaskBranchChanged = (event: Event) => {
+      const detail = (event as CustomEvent<TaskBranchChangedDetail>).detail;
+      const nextBranch = detail?.branch?.trim();
+      const taskPath = detail?.taskPath?.trim();
+      if (!nextBranch || !taskPath) return;
+
+      for (const project of projects) {
+        updateTaskCache(project.id, (old) =>
+          old.map((task) => {
+            let changed = false;
+            let nextTask = task;
+
+            if (task.path === taskPath && task.branch !== nextBranch) {
+              nextTask = { ...nextTask, branch: nextBranch };
+              changed = true;
+            }
+
+            const variants = nextTask.metadata?.multiAgent?.variants;
+            if (Array.isArray(variants) && variants.length > 0) {
+              let variantsChanged = false;
+              const nextVariants = variants.map((variant) => {
+                if (variant?.path !== taskPath || variant.branch === nextBranch) {
+                  return variant;
+                }
+                variantsChanged = true;
+                return { ...variant, branch: nextBranch };
+              });
+              if (variantsChanged) {
+                nextTask = {
+                  ...nextTask,
+                  metadata: nextTask.metadata?.multiAgent
+                    ? {
+                        ...nextTask.metadata,
+                        multiAgent: {
+                          ...nextTask.metadata.multiAgent,
+                          variants: nextVariants,
+                        },
+                      }
+                    : nextTask.metadata,
+                };
+                changed = true;
+              }
+            }
+
+            return changed ? nextTask : task;
+          })
+        );
+      }
+    };
+
+    window.addEventListener(TASK_BRANCH_CHANGED_EVENT, handleTaskBranchChanged as EventListener);
+    return () => {
+      window.removeEventListener(
+        TASK_BRANCH_CHANGED_EVENT,
+        handleTaskBranchChanged as EventListener
+      );
+    };
+  }, [projects, updateTaskCache]);
 
   // ---------------------------------------------------------------------------
   // Lifecycle helpers

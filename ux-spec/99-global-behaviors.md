@@ -14,7 +14,7 @@ Configurable shortcuts appear in **Settings → Interface → Keyboard shortcuts
 | Settings | ⌘, | Ctrl+, | Opens/closes Settings overlay. |
 | Toggle left sidebar | Ctrl+M | Ctrl+M | Hidden when **Editor** covers sidebar. |
 | Toggle right sidebar | ⌘B | Ctrl+B | |
-| Toggle theme | ⌘⇧T | Ctrl+Shift+T | Cycles **light → dark navy → dark black** (per in-app description). |
+| Toggle theme | ⌘⇧T | Ctrl+Shift+T | Shortcut description: *Cycle through light, dark navy, and dark black themes*. Settings also exposes **Dark Gray** and **System** without this shortcut. |
 | Toggle Kanban | ⌘P | Ctrl+P | No-op if no project selected. |
 | Toggle Editor | ⌘E | Ctrl+E | |
 | Close modal / overlay | Esc | Esc | Closes **first open** of: Command palette, Settings, Git changes full view, Editor, Kanban — in that order. If a nested `role="dialog"` exists, Esc may be left to that dialog. |

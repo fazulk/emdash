@@ -7,10 +7,3 @@ The role of this file is to describe common mistakes and confusion points that a
 When changing keyboard shortcut defaults, update both:
 - `src/renderer/hooks/useKeyboardShortcuts.ts` for the renderer shortcut definitions
 - `src/main/settings.ts` for persisted default settings
-
-If the shortcut defaults changed from a previously shipped value, also consider adding a migration in `normalizeSettings()` in `src/main/settings.ts` so existing users with saved settings get updated.
-
-Relevant tests:
-- `src/test/main/settings.test.ts`
-- `src/test/renderer/useKeyboardShortcuts.test.ts`
-This project uses beads for issue tracking.
